@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import SocialShareBar from '../common/SocialShareBar';
 import { 
   Plus, 
   Trash2, 
@@ -87,6 +88,15 @@ export default function CompareView() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {comparedPhones.length > 0 && (
+            <SocialShareBar 
+              title={`Compare ${comparedPhones.map(p => p.name).join(' vs ')} - GsmScope`}
+              summary={`Full specifications comparison matrix on GsmScope.`}
+              layout="compact"
+              showLabel={true}
+            />
+          )}
+
           {/* Highlight diff toggle */}
           <button
             onClick={() => setHighlightDifferences(!highlightDifferences)}

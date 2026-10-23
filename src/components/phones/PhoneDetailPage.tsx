@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Phone } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { recordPhoneViewApi } from '../../services/api';
+import SocialShareBar from '../common/SocialShareBar';
 import { 
   ArrowLeft,
   Scale, 
@@ -173,16 +174,14 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Share */}
-          <button
-            onClick={handleShare}
-            className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-            title="Share device URL"
-          >
-            <Share2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>{copiedLink ? 'Link Copied!' : 'Share'}</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Social Sharing for Facebook, X, Reddit, WhatsApp, Telegram, and Copy */}
+          <SocialShareBar 
+            title={`${phone.brand} ${phone.name} Price in Nigeria & Full Specs`}
+            summary={`Check out ${phone.name} with ${phone.keyHighlights.processor}, ${phone.keyHighlights.camera}, ${phone.keyHighlights.battery}.`}
+            layout="inline"
+            showLabel={true}
+          />
 
           {/* Compare toggle */}
           <button
@@ -340,6 +339,13 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
           </div>
         </div>
       </section>
+
+      {/* Social Share Bar */}
+      <SocialShareBar 
+        layout="bar"
+        title={`${phone.brand} ${phone.name} Price in Nigeria & Full Specifications - GsmScope`}
+        summary={`${phone.keyHighlights.processor}, ${phone.keyHighlights.camera}, ${phone.keyHighlights.battery}.`}
+      />
 
       {/* 3. Main Content Columns: Specs Sheet (8 cols) + Sidebars (4 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -768,7 +774,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <h3 className="font-bold text-slate-900 dark:text-white text-sm font-['Space_Grotesk'] flex items-center gap-2">
                 <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Recent {phone.brand} Phones</span>
+                <span>Recent phones</span>
               </h3>
               <button
                 onClick={() => {
@@ -822,7 +828,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <h3 className="font-bold text-slate-900 dark:text-white text-sm font-['Space_Grotesk'] flex items-center gap-2">
                 <Flame className="w-4 h-4 text-amber-500" />
-                <span>Most Popular by Views</span>
+                <span>Most viewed</span>
               </h3>
               <span className="text-[10px] font-mono uppercase bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded font-semibold">
                 Trending
@@ -875,7 +881,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <h3 className="font-bold text-slate-900 dark:text-white text-sm font-['Space_Grotesk'] flex items-center gap-2">
                   <Scale className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>Direct Competitors</span>
+                  <span>Competitors</span>
                 </h3>
               </div>
 

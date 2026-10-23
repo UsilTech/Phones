@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Article, Phone } from '../../types';
 import { useApp } from '../../context/AppContext';
+import SocialShareBar from '../common/SocialShareBar';
 import { 
   ArrowLeft, 
   Share2, 
@@ -142,15 +143,14 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleShare}
-            className="px-3.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-            title="Share article URL"
-          >
-            <Share2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>{copied ? 'Link Copied!' : 'Share Article'}</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Social Sharing for Facebook, X, Reddit, WhatsApp, Telegram, and Copy */}
+          <SocialShareBar 
+            title={`${article.title} - GsmScope`}
+            summary={article.summary}
+            layout="inline"
+            showLabel={true}
+          />
         </div>
       </nav>
 
@@ -246,6 +246,13 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
               </p>
             </div>
           </div>
+
+          {/* Social Share Bar */}
+          <SocialShareBar 
+            layout="bar"
+            title={`${article.title} - GsmScope`}
+            summary={article.summary}
+          />
 
           {/* Discussion & User Comments Section */}
           <section className="pt-6 border-t border-slate-100 dark:border-slate-800 space-y-6">

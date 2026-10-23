@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import SocialShareBar from '../common/SocialShareBar';
 import { 
   BookOpen, 
   Clock, 
@@ -182,13 +183,12 @@ export default function GuidesView() {
               <span className="px-3 py-1 rounded-full text-xs font-mono font-semibold bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
                 {activeGuide.category}
               </span>
-              <button
-                onClick={handleShare}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Share2 className="w-3.5 h-3.5" />}
-                <span>{copiedLink ? 'Link copied!' : 'Share guide'}</span>
-              </button>
+              <SocialShareBar 
+                title={`${activeGuide.title} - GsmScope Guide`}
+                summary={activeGuide.summary}
+                layout="compact"
+                showLabel={true}
+              />
             </div>
 
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk'] tracking-tight leading-tight">
@@ -218,6 +218,13 @@ export default function GuidesView() {
               <p key={idx}>{p}</p>
             ))}
           </div>
+
+          {/* Social Share Bar */}
+          <SocialShareBar 
+            layout="bar"
+            title={`${activeGuide.title} - GsmScope Guide`}
+            summary={activeGuide.summary}
+          />
 
           {/* Back button */}
           <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">

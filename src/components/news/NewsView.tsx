@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { subscribeNewsletterApi } from '../../services/api';
+import SocialShareBar from '../common/SocialShareBar';
 import { 
   Clock, 
   ArrowRight, 
@@ -144,14 +145,25 @@ export default function NewsView() {
               </p>
             </div>
 
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
               <span className="text-slate-500 dark:text-slate-400 font-medium">
                 By {featuredArticle.author.name}
               </span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                <span>Read Full Story</span>
-                <ArrowRight className="w-4 h-4" />
-              </span>
+
+              <div className="flex items-center gap-3">
+                <div onClick={(e) => e.stopPropagation()}>
+                  <SocialShareBar 
+                    title={`${featuredArticle.title} - GsmScope`}
+                    summary={featuredArticle.summary}
+                    layout="compact"
+                    showLabel={false}
+                  />
+                </div>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                  <span>Read Story</span>
+                  <ArrowRight className="w-4 h-4" />
+                </span>
+              </div>
             </div>
           </div>
         </section>
@@ -205,12 +217,23 @@ export default function NewsView() {
                 </div>
 
                 {/* Footer with Author and CTA */}
-                <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                  <span className="truncate">{article.author.name}</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                    <span>Read Article</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
+                <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <span className="truncate max-w-[120px]">{article.author.name}</span>
+
+                  <div className="flex items-center gap-2">
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <SocialShareBar 
+                        title={`${article.title} - GsmScope`}
+                        summary={article.summary}
+                        layout="compact"
+                        showLabel={false}
+                      />
+                    </div>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                      <span>Read</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
                 </div>
               </article>
             ))}

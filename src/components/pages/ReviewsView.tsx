@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import SocialShareBar from '../common/SocialShareBar';
 import { Star, MessageSquare, MapPin, Plus, Check } from 'lucide-react';
 
 export default function ReviewsView() {
@@ -57,13 +58,21 @@ export default function ReviewsView() {
             Honest feedback from people who own and use these devices daily in Nigeria.
           </p>
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-md"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Write a Review</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <SocialShareBar 
+            title="User Reviews - Real Smartphone Experiences in Nigeria" 
+            summary="Read hands-on reviews and verdicts from Nigerian smartphone owners."
+            layout="compact"
+            showLabel={true}
+          />
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-md"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Write a Review</span>
+          </button>
+        </div>
       </div>
 
       {/* Review Submission Form Modal / Box */}
@@ -260,9 +269,17 @@ export default function ReviewsView() {
                   </div>
                 )}
 
-                <div className="pt-3 border-t border-slate-800 flex items-center gap-2 text-xs text-slate-400">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Verified Buyer: <strong>{leadRev.userName}</strong> ({leadRev.location})</span>
+                <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Verified Buyer: <strong>{leadRev.userName}</strong> ({leadRev.location})</span>
+                  </div>
+                  <SocialShareBar 
+                    title={`Review of ${leadRev.phoneName}: "${leadRev.title}" - GsmScope`}
+                    summary={leadRev.comment}
+                    layout="compact"
+                    showLabel={false}
+                  />
                 </div>
               </div>
             );
@@ -329,6 +346,16 @@ export default function ReviewsView() {
                 )}
               </div>
             )}
+
+            <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-xs">
+              <span className="text-[11px] text-slate-500">Verified community verdict</span>
+              <SocialShareBar 
+                title={`Review of ${rev.phoneName}: "${rev.title}" - GsmScope`}
+                summary={rev.comment}
+                layout="compact"
+                showLabel={false}
+              />
+            </div>
             </div>
           ))}
         </div>

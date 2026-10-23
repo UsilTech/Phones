@@ -22,6 +22,7 @@ import AdvertiseView from './components/pages/AdvertiseView';
 import AdminDashboardModal from './components/admin/AdminDashboardModal';
 import AdminLoginView from './components/admin/AdminLoginView';
 import JsonLdScript from './components/seo/JsonLdScript';
+import SocialShareBar from './components/common/SocialShareBar';
 import { 
   SlidersHorizontal,
   Scale,
@@ -298,15 +299,12 @@ function MainApp() {
               </div>
             </section>
 
-            {/* 3. Latest Reviews Section - One Big Grid Display + Rest Beneath It */}
+            {/* 3. Latest Reviews Section - Phone Review Posts (Editorial Hardware Reviews) */}
             <section className="space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
                 <div>
-                  <span className="text-[11px] font-mono font-semibold uppercase text-emerald-600 dark:text-emerald-400">
-                    Phone Reviews
-                  </span>
                   <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-['Space_Grotesk']">
-                    Latest reviews
+                    Latest Reviews
                   </h2>
                 </div>
                 <button
@@ -321,117 +319,159 @@ function MainApp() {
                 </button>
               </div>
 
-              {/* One Big Grid Display (Featured Lead Review) */}
-              {reviews.length > 0 && (
-                <div className="space-y-4">
-                  {(() => {
-                    const leadReview = reviews[0];
-                    return (
-                      <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border-2 border-emerald-500/40 space-y-4 shadow-lg hover:border-emerald-500 transition-all flex flex-col justify-between">
-                        <div>
-                          <div className="flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-2 gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono uppercase tracking-wider font-bold text-white bg-emerald-600 px-2 py-0.5 rounded">
-                                Featured Verdict
-                              </span>
-                              <span className="text-emerald-600 dark:text-emerald-400 font-mono font-bold text-sm">
-                                {leadReview.phoneName}
-                              </span>
-                            </div>
-                            <span className="font-mono text-xs">{leadReview.date}</span>
-                          </div>
+              {/* Phone Review Posts */}
+              {(() => {
+                const phoneReviewArticles = articles.filter(
+                  (a) => a.category.toLowerCase().includes('review') || a.title.toLowerCase().includes('review')
+                );
+                const displayReviewPosts = phoneReviewArticles.length > 0 ? phoneReviewArticles : articles.slice(0, 3);
+                const leadReview = displayReviewPosts[0];
+                const restReviews = displayReviewPosts.slice(1, 3);
 
-                          <div className="flex items-center gap-3 my-2">
-                            <div className="flex text-amber-400">
-                              {Array.from({ length: leadReview.rating }).map((_, i) => (
-                                <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                              ))}
-                            </div>
-                            <h3 className="font-extrabold text-slate-900 dark:text-white text-base sm:text-xl font-['Space_Grotesk']">
-                              &ldquo;{leadReview.title}&rdquo;
-                            </h3>
-                          </div>
+                if (!leadReview) return null;
+                const relatedPhone = phones.find(p => leadReview.relatedPhoneIds?.includes(p.id));
 
-                          <p className="text-sm sm:text-base text-slate-700 dark:text-slate-200 leading-relaxed pt-1">
-                            {leadReview.comment}
-                          </p>
-
-                          {/* Pros & Cons summary chips */}
-                          {(leadReview.pros.length > 0 || leadReview.cons.length > 0) && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 text-xs">
-                              {leadReview.pros.length > 0 && (
-                                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-500/20">
-                                  <span className="font-bold text-emerald-700 dark:text-emerald-300 block mb-1">PROS</span>
-                                  <span className="text-slate-600 dark:text-slate-300">{leadReview.pros.join(', ')}</span>
-                                </div>
-                              )}
-                              {leadReview.cons.length > 0 && (
-                                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-500/20">
-                                  <span className="font-bold text-rose-700 dark:text-rose-300 block mb-1">CONS</span>
-                                  <span className="text-slate-600 dark:text-slate-300">{leadReview.cons.join(', ')}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                          <span className="flex items-center gap-1.5 font-medium">
-                            <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                            {leadReview.userName} · {leadReview.location}
-                          </span>
-                          <button
-                            onClick={() => {
-                              setActiveTab('reviews');
-                              window.scrollTo({ top: 0, behavior: 'instant' });
-                            }}
-                            className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline flex items-center gap-1"
-                          >
-                            <span>Read all community reviews</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Rest Reviews Beneath It */}
-                  {reviews.length > 1 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                      {reviews.slice(1, 3).map((rev) => (
-                        <div key={rev.id} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 shadow-sm flex flex-col justify-between">
-                          <div>
-                            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
-                              <span className="text-emerald-600 dark:text-emerald-400 font-mono font-semibold">{rev.phoneName}</span>
-                              <span>{rev.date}</span>
-                            </div>
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="flex text-amber-400">
-                                {Array.from({ length: rev.rating }).map((_, i) => (
-                                  <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                                ))}
-                              </div>
-                              <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-                                &ldquo;{rev.title}&rdquo;
-                              </h4>
-                            </div>
-                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                              {rev.comment}
-                            </p>
-                          </div>
-
-                          <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                            <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                              {rev.userName} · {rev.location}
+                return (
+                  <div className="space-y-6">
+                    {/* One Big Grid Display (Featured Lead Phone Review Post) */}
+                    <div 
+                      onClick={() => {
+                        setSelectedArticle(leadReview);
+                        window.scrollTo({ top: 0, behavior: 'instant' });
+                      }}
+                      className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border-2 border-emerald-500/40 hover:border-emerald-500 space-y-6 shadow-xl transition-all cursor-pointer group"
+                    >
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                        <div className="lg:col-span-8 space-y-3">
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                            <span className="text-[11px] font-mono uppercase tracking-wider font-bold text-white bg-emerald-600 px-2.5 py-1 rounded-md">
+                              Phone Review
+                            </span>
+                            <span className="text-emerald-600 dark:text-emerald-400 font-mono font-semibold text-xs bg-emerald-50 dark:bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/30">
+                              {leadReview.category}
+                            </span>
+                            <span className="text-slate-400 font-mono text-xs">
+                              {leadReview.date} · {leadReview.readTime}
                             </span>
                           </div>
+
+                          <h3 className="font-extrabold text-slate-900 dark:text-white text-lg sm:text-2xl font-['Space_Grotesk'] leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                            {leadReview.title}
+                          </h3>
+
+                          <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3">
+                            {leadReview.summary}
+                          </p>
+
+                          {/* Related Phone Highlights if available */}
+                          {relatedPhone && (
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs flex flex-wrap items-center gap-x-4 gap-y-1.5 text-slate-600 dark:text-slate-400">
+                              <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <Smartphone className="w-3.5 h-3.5 text-emerald-500" />
+                                {relatedPhone.brand} {relatedPhone.name}
+                              </span>
+                              <span>Display: {relatedPhone.keyHighlights.display.split(' ')[0]}</span>
+                              <span>Battery: {relatedPhone.keyHighlights.battery}</span>
+                              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                {currency === 'USD' ? formatUSD(relatedPhone.priceUSD) : formatNaira(relatedPhone.priceNGN)}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="pt-2 flex flex-wrap items-center justify-between gap-3">
+                            <span className="text-xs text-slate-500 dark:text-slate-400">
+                              By <strong>{leadReview.author.name}</strong> ({leadReview.author.role})
+                            </span>
+                            
+                            {/* Social Share Bar */}
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <SocialShareBar 
+                                title={`${leadReview.title} - GsmScope Phone Review`}
+                                summary={leadReview.summary}
+                                layout="compact"
+                                showLabel={true}
+                              />
+                            </div>
+                          </div>
                         </div>
-                      ))}
+
+                        {/* Image Column */}
+                        <div className="lg:col-span-4 flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 h-52 sm:h-64 overflow-hidden">
+                          <img
+                            src={relatedPhone?.image || leadReview.coverImage}
+                            alt={leadReview.title}
+                            referrerPolicy="no-referrer"
+                            className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500 drop-shadow-md"
+                          />
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
-              )}
+
+                    {/* Rest Phone Review Posts Beneath It */}
+                    {restReviews.length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {restReviews.map((post) => {
+                          const postPhone = phones.find(p => post.relatedPhoneIds?.includes(p.id));
+                          return (
+                            <div
+                              key={post.id}
+                              onClick={() => {
+                                setSelectedArticle(post);
+                                window.scrollTo({ top: 0, behavior: 'instant' });
+                              }}
+                              className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm hover:border-emerald-500/60 transition-all flex flex-col justify-between cursor-pointer group"
+                            >
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-16 h-16 rounded-xl bg-slate-50 dark:bg-slate-950 p-1.5 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-800">
+                                    <img
+                                      src={postPhone?.image || post.coverImage}
+                                      alt={post.title}
+                                      referrerPolicy="no-referrer"
+                                      className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform"
+                                    />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                                      <span className="text-[10px] font-mono uppercase font-semibold text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-500/20">
+                                        Review
+                                      </span>
+                                      <span className="font-mono text-[11px]">{post.date}</span>
+                                    </div>
+                                    <h4 className="font-bold text-slate-900 dark:text-white text-sm line-clamp-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors font-['Space_Grotesk']">
+                                      {post.title}
+                                    </h4>
+                                  </div>
+                                </div>
+
+                                <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+                                  {post.summary}
+                                </p>
+                              </div>
+
+                              <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs gap-2">
+                                <span className="text-emerald-600 dark:text-emerald-400 font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                                  <span>Read review</span>
+                                  <ArrowRight className="w-3.5 h-3.5" />
+                                </span>
+
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <SocialShareBar 
+                                    title={`${post.title} - GsmScope Review`}
+                                    summary={post.summary}
+                                    layout="compact"
+                                    showLabel={false}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </section>
 
             {/* 4. Quick 2-Phone Comparison Banner ("Which phone is right for you?") */}

@@ -1121,6 +1121,60 @@ At ₦1,850,000 ($1,230), the Galaxy S24 Ultra is an investment for professional
     tags: ['Samsung', 'Galaxy S24 Ultra', 'Lagos Review', 'Flagship', 'Cameras'],
     featured: true,
     relatedPhoneIds: ['samsung-galaxy-s24-ultra']
+  },
+  {
+    id: 'art-iphone-16-pro-review',
+    title: 'iPhone 16 Pro Max in-depth review: titanium build & Lagos battery test',
+    slug: 'iphone-16-pro-max-in-depth-review-titanium-lagos-battery-test',
+    category: 'Reviews',
+    coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
+    summary: 'Testing the 48MP Fusion camera, dedicated Camera Control key, and true 2-day battery endurance under heavy Nigerian mobile network use.',
+    content: `The iPhone 16 Pro Max is Apple's largest and most capable handset to date. In Nigeria, where flagship pricing demands serious justification, we put the 16 Pro Max through four weeks of real-world use across Lagos, Abuja, and Port Harcourt.
+
+### The Camera Control Button
+The capacitive Camera Control button lets you launch the camera and adjust focal lengths without looking down at the screen. For street photography in Computer Village or recording 4K 120fps video at events, this tactile control provides an immediate speed advantage.
+
+### Battery Endurance Across Nigerian 5G
+Powered by the Apple A18 Pro 3nm silicon, battery life is benchmark-setting. Even with MTN 5G active and continuous hotspot sharing during power cuts, the 16 Pro Max reliably finishes a 16-hour workday with over 38% battery remaining.
+
+### Retail Availability & Warranty
+Available at verified authorized retailers in Nigeria with Redington and iStore official warranties.`,
+    author: {
+      name: 'Chidi Okafor',
+      role: 'Staff Hardware Editor'
+    },
+    date: '18 Feb 2026',
+    readTime: '7 min read',
+    tags: ['iPhone 16 Pro Max', 'Apple', 'Review', 'Lagos Tech', 'Flagship'],
+    featured: true,
+    relatedPhoneIds: ['apple-iphone-16-pro-max']
+  },
+  {
+    id: 'art-oneplus-12r-review',
+    title: 'OnePlus 12R review: the ultimate flagship killer under ₦850,000',
+    slug: 'oneplus-12r-review-ultimate-flagship-killer-nigeria',
+    category: 'Reviews',
+    coverImage: '/src/assets/images/news_mobile_processor_1792578846003.jpg',
+    summary: 'Massive 5500 mAh battery, blazing 100W SUPERVOOC charging, and Snapdragon 8 Gen 2 gaming performance tested in Lagos.',
+    content: `With flagship smartphones now routinely crossing the ₦1.8 million threshold, the OnePlus 12R arrives as a breath of fresh air for Nigerian performance enthusiasts.
+
+### 100W Charging vs Generator Life
+In Nigeria, fast charging isn't a luxury—it's an essential defense against rolling blackouts. The bundled 100W SUPERVOOC charger takes the 5500 mAh cell from 1% to 100% in exactly 26 minutes on generator or inverter power.
+
+### Display & Gaming
+The 6.78-inch 1.5K ProXDR 120Hz LTPO 4.0 display is breathtaking. Peak brightness easily punches through direct afternoon sunlight at 4500 nits peak, while PUBG and Call of Duty Mobile run at locked 90fps without thermal throttling.
+
+### The Verdict
+For anyone wanting near-flagship performance, class-leading battery life, and rapid charging without paying two million naira, the OnePlus 12R is our top mid-flagship recommendation for 2026.`,
+    author: {
+      name: 'Ada Nwosu',
+      role: 'Senior Hardware Reviewer'
+    },
+    date: '10 Feb 2026',
+    readTime: '6 min read',
+    tags: ['OnePlus 12R', 'Review', 'Battery Test', 'Flagship Killer', 'Performance'],
+    featured: true,
+    relatedPhoneIds: ['oneplus-12r']
   }
 ];
 
