@@ -87,9 +87,6 @@ export default function BestCategoriesSection() {
           <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight font-['Space_Grotesk']">
             Curated Buyer Guides &amp; Categories
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Hand-tested smartphone recommendations tailored specifically to budgets and priorities in Nigeria.
-          </p>
         </div>
         <button
           onClick={() => setActiveTab('phones')}

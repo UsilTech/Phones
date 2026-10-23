@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { subscribeNewsletterApi } from '../../services/api';
 import { 
   Clock, 
   ArrowRight, 
@@ -46,6 +47,7 @@ export default function NewsView() {
     e.preventDefault();
     if (newsletterEmail.trim()) {
       setNewsletterDone(true);
+      subscribeNewsletterApi(newsletterEmail.trim()).catch(console.warn);
       setTimeout(() => {
         setNewsletterDone(false);
         setNewsletterEmail('');

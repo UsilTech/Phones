@@ -57,7 +57,7 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
   const [commentSubmitted, setCommentSubmitted] = useState(false);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [article.id]);
 
   const handleShare = () => {

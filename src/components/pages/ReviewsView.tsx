@@ -204,9 +204,74 @@ export default function ReviewsView() {
         </form>
       )}
 
-      {/* Reviews List Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {approvedReviews.map((rev) => (
+      {/* Reviews List Grid - One Big Grid Display + Rest Beneath It */}
+      {approvedReviews.length > 0 && (
+        <div className="space-y-6">
+          {/* 1. ONE BIG Grid Display (Featured Lead Review) */}
+          {(() => {
+            const leadRev = approvedReviews[0];
+            return (
+              <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 border-2 border-emerald-500/40 shadow-xl space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono uppercase tracking-wider font-bold text-white bg-emerald-600 px-2 py-0.5 rounded">
+                      Featured Review
+                    </span>
+                    <span className="text-emerald-400 font-mono font-bold text-sm sm:text-base">
+                      {leadRev.phoneName}
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-400 font-mono">{leadRev.date}</span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex text-amber-400">
+                    {Array.from({ length: leadRev.rating }).map((_, i) => (
+                      <Star key={i} className="w-5 h-5 fill-amber-400 text-amber-400" />
+                    ))}
+                  </div>
+                  <h3 className="font-extrabold text-white text-lg sm:text-xl font-['Space_Grotesk']">
+                    &ldquo;{leadRev.title}&rdquo;
+                  </h3>
+                </div>
+
+                <p className="text-sm sm:text-base text-slate-200 leading-relaxed">
+                  {leadRev.comment}
+                </p>
+
+                {(leadRev.pros.length > 0 || leadRev.cons.length > 0) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">
+                    {leadRev.pros.length > 0 && (
+                      <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30">
+                        <span className="font-bold text-emerald-400 block mb-1">PROS</span>
+                        <ul className="list-disc list-inside text-slate-300 space-y-0.5">
+                          {leadRev.pros.map((p, i) => <li key={i}>{p}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                    {leadRev.cons.length > 0 && (
+                      <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30">
+                        <span className="font-bold text-rose-400 block mb-1">CONS</span>
+                        <ul className="list-disc list-inside text-slate-300 space-y-0.5">
+                          {leadRev.cons.map((c, i) => <li key={i}>{c}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="pt-3 border-t border-slate-800 flex items-center gap-2 text-xs text-slate-400">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Verified Buyer: <strong>{leadRev.userName}</strong> ({leadRev.location})</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 2. Rest Reviews Beneath It */}
+          {approvedReviews.length > 1 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+              {approvedReviews.slice(1).map((rev) => (
           <div key={rev.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -264,9 +329,12 @@ export default function ReviewsView() {
                 )}
               </div>
             )}
-          </div>
-        ))}
-      </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )}
     </div>
   );
 }

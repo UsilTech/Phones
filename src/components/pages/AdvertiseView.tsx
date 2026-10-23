@@ -14,6 +14,7 @@ import {
   ExternalLink 
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { submitContactInquiryApi } from '../../services/api';
 
 export default function AdvertiseView() {
   const { setActiveTab, formatNaira, formatUSD } = useApp();
@@ -27,6 +28,14 @@ export default function AdvertiseView() {
     e.preventDefault();
     if (partnerEmail && partnerBrand) {
       setSubmitted(true);
+      submitContactInquiryApi({
+        name: partnerBrand,
+        email: partnerEmail,
+        phone: partnerPhone,
+        subject: `Advertising Proposal: ${formatChosen}`,
+        message: `Brand/Retailer ${partnerBrand} requested advertising proposal for ${formatChosen}. Contact phone: ${partnerPhone || 'N/A'}`
+      }).catch(console.warn);
+
       setTimeout(() => {
         setSubmitted(false);
         setPartnerEmail('');

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Phone } from '../../types';
 import { useApp } from '../../context/AppContext';
+import { recordPhoneViewApi } from '../../services/api';
 import { 
   ArrowLeft,
   Scale, 
@@ -64,9 +65,10 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
   const [reviewCons, setReviewCons] = useState('');
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
-  // Scroll to top whenever phone changes
+  // Scroll to top and record persistent view count on backend whenever phone changes
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    recordPhoneViewApi(phone.id).catch(console.warn);
   }, [phone.id]);
 
   const inCompare = isInCompare(phone.id);

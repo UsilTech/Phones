@@ -44,9 +44,10 @@ export default function HeroSection() {
 
         {/* Slide Content */}
         {currentPhone && (
-          <div className="relative z-10 flex flex-col md:flex-row items-center gap-6 md:gap-8 justify-between flex-1">
-            <div className="space-y-4 flex-1">
-              <div className="flex items-center gap-2">
+          <div className="relative z-10 flex flex-col justify-between flex-1 space-y-4">
+            {/* Top Info Header */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
                 <span className="text-[11px] font-mono uppercase tracking-wider font-semibold text-emerald-400 bg-emerald-950/80 border border-emerald-500/30 px-2 py-0.5 rounded">
                   Featured phone
                 </span>
@@ -55,53 +56,53 @@ export default function HeroSection() {
                 </span>
               </div>
 
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-white font-['Space_Grotesk'] tracking-tight">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white font-['Space_Grotesk'] tracking-tight">
                 {currentPhone.name}
               </h1>
+            </div>
 
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-lg">
-                {currentPhone.nairaPriceNotes}
-              </p>
-
-              {/* Key Specs overview */}
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300 pt-1">
-                <span>{currentPhone.keyHighlights.display}</span>
-                <span aria-hidden="true">·</span>
-                <span>{currentPhone.keyHighlights.processor}</span>
-                <span aria-hidden="true">·</span>
-                <span>{currentPhone.keyHighlights.battery}</span>
-              </div>
-
-              {/* Actions */}
-              <div className="flex flex-wrap items-center gap-3 pt-3">
-                <button
-                  onClick={() => setSelectedPhone(currentPhone)}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-lg"
-                >
-                  <Eye className="w-4 h-4" />
-                  <span>View full specs</span>
-                </button>
-                <button
-                  onClick={() => {
-                    addToCompare(currentPhone.id);
-                    setActiveTab('compare');
-                  }}
-                  className="px-4 py-2.5 bg-slate-900/80 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Scale className="w-4 h-4 text-emerald-400" />
-                  <span>Compare this phone</span>
-                </button>
+            {/* Featured Phone Image Showcase - Positioned under title with increased size */}
+            <div 
+              onClick={() => {
+                setSelectedPhone(currentPhone);
+                window.scrollTo({ top: 0, behavior: 'instant' });
+              }}
+              className="w-full py-2 sm:py-4 flex items-center justify-center cursor-pointer group"
+            >
+              <div className="relative flex items-center justify-center">
+                <div className="absolute inset-0 bg-emerald-500/15 rounded-full blur-3xl group-hover:bg-emerald-500/30 transition-all pointer-events-none" />
+                <img
+                  src={currentPhone.image}
+                  alt={currentPhone.name}
+                  referrerPolicy="no-referrer"
+                  className="max-h-72 sm:max-h-80 md:max-h-96 w-auto object-contain group-hover:scale-105 transition-transform duration-500 drop-shadow-[0_25px_40px_rgba(0,0,0,0.7)]"
+                />
               </div>
             </div>
 
-            {/* Phone Image Showcase */}
-            <div className="w-48 sm:w-56 md:w-64 aspect-[4/3] rounded-2xl bg-[#061a11]/80 border border-emerald-950 p-4 flex items-center justify-center shrink-0 shadow-inner group">
-              <img
-                src={currentPhone.image}
-                alt={currentPhone.name}
-                referrerPolicy="no-referrer"
-                className="max-h-48 w-auto object-contain group-hover:scale-105 transition-transform duration-500"
-              />
+            {/* Actions Side by Side below image */}
+            <div className="flex flex-row items-center justify-center sm:justify-start gap-3 sm:gap-4 pt-2">
+              <button
+                onClick={() => {
+                  setSelectedPhone(currentPhone);
+                  window.scrollTo({ top: 0, behavior: 'instant' });
+                }}
+                className="flex-1 sm:flex-initial px-6 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg hover:shadow-emerald-900/40"
+              >
+                <Eye className="w-4 h-4" />
+                <span>View full specs</span>
+              </button>
+              <button
+                onClick={() => {
+                  addToCompare(currentPhone.id);
+                  setActiveTab('compare');
+                  window.scrollTo({ top: 0, behavior: 'instant' });
+                }}
+                className="flex-1 sm:flex-initial px-6 py-3 bg-slate-900/90 hover:bg-slate-800 active:scale-95 text-slate-100 border border-slate-700/80 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm hover:border-emerald-500/50"
+              >
+                <Scale className="w-4 h-4 text-emerald-400" />
+                <span>Compare this phone</span>
+              </button>
             </div>
           </div>
         )}

@@ -51,9 +51,6 @@ export default function PhoneFinderSection() {
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk'] tracking-tight">
             Not sure what to buy?
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-            Tell us your brand, budget and hardware requirements and we will shortlist matching phones from the database instantly.
-          </p>
           <div className="pt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
             <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <span>Over {phones.length} active models tracked with full specifications</span>

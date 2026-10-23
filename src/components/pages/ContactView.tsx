@@ -11,6 +11,7 @@ import {
   HelpCircle,
   ExternalLink
 } from 'lucide-react';
+import { submitContactInquiryApi } from '../../services/api';
 
 export default function ContactView() {
   const [email, setEmail] = useState('');
@@ -24,6 +25,14 @@ export default function ContactView() {
     e.preventDefault();
     if (email && message) {
       setSent(true);
+      submitContactInquiryApi({
+        name,
+        email,
+        phone: phoneInput,
+        subject,
+        message
+      }).catch(console.warn);
+
       setTimeout(() => {
         setSent(false);
         setEmail('');

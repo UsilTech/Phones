@@ -179,6 +179,7 @@ export type ActiveTab =
   | 'compare'
   | 'brands'
   | 'news'
+  | 'guides'
   | 'best-phones'
   | 'reviews'
   | 'about'

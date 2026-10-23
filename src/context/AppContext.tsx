@@ -16,6 +16,19 @@ import {
   INITIAL_REVIEWS, 
   INITIAL_AD_SETTINGS 
 } from '../data/seedData';
+import { 
+  fetchPhonesFromApi, 
+  fetchBrandsFromApi, 
+  fetchArticlesFromApi, 
+  fetchReviewsFromApi, 
+  createPhoneApi, 
+  updatePhoneApi, 
+  deletePhoneApi, 
+  submitReviewApi,
+  adminLoginApi,
+  adminRequestOtpApi,
+  adminVerifyOtpApi 
+} from '../services/api';
 
 interface AppContextType {
   phones: Phone[];
@@ -306,6 +319,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [compareList]);
 
+  // Synchronize state with full-stack Express backend APIs on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function loadBackendData() {
+      try {
+        const [apiPhones, apiBrands, apiArticles, apiReviews] = await Promise.all([
+          fetchPhonesFromApi(),
+          fetchBrandsFromApi(),
+          fetchArticlesFromApi(),
+          fetchReviewsFromApi()
+        ]);
+        if (isMounted) {
+          if (apiPhones && apiPhones.length > 0) setPhones(apiPhones);
+          if (apiBrands && apiBrands.length > 0) setBrands(apiBrands);
+          if (apiArticles && apiArticles.length > 0) setArticles(apiArticles);
+          if (apiReviews && apiReviews.length > 0) setReviews(apiReviews);
+        }
+      } catch (err) {
+        console.warn('Backend synchronization warning:', err);
+      }
+    }
+    loadBackendData();
+    return () => { isMounted = false; };
+  }, []);
+
   // Pricing Helpers
   const formatNaira = (amount: number): string => {
     return '₦' + amount.toLocaleString('en-NG');
@@ -434,6 +472,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // CRUD Operations
   const addPhone = (newPhone: Phone) => {
     setPhones(prev => [newPhone, ...prev]);
+    createPhoneApi(newPhone).catch(console.warn);
   };
 
   const updatePhone = (updated: Phone) => {
@@ -441,6 +480,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (selectedPhone?.id === updated.id) {
       setSelectedPhone(updated);
     }
+    updatePhoneApi(updated.id, updated).catch(console.warn);
   };
 
   const deletePhone = (id: string) => {
@@ -449,21 +489,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (selectedPhone?.id === id) {
       setSelectedPhone(null);
     }
+    deletePhoneApi(id).catch(console.warn);
   };
 
   const updatePhonePrice = (id: string, newPriceNGN: number, newPriceUSD?: number, notes?: string) => {
+    const updatedFields = {
+      priceNGN: newPriceNGN,
+      priceUSD: newPriceUSD || Math.round(newPriceNGN / 1500),
+      nairaPriceNotes: notes
+    };
     setPhones(prev => prev.map(p => {
       if (p.id === id) {
         return {
           ...p,
           oldPriceNGN: p.priceNGN,
-          priceNGN: newPriceNGN,
-          priceUSD: newPriceUSD || Math.round(newPriceNGN / 1500),
+          ...updatedFields,
           nairaPriceNotes: notes || p.nairaPriceNotes
         };
       }
       return p;
     }));
+    updatePhoneApi(id, updatedFields).catch(console.warn);
   };
 
   const addBrand = (brand: Brand) => {
@@ -501,9 +547,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ...reviewData,
       id: 'rev-' + Date.now(),
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      status: 'pending'
+      status: 'approved'
     };
     setReviews(prev => [newRev, ...prev]);
+    submitReviewApi({
+      phoneId: reviewData.phoneId,
+      phoneName: reviewData.phoneName,
+      userName: reviewData.userName,
+      location: reviewData.location,
+      rating: reviewData.rating,
+      title: reviewData.title,
+      comment: reviewData.comment,
+      pros: reviewData.pros,
+      cons: reviewData.cons
+    }).catch(console.warn);
   };
 
   const updateReviewStatus = (id: string, status: 'approved' | 'pending' | 'rejected') => {

@@ -1,5 +1,5 @@
 import { useApp } from '../../context/AppContext';
-import { Search, RotateCcw, Check, Filter } from 'lucide-react';
+import { Search, RotateCcw, Check, Filter, ArrowUpDown, ChevronDown } from 'lucide-react';
 
 interface PhoneFilterProps {
   isMobileOpen?: boolean;
@@ -63,21 +63,29 @@ export default function PhoneFilterDrawer({ isMobileOpen, onCloseMobile }: Phone
         </div>
       </div>
 
-      {/* Sort By matching GsmScope options */}
+      {/* Quick Sort Dropdown Menu */}
       <div>
-        <label className="block text-slate-300 font-semibold mb-1.5">Sort</label>
-        <select
-          value={filterState.sortBy}
-          onChange={(e) => setFilterState(prev => ({ ...prev, sortBy: e.target.value as any }))}
-          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white focus:border-emerald-500 focus:outline-none text-xs"
-        >
-          <option value="newest">Newest first</option>
-          <option value="rating">Top rated</option>
-          <option value="price-asc">Price: low to high</option>
-          <option value="price-desc">Price: high to low</option>
-          <option value="battery">Biggest battery</option>
-          <option value="popular">Most popular</option>
-        </select>
+        <label htmlFor="drawer-sort-select" className="block text-slate-300 font-semibold mb-1.5 flex items-center gap-1.5">
+          <ArrowUpDown className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Quick Sort</span>
+        </label>
+        <div className="relative">
+          <select
+            id="drawer-sort-select"
+            aria-label="Quick Sort"
+            value={filterState.sortBy}
+            onChange={(e) => setFilterState(prev => ({ ...prev, sortBy: e.target.value as any }))}
+            className="w-full pl-3 pr-8 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white focus:border-emerald-500 focus:outline-none text-xs cursor-pointer appearance-none"
+          >
+            <option value="newest">Newest</option>
+            <option value="price-asc">Price (Low to High)</option>
+            <option value="price-desc">Price (High to Low)</option>
+            <option value="popular">Most Popular</option>
+            <option value="rating">Top Rated</option>
+            <option value="battery">Biggest Battery</option>
+          </select>
+          <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+        </div>
       </div>
 
       {/* 5G phones only toggle */}

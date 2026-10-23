@@ -26,8 +26,9 @@ export default function Header() {
     { tab: 'phones', label: 'Phones' },
     { tab: 'best-phones', label: 'Best Phones' },
     { tab: 'compare', label: 'Compare' },
-    { tab: 'news', label: 'News' },
     { tab: 'reviews', label: 'Reviews' },
+    { tab: 'news', label: 'News' },
+    { tab: 'guides', label: 'Guides' },
     { tab: 'brands', label: 'Brands' },
   ];
 
@@ -53,25 +54,30 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-40 bg-[#061a11]/95 dark:bg-[#061a11]/95 backdrop-blur-md border-b border-emerald-950/80 shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full px-4 sm:px-8 lg:px-12">
         <div className="flex items-center justify-between gap-6 h-16">
           {/* Zone 1: GsmScope Brand Logo / Wordmark */}
           <button
             onClick={() => handleNavClick('home')}
-            className="flex items-center gap-2 cursor-pointer focus:outline-none shrink-0"
+            className="flex items-center gap-2 cursor-pointer focus:outline-none shrink-0 text-left"
           >
-            <div className="flex items-center gap-1.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold font-mono text-base">
-                G
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold font-mono text-base">
+                  G
+                </div>
+                <span className="font-extrabold text-xl tracking-tight text-white font-['Space_Grotesk'] whitespace-nowrap">
+                  Gsm<span className="text-emerald-400">Scope</span>
+                </span>
               </div>
-              <span className="font-extrabold text-xl tracking-tight text-white font-['Space_Grotesk'] whitespace-nowrap">
-                Gsm<span className="text-emerald-400">Scope</span>
+              <span className="hidden sm:block text-[10px] text-slate-400 font-medium tracking-tight">
+                Mobile reviews, specs and prices
               </span>
             </div>
           </button>
 
           {/* Zone 2: Navigation Links (Single-Line Clean Typography) */}
-          <nav className="hidden lg:flex items-center gap-6 text-sm font-medium">
+          <nav className="hidden lg:flex items-center gap-5 text-sm font-medium">
             {navItems.map((item) => {
               const isActive = activeTab === item.tab;
               return (
@@ -98,8 +104,32 @@ export default function Header() {
             })}
           </nav>
 
-          {/* Zone 3: Currency Switcher, Dark/Light Mode Switch, Search Toggle */}
+          {/* Zone 3: Currency Switcher, Socials, Dark/Light Mode Switch, Search Toggle */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Social media links matching Second-gsmscope.vercel.app */}
+            <div className="hidden md:flex items-center gap-1 text-slate-300 border-r border-emerald-950/80 pr-2">
+              <a
+                href="https://www.facebook.com/share/1HKzhSt52c/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                title="GsmScope on Facebook"
+                aria-label="Facebook"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v7h4v-7h3l1-4h-4V8z"/></svg>
+              </a>
+              <a
+                href="https://www.youtube.com/@gsm_scope"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                title="GsmScope on YouTube"
+                aria-label="YouTube"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="m10 9 5 3-5 3z"/></svg>
+              </a>
+            </div>
+
             {/* Currency Switcher: NGN ₦ / USD $ */}
             <button
               onClick={toggleCurrency}
