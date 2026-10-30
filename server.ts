@@ -46,11 +46,25 @@ const {
 // Enable trust proxy for reverse-proxy / cloud deployment environments
 app.enable('trust proxy');
 
-// Enforce secure HTTPS connections and HSTS headers
+// Secure HTTPS handling (respects non-SSL test domains, local dev, and IP addresses)
 app.use((req, res, next) => {
-  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   const forwardedProto = req.headers['x-forwarded-proto'];
-  if (process.env.NODE_ENV === 'production' && forwardedProto && forwardedProto !== 'https') {
+  const host = (req.headers.host || '').toLowerCase();
+  const isLocalOrIp =
+    host.includes('localhost') ||
+    host.includes('127.0.0.1') ||
+    host.includes(':3000') ||
+    /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(host);
+
+  if (forwardedProto === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  } else if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.FORCE_HTTPS === 'true' &&
+    forwardedProto &&
+    forwardedProto !== 'https' &&
+    !isLocalOrIp
+  ) {
     return res.redirect(301, `https://${req.headers.host}${req.url}`);
   }
   next();
@@ -71,6 +85,10 @@ try {
 }
 
 // Serve uploaded media and static assets with fast HTTP cache headers
+const DIST_ASSETS_DIR = path.resolve(__dirname, 'dist', 'assets');
+if (fs.existsSync(DIST_ASSETS_DIR)) {
+  app.use('/assets', express.static(DIST_ASSETS_DIR, { maxAge: '365d', immutable: true, etag: true }));
+}
 app.use('/uploads', express.static(PUBLIC_UPLOADS_DIR, { maxAge: '7d', etag: true }));
 app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d', etag: true }));
 app.use('/assets', express.static(path.resolve(__dirname, 'public', 'assets'), { maxAge: '365d', immutable: true, etag: true }));
@@ -2590,12 +2608,27 @@ async function startServer() {
       }
     });
   } else {
-    // In production: serve built static assets from dist with aggressive caching for hashed bundles
+    // In production: verify whether compiled dist/index.html exists.
+    // If missing (e.g. user deployed code without running build), automatically run Vite build on the fly!
     const distPath = path.resolve(__dirname, 'dist');
     const prodIndexPath = path.resolve(distPath, 'index.html');
-    const fallbackIndexPath = path.resolve(__dirname, 'index.html');
+    const distAssetsPath = path.resolve(distPath, 'assets');
 
-    if (fs.existsSync(distPath)) {
+    if (!fs.existsSync(prodIndexPath)) {
+      console.log('[GsmScope Server] dist/index.html not detected at startup. Auto-compiling production bundle with Vite...');
+      try {
+        const { build } = await import('vite');
+        await build();
+        console.log('[GsmScope Server] Production build completed successfully!');
+      } catch (buildErr) {
+        console.warn('[GsmScope Server] Vite auto-build warning, falling back to dynamic Vite transformer:', buildErr);
+      }
+    }
+
+    if (fs.existsSync(prodIndexPath)) {
+      if (fs.existsSync(distAssetsPath)) {
+        app.use('/assets', express.static(distAssetsPath, { maxAge: '365d', immutable: true, etag: true }));
+      }
       app.use(
         express.static(distPath, {
           index: false,
@@ -2603,34 +2636,60 @@ async function startServer() {
           etag: true,
         })
       );
+
+      let cachedProdTemplate = fs.readFileSync(prodIndexPath, 'utf-8');
+
+      app.get(/.*/, (req: Request, res: Response, next) => {
+        if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
+          return next();
+        }
+        if (!cachedProdTemplate && fs.existsSync(prodIndexPath)) {
+          try {
+            cachedProdTemplate = fs.readFileSync(prodIndexPath, 'utf-8');
+          } catch {}
+        }
+        if (cachedProdTemplate) {
+          const seoHtml = injectDynamicSeoIntoHtml(cachedProdTemplate, req);
+          res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8' }).send(seoHtml);
+        } else {
+          next();
+        }
+      });
     } else {
-      console.warn('Production dist folder not found at startup. Please ensure `npm run build` has been run.');
-    }
+      // Bulletproof fallback: If build could not be created, run Vite runtime transformer so user NEVER sees a blank screen!
+      console.log('[GsmScope Server] Using Vite runtime middleware to serve uncompiled assets safely without blank screen');
+      const vitePromise = import('vite').then(({ createServer: createViteServer }) =>
+        createViteServer({
+          server: { middlewareMode: true },
+          appType: 'custom',
+        })
+      );
 
-    let cachedProdTemplate = fs.existsSync(prodIndexPath)
-      ? fs.readFileSync(prodIndexPath, 'utf-8')
-      : '';
-
-    app.get(/.*/, (req: Request, res: Response, next) => {
-      if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
-        return next();
-      }
-      if (!cachedProdTemplate && fs.existsSync(prodIndexPath)) {
+      app.use(async (req: Request, res: Response, next) => {
         try {
-          cachedProdTemplate = fs.readFileSync(prodIndexPath, 'utf-8');
-        } catch {}
-      }
-      const templateToRender =
-        cachedProdTemplate ||
-        (fs.existsSync(fallbackIndexPath) ? fs.readFileSync(fallbackIndexPath, 'utf-8') : '');
+          const vite = await vitePromise;
+          vite.middlewares(req, res, next);
+        } catch (e) {
+          next(e);
+        }
+      });
 
-      if (templateToRender) {
-        const seoHtml = injectDynamicSeoIntoHtml(templateToRender, req);
-        res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8' }).send(seoHtml);
-      } else {
-        res.status(503).send('GsmScope production bundle not found. Run `npm run build` in cPanel Terminal.');
-      }
-    });
+      app.get(/.*/, async (req: Request, res: Response, next) => {
+        if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
+          return next();
+        }
+        try {
+          const vite = await vitePromise;
+          const indexPath = path.resolve(__dirname, 'index.html');
+          const template = fs.readFileSync(indexPath, 'utf-8');
+          const transformed = await vite.transformIndexHtml(req.originalUrl, template);
+          const seoHtml = injectDynamicSeoIntoHtml(transformed, req);
+          res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8' }).end(seoHtml);
+        } catch (e) {
+          next(e);
+        }
+      });
+    }
   }
 
   const isNumericPort = !isNaN(Number(PORT));

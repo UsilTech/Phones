@@ -103,7 +103,12 @@ This ensures your admin changes (new brands, phones, articles, ad settings, cust
 ---
 
 ## Troubleshooting
-- **Cannot GET / or blank page**: Ensure you uploaded the compiled `dist/` folder (or run `npm run build` in cPanel Terminal).
-- **Port issues**: In cPanel Passenger, you do not need to set a port number; cPanel routes domain requests into `app.cjs` via a Unix domain socket automatically.
+- **Blank Screen Fix**:
+  1. The server now includes **automatic on-startup Vite compiling** and **seamless dynamic Vite transformer fallback**.
+  2. If you see a blank page, run `npm run build` once in cPanel Terminal (or click **Run NPM Install** in cPanel Setup Node.js App — it now triggers automatic build via `postinstall`).
+  3. Ensure the `dist/` folder was extracted directly into your application root folder alongside `package.json` and `server.ts`.
+  4. Ensure your domain or IP has finished pointing to the server. If testing on HTTP, the server will no longer force unwanted HTTPS redirects or block insecure script requests.
+- **Port issues**: In cPanel Passenger, you do not need to manually configure a `PORT` variable; cPanel routes domain requests into `app.cjs` via a Unix domain socket automatically.
 - **SSL Certificate**: Go to cPanel > **SSL/TLS Status** > click **Run AutoSSL** to ensure free HTTPS certificate is active for `gsmscope.com`.
+- **Backend Health Check**: Open `https://gsmscope.com/api/health` (or `http://your-domain/api/health`) to confirm that Node.js, Express, storage permissions, and database are healthy.
 

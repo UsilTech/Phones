@@ -763,6 +763,8 @@ export async function deleteMediaItemApi(id: string): Promise<boolean> {
 export interface AiVerifiedSource {
   title: string;
   uri: string;
+  url?: string;
+  domain?: string;
   isManufacturer?: boolean;
 }
 

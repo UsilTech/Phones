@@ -4565,20 +4565,22 @@ export default function AdminDashboardModal() {
                     <span>Verified Manufacturer &amp; Hardware Authority Sources Used:</span>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {aiPhoneSources.map((src, idx) => (
-                      <a
-                        key={`${src.url}-${idx}`}
-                        href={src.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
-                          src.isManufacturer
-                            ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500/25'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-emerald-500/40'
-                        }`}
-                      >
-                        <Globe className="w-3 h-3 text-emerald-500 shrink-0" />
-                        <span className="truncate max-w-[220px]">{src.title || src.domain}</span>
+                    {aiPhoneSources.map((src, idx) => {
+                      const linkUrl = src.url || src.uri || '#';
+                      return (
+                        <a
+                          key={`${linkUrl}-${idx}`}
+                          href={linkUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+                            src.isManufacturer
+                              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500/25'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-emerald-500/40'
+                          }`}
+                        >
+                          <Globe className="w-3 h-3 text-emerald-500 shrink-0" />
+                          <span className="truncate max-w-[220px]">{src.title || src.domain || linkUrl}</span>
                         {src.isManufacturer && (
                           <span className="px-1 py-0.2 rounded bg-emerald-600 text-white text-[9px] font-mono uppercase">
                             OEM
@@ -4586,7 +4588,8 @@ export default function AdminDashboardModal() {
                         )}
                         <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
                       </a>
-                    ))}
+                    );
+                  })}
                   </div>
                 </div>
               )}
@@ -5543,18 +5546,21 @@ export default function AdminDashboardModal() {
                           Verified Sources ({aiArticleSources.length}):
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          {aiArticleSources.slice(0, 4).map((src, idx) => (
-                            <a
-                              key={`${src.url}-${idx}`}
-                              href={src.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] text-emerald-700 dark:text-emerald-300 hover:underline"
-                            >
-                              <Globe className="w-2.5 h-2.5 shrink-0" />
-                              <span className="truncate max-w-[130px]">{src.domain}</span>
-                            </a>
-                          ))}
+                          {aiArticleSources.slice(0, 4).map((src, idx) => {
+                            const linkUrl = src.url || src.uri || '#';
+                            return (
+                              <a
+                                key={`${linkUrl}-${idx}`}
+                                href={linkUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] text-emerald-700 dark:text-emerald-300 hover:underline"
+                              >
+                                <Globe className="w-2.5 h-2.5 shrink-0" />
+                                <span className="truncate max-w-[130px]">{src.domain || src.title || linkUrl}</span>
+                              </a>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -6098,19 +6104,22 @@ export default function AdminDashboardModal() {
                               <ShieldCheck className="w-3 h-3" />
                               <span>Sources:</span>
                             </span>
-                            {aiAdminReviewSources.map((src, idx) => (
-                              <a
-                                key={`${src.url}-${idx}`}
-                                href={src.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] text-slate-700 dark:text-slate-300 hover:border-emerald-500/40"
-                              >
-                                <Globe className="w-2.5 h-2.5 text-emerald-500" />
-                                <span className="truncate max-w-[160px]">{src.title || src.domain}</span>
-                                <ExternalLink className="w-2.5 h-2.5 opacity-60" />
-                              </a>
-                            ))}
+                            {aiAdminReviewSources.map((src, idx) => {
+                              const linkUrl = src.url || src.uri || '#';
+                              return (
+                                <a
+                                  key={`${linkUrl}-${idx}`}
+                                  href={linkUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] text-slate-700 dark:text-slate-300 hover:border-emerald-500/40"
+                                >
+                                  <Globe className="w-2.5 h-2.5 text-emerald-500" />
+                                  <span className="truncate max-w-[160px]">{src.title || src.domain || linkUrl}</span>
+                                  <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                                </a>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
