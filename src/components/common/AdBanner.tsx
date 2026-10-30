@@ -6,7 +6,47 @@ interface AdBannerProps {
 }
 
 export default function AdBanner({ type }: AdBannerProps) {
-  const { adSettings, setActiveTab } = useApp();
+  const { adSettings, phones, articles, setActiveTab, setSelectedPhone, setSelectedArticle } = useApp();
+
+  const handleBannerLink = (rawUrl: string | undefined, fallbackTab: 'phones' | 'compare') => {
+    const url = (rawUrl || '').trim();
+    if (!url || url === '#') {
+      setActiveTab(fallbackTab);
+      return;
+    }
+    if (url.startsWith('/?') || url.startsWith('?')) {
+      const searchStr = url.startsWith('/') ? url.slice(1) : url;
+      const params = new URLSearchParams(searchStr);
+      const phoneParam = params.get('phone');
+      const articleParam = params.get('article');
+      const tabParam = params.get('tab');
+      if (phoneParam) {
+        const matched = phones.find((p) => p.id.toLowerCase() === phoneParam.toLowerCase());
+        if (matched) {
+          setSelectedPhone(matched);
+          return;
+        }
+      }
+      if (articleParam) {
+        const matchedArt = articles.find((a) => a.id === articleParam || a.slug === articleParam);
+        if (matchedArt) {
+          setSelectedArticle(matchedArt);
+          return;
+        }
+      }
+      if (tabParam) {
+        setSelectedPhone(null);
+        setSelectedArticle(null);
+        setActiveTab(tabParam as any);
+        return;
+      }
+    }
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      window.location.href = url;
+      return;
+    }
+    setActiveTab(fallbackTab);
+  };
 
   if (type === 'top') {
     if (!adSettings.topBanner.enabled) return null;
@@ -25,7 +65,7 @@ export default function AdBanner({ type }: AdBannerProps) {
             </span>
           </div>
           <button
-            onClick={() => setActiveTab('phones')}
+            onClick={() => handleBannerLink(adSettings.topBanner.linkUrl, 'phones')}
             className="text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1 cursor-pointer"
           >
             <span>Explore verified deals</span>
@@ -53,7 +93,7 @@ export default function AdBanner({ type }: AdBannerProps) {
           {adSettings.sidebarBanner.subtitle}
         </p>
         <button
-          onClick={() => setActiveTab('compare')}
+          onClick={() => handleBannerLink(adSettings.sidebarBanner.linkUrl, 'compare')}
           className="w-full py-2 px-3 text-xs font-semibold text-emerald-300 bg-emerald-950/60 border border-emerald-500/40 rounded-lg hover:bg-emerald-900/60 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
         >
           <span>Compare Swap Values</span>

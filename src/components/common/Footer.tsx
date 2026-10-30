@@ -1,64 +1,141 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ActiveTab } from '../../types';
-import { Mail, Check, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Mail, Check, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
 import { subscribeNewsletterApi } from '../../services/api';
 
 export default function Footer() {
-  const { setActiveTab, setCategoryPreset } = useApp();
+  const { 
+    setActiveTab, 
+    setCategoryPreset, 
+    resetFilters,
+    setSelectedPhone, 
+    setSelectedArticle, 
+    setSelectedBrand,
+    triggerNavigation,
+    startGlobalLoading, 
+    stopGlobalLoading, 
+    showGlobalToast,
+    websiteContent
+  } = useApp();
   const [subEmail, setSubEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [subMessage, setSubMessage] = useState('Confirmation email sent!');
+  const [isSubscribing, setIsSubscribing] = useState(false);
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (subEmail.trim()) {
+    if (isSubscribing) return;
+    const email = subEmail.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      showGlobalToast('Please enter a valid email address.', 'error');
+      return;
+    }
+
+    setIsSubscribing(true);
+    startGlobalLoading('Subscribing to newsletter');
+
+    try {
+      const [result] = await Promise.all([
+        subscribeNewsletterApi(email),
+        new Promise((res) => setTimeout(res, 400))
+      ]);
+      if (!result.success) {
+        showGlobalToast(result.message || 'Please enter a valid email address.', 'error');
+        return;
+      }
+      setSubMessage(result.message || `Confirmation email sent to ${email}!`);
       setSubscribed(true);
-      subscribeNewsletterApi(subEmail.trim()).catch(console.warn);
+      setSubEmail('');
+      showGlobalToast(
+        result.message || `Confirmation email sent to ${email}!`,
+        result.alreadySubscribed ? 'info' : 'success'
+      );
       setTimeout(() => {
         setSubscribed(false);
-        setSubEmail('');
-      }, 3500);
+      }, 5000);
+    } catch {
+      showGlobalToast('Failed to subscribe. Please try again.', 'error');
+    } finally {
+      stopGlobalLoading();
+      setIsSubscribing(false);
     }
+  };
+
+  const handleFooterNav = (tab: ActiveTab) => {
+    triggerNavigation(() => {
+      setSelectedPhone(null);
+      setSelectedArticle(null);
+      setSelectedBrand(null);
+      if (tab === 'phones') {
+        resetFilters();
+      }
+      if (tab === 'guides') {
+        window.dispatchEvent(new CustomEvent('gsmscope:reset-guide'));
+      }
+      setActiveTab(tab);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
   };
 
   return (
     <footer className="border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#061a11] text-slate-600 dark:text-slate-300 text-xs">
       {/* Newsletter Strip from GsmScope: Price drop and launch alerts */}
-      <div className="border-b border-slate-200 dark:border-emerald-950/80 bg-white dark:bg-[#0a2a1a]/50 py-10 px-4 sm:px-8 lg:px-12">
+      <div className="border-b border-slate-200 dark:border-emerald-950/80 bg-white dark:bg-[#0a2a1a]/50 py-8 px-[calc(1rem-5px)] sm:px-[calc(2rem-5px)] lg:px-[calc(3rem-5px)]">
         <div className="w-full flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="max-w-xl space-y-1">
             <span className="text-[11px] font-mono font-semibold uppercase text-emerald-600 dark:text-emerald-400">
               Stay Ahead
             </span>
             <h3 className="text-xl font-bold text-slate-900 dark:text-white font-['Space_Grotesk']">
-              Price drop and launch alerts
+              News update &amp; launch alerts
             </h3>
             <p className="text-xs text-slate-600 dark:text-slate-300">
-              Join the GsmScope list for Nigerian price changes, new phone releases and buying guides. Brands and advertisers can also reach us about sponsored placements.
+              Join the GsmScope newsletter for global price trends, new device launches, and authoritative buying guides.
             </p>
           </div>
 
-          <form onSubmit={handleSubscribe} className="w-full md:w-auto flex-1 max-w-md">
+          <form onSubmit={handleSubscribe} noValidate className="w-full md:w-auto flex-1 max-w-md">
             {subscribed ? (
-              <div className="px-4 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>You are subscribed for GsmScope market alerts!</span>
+              <div className="px-4 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-semibold flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="truncate">{subMessage}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSubscribed(false)}
+                  className="text-[11px] font-normal underline hover:text-emerald-500 shrink-0 cursor-pointer"
+                >
+                  Done
+                </button>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <input
                   type="email"
                   required
+                  disabled={isSubscribing}
                   value={subEmail}
                   onChange={(e) => setSubEmail(e.target.value)}
                   placeholder="Enter your email address..."
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700/80 text-slate-900 dark:text-white placeholder-slate-400 text-xs focus:outline-none focus:border-emerald-500"
+                  aria-label="Email address for newsletter alerts"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700/80 text-slate-900 dark:text-white placeholder-slate-400 text-xs focus:outline-none focus:border-emerald-500 disabled:opacity-60"
                 />
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-xs transition-colors shrink-0 cursor-pointer shadow-md"
+                  disabled={isSubscribing}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold rounded-xl text-xs transition-colors shrink-0 cursor-pointer shadow-md flex items-center gap-1.5"
                 >
-                  Subscribe
+                  {isSubscribing ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Subscribing...</span>
+                    </>
+                  ) : (
+                    <span>Subscribe</span>
+                  )}
                 </button>
               </div>
             )}
@@ -67,19 +144,34 @@ export default function Footer() {
       </div>
 
       {/* Main Footer Links Columns */}
-      <div className="w-full px-4 sm:px-8 lg:px-12 py-12">
+      <div className="w-full px-[calc(1rem-5px)] sm:px-[calc(2rem-5px)] lg:px-[calc(3rem-5px)] py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           {/* Brand Info */}
           <div className="space-y-3">
-            <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white font-['Space_Grotesk']">
-                Gsm<span className="text-emerald-600 dark:text-emerald-400">Scope</span>
-              </span>
+            <div>
+              <button
+                onClick={() => handleFooterNav('home')}
+                className="inline-flex items-center cursor-pointer focus:outline-none transition-opacity hover:opacity-95 text-left py-0.5"
+                aria-label={`${websiteContent?.siteName || 'GsmScope'} Home`}
+              >
+                {/* Light Mode Logo */}
+                <img
+                  src={websiteContent?.headerLogoLightUrl || websiteContent?.headerLogoUrl || '/assets/aistudio/GsmScope_header_logo_fc9cfbb4.webp'}
+                  alt={`${websiteContent?.siteName || 'GsmScope'} - ${websiteContent?.siteTagline || 'Mobile Reviews & Specifications'}`}
+                  className="dark:hidden h-9 sm:h-10 w-auto object-contain select-none"
+                />
+                {/* Dark Mode Logo */}
+                <img
+                  src={websiteContent?.headerLogoDarkUrl || websiteContent?.headerLogoUrl || '/assets/aistudio/GsmScope_header_logo_dark.webp'}
+                  alt={`${websiteContent?.siteName || 'GsmScope'} - ${websiteContent?.siteTagline || 'Mobile Reviews & Specifications'}`}
+                  className="hidden dark:block h-9 sm:h-10 w-auto object-contain select-none"
+                />
+              </button>
             </div>
-            <p className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
-              GsmScope is a comprehensive mobile technology platform designed for Nigerian smartphone buyers. Our database tracks phone specifications, current prices in naira and USD, deep comparisons, and industry news.
+            <p className="text-slate-600 dark:text-slate-400 text-[15px] leading-relaxed">
+              {websiteContent?.aboutSummary || 'GsmScope is a comprehensive world mobile technology platform. Our global database tracks smartphone specifications, market prices, deep comparisons, and industry news.'}
             </p>
-            <div className="text-[11px] text-emerald-600 dark:text-emerald-400/90 font-mono flex items-center gap-1.5 pt-1">
+            <div className="text-[14px] text-emerald-600 dark:text-emerald-400/90 font-mono flex items-center gap-1.5 pt-1">
               <ShieldCheck className="w-4 h-4" />
               <span>Independent hardware reviews &amp; specs</span>
             </div>
@@ -87,47 +179,42 @@ export default function Footer() {
 
           {/* Explore */}
           <div>
-            <h4 className="font-semibold text-slate-900 dark:text-white text-sm mb-3 font-['Space_Grotesk']">
+            <h4 className="font-semibold text-slate-900 dark:text-white text-[19px] mb-3 font-['Space_Grotesk']">
               Explore
             </h4>
-            <ul className="space-y-2">
+            <ul className="space-y-2 text-[15px]">
               <li>
-                <button onClick={() => setActiveTab('home')} className="hover:text-emerald-400 transition-colors text-left">
-                  Home
-                </button>
-              </li>
-              <li>
-                <button onClick={() => setActiveTab('phones')} className="hover:text-emerald-400 transition-colors text-left">
+                <button onClick={() => handleFooterNav('phones')} className="hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   All Phones
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveTab('best-phones')} className="hover:text-emerald-400 transition-colors text-left">
+                <button onClick={() => handleFooterNav('best-phones')} className="hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Best Phones
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveTab('compare')} className="hover:text-emerald-400 transition-colors text-left">
+                <button onClick={() => handleFooterNav('compare')} className="hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Compare Phones
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveTab('news')} className="hover:text-emerald-400 transition-colors text-left">
+                <button onClick={() => handleFooterNav('news')} className="hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   News &amp; Articles
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveTab('reviews')} className="hover:text-emerald-400 transition-colors text-left">
+                <button onClick={() => handleFooterNav('user-reviews')} className="hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   User Reviews
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveTab('guides')} className="hover:text-emerald-400 transition-colors text-left cursor-pointer">
+                <button onClick={() => handleFooterNav('guides')} className="hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Guides
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveTab('brands')} className="hover:text-emerald-400 transition-colors text-left">
+                <button onClick={() => handleFooterNav('brands')} className="hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Brand Directory
                 </button>
               </li>
@@ -136,43 +223,38 @@ export default function Footer() {
 
           {/* Buying Guides */}
           <div>
-            <h4 className="font-semibold text-slate-900 dark:text-white text-sm mb-3 font-['Space_Grotesk']">
+            <h4 className="font-semibold text-slate-900 dark:text-white text-[19px] mb-3 font-['Space_Grotesk']">
               Buying Guides
             </h4>
-            <ul className="space-y-2">
+            <ul className="space-y-2 text-[15px]">
               <li>
-                <button onClick={() => setCategoryPreset('top-rated')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
+                <button onClick={() => { setCategoryPreset('top-rated'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Best phones overall
                 </button>
               </li>
               <li>
-                <button onClick={() => setCategoryPreset('under-200k')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
+                <button onClick={() => { setCategoryPreset('under-200k'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Best budget phones
                 </button>
               </li>
               <li>
-                <button onClick={() => setCategoryPreset('best-camera')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
+                <button onClick={() => { setCategoryPreset('best-camera'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Best camera phones
                 </button>
               </li>
               <li>
-                <button onClick={() => setCategoryPreset('best-gaming')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
+                <button onClick={() => { setCategoryPreset('best-gaming'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Best gaming phones
                 </button>
               </li>
               <li>
-                <button onClick={() => setCategoryPreset('best-battery')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
+                <button onClick={() => { setCategoryPreset('best-battery'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Best battery phones
                 </button>
               </li>
               <li>
-                <button onClick={() => setCategoryPreset('best-5g')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
+                <button onClick={() => { setCategoryPreset('best-5g'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Best 5G phones
-                </button>
-              </li>
-              <li>
-                <button onClick={() => setCategoryPreset('under-100k')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
-                  Phones under 100K
                 </button>
               </li>
             </ul>
@@ -180,74 +262,66 @@ export default function Footer() {
 
           {/* Company */}
           <div>
-            <h4 className="font-semibold text-slate-900 dark:text-white text-sm mb-3 font-['Space_Grotesk']">
+            <h4 className="font-semibold text-slate-900 dark:text-white text-[19px] mb-3 font-['Space_Grotesk']">
               Company
             </h4>
-            <ul className="space-y-2">
+            <ul className="space-y-2 text-[15px]">
               <li>
-                <button onClick={() => setActiveTab('about')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
+                <button onClick={() => handleFooterNav('about')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   About Us
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveTab('contact')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
+                <button onClick={() => handleFooterNav('contact')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Contact Us
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveTab('advertise')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
+                <button onClick={() => handleFooterNav('advertise')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Advertise with Us
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveTab('about')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
+                <button onClick={() => handleFooterNav('privacy')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Privacy Policy
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveTab('about')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
+                <button onClick={() => handleFooterNav('terms')} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Terms of Service
                 </button>
-              </li>
-              <li className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-1 text-[11px]">
-                <a href="mailto:info@gsmscope.com" className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-mono">
-                  info@gsmscope.com
-                </a>
-                <a href="tel:+2349127408003" className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-mono">
-                  +2349127408003
-                </a>
               </li>
             </ul>
           </div>
         </div>
 
         {/* Copyright Bar & Social Links */}
-        <div className="border-t border-slate-200 dark:border-emerald-950/80 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
-          <p>© {new Date().getFullYear()} GsmScope. All rights reserved.</p>
-          <div className="flex items-center gap-5">
+        <div className="border-t border-slate-200 dark:border-emerald-950/80 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[15px] text-slate-500 dark:text-slate-400">
+          <p>{websiteContent?.footerCopyright || `© ${new Date().getFullYear()} GsmScope. All rights reserved.`}</p>
+          <div className="flex items-center gap-4">
             <a
-              href="https://www.facebook.com/share/1HKzhSt52c/"
+              href={websiteContent?.facebookUrl || 'https://www.facebook.com/share/1HKzhSt52c/'}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="GsmScope on Facebook"
-              className="text-slate-400 hover:text-emerald-500 transition-colors flex items-center gap-1.5"
+              title={`${websiteContent?.siteName || 'GsmScope'} on Facebook`}
+              aria-label={`${websiteContent?.siteName || 'GsmScope'} on Facebook`}
+              className="p-2 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-slate-200/50 dark:hover:bg-white/10 transition-colors flex items-center justify-center"
             >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
               </svg>
-              <span>Facebook</span>
             </a>
             <a
-              href="https://www.youtube.com/@gsm_scope"
+              href={websiteContent?.youtubeUrl || 'https://www.youtube.com/@gsm_scope'}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="GsmScope on YouTube"
-              className="text-slate-400 hover:text-emerald-500 transition-colors flex items-center gap-1.5"
+              title={`${websiteContent?.siteName || 'GsmScope'} on YouTube`}
+              aria-label={`${websiteContent?.siteName || 'GsmScope'} on YouTube`}
+              className="p-2 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-slate-200/50 dark:hover:bg-white/10 transition-colors flex items-center justify-center"
             >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
               </svg>
-              <span>YouTube</span>
             </a>
           </div>
         </div>

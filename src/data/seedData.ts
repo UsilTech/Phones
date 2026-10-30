@@ -1,4 +1,4 @@
-import { Phone, Brand, Article, Review, AdSettings } from '../types';
+import { Phone, Brand, Article, Review, AdSettings, AdPlacementId, AdPlacementConfig, WebsiteContent, MediaItem } from '../types';
 
 export const INITIAL_BRANDS: Brand[] = [
   {
@@ -6,10 +6,10 @@ export const INITIAL_BRANDS: Brand[] = [
     name: 'Infinix',
     slug: 'infinix',
     country: 'Hong Kong (Transsion)',
-    description: 'Trendsetting smart brand focused on youth, high refresh rate displays, fast charging tech, and gaming performance in Nigeria.',
-    officialPresenceInNigeria: 'Extensive retail presence in Computer Village, Slot, 3CHub, and official Jumia flagship store.',
+    description: 'Trendsetting smart brand focused on youth, high refresh rate displays, fast charging tech, and gaming performance worldwide.',
+    globalPresence: 'Global distribution across Asia, Africa, Middle East, and Latin America via official stores and retail partners.',
     popularSeries: ['Smart (Budget Entry)', 'Hot (Affordable Gaming)', 'Note (All-Round FastCharge)', 'Zero (Flagship Design)'],
-    warrantyPartner: 'Carlcare Service Centers (12 + 1 months warranty nationwide)',
+    warrantyPartner: 'Carlcare Global Service Network (12 + 1 months warranty)',
     logoLetter: 'I',
     accentBg: 'bg-emerald-600'
   },
@@ -18,10 +18,10 @@ export const INITIAL_BRANDS: Brand[] = [
     name: 'Tecno',
     slug: 'tecno',
     country: 'Hong Kong (Transsion)',
-    description: 'Leading smartphone brand in Africa known for camera innovations, balanced pricing, and nationwide Carlcare support.',
-    officialPresenceInNigeria: 'Official Headquarters in Ikeja, Lagos; Carlcare authorized service network across all 36 states.',
+    description: 'Leading global smartphone manufacturer known for camera innovations, balanced pricing, and worldwide service support.',
+    globalPresence: 'Active operations across 70+ countries worldwide with authorized service and flagship experience centers.',
     popularSeries: ['Pop (Budget)', 'Spark (Mainstream Value)', 'Camon (Camera Flagships)', 'Phantom (Premium Ultra)'],
-    warrantyPartner: 'Carlcare Service Centers (13 - 14 months warranty)',
+    warrantyPartner: 'Carlcare Global Service Network (13 - 14 months warranty)',
     logoLetter: 'T',
     accentBg: 'bg-blue-600'
   },
@@ -31,9 +31,9 @@ export const INITIAL_BRANDS: Brand[] = [
     slug: 'samsung',
     country: 'South Korea',
     description: 'Global technology giant producing industry-leading Dynamic AMOLED displays, Galaxy S Ultra flagships, and Galaxy A series.',
-    officialPresenceInNigeria: 'Samsung Electronics West Africa, Victoria Island, Lagos; nationwide authorized experience stores.',
+    globalPresence: 'Global retail presence worldwide in over 130 countries via official Samsung Experience Stores and certified distributors.',
     popularSeries: ['Galaxy S (Ultra Flagships)', 'Galaxy Z (Foldables)', 'Galaxy A (Mid-range & Budget)'],
-    warrantyPartner: 'Samsung Authorized Service Centers (24 months warranty on select devices)',
+    warrantyPartner: 'Samsung Authorized Service Centers (Global manufacturer warranty)',
     logoLetter: 'S',
     accentBg: 'bg-indigo-600'
   },
@@ -43,9 +43,9 @@ export const INITIAL_BRANDS: Brand[] = [
     slug: 'apple',
     country: 'United States',
     description: 'Maker of iPhone, renowned for custom Apple Silicon, iOS ecosystem integration, benchmark video recording, and resale value.',
-    officialPresenceInNigeria: 'Redington / Authorized Apple Resellers (iStore, Slot, Pointek).',
+    globalPresence: 'Worldwide distribution through Apple Stores, Apple Authorized Resellers, and major telecom carriers.',
     popularSeries: ['iPhone 16 / 16 Pro Max', 'iPhone 15 / 15 Pro', 'iPhone SE'],
-    warrantyPartner: 'Apple Authorized Service Providers (Redington, iStore)',
+    warrantyPartner: 'Apple Authorized Service Providers (1-Year Global Apple Warranty)',
     logoLetter: 'A',
     accentBg: 'bg-slate-700'
   },
@@ -55,9 +55,9 @@ export const INITIAL_BRANDS: Brand[] = [
     slug: 'xiaomi',
     country: 'China',
     description: 'Consumer electronics brand known for aggressive spec-to-price ratios, HyperOS, and Leica co-engineered mobile cameras.',
-    officialPresenceInNigeria: 'Xiaomi Authorized Stores (Ikeja City Mall, Jabi Lake Mall Abuja) & Jumia Official.',
+    globalPresence: 'Global distribution in 100+ countries with official Mi Home stores and authorized global partners.',
     popularSeries: ['Redmi (Budget Value)', 'Redmi Note (Mid-range kings)', 'Xiaomi Series (High-End Flagship)', 'POCO (Gaming)'],
-    warrantyPartner: 'Xiaomi Authorized Service (Raya Service)',
+    warrantyPartner: 'Xiaomi Authorized Service Centers',
     logoLetter: 'X',
     accentBg: 'bg-orange-600'
   },
@@ -67,9 +67,9 @@ export const INITIAL_BRANDS: Brand[] = [
     slug: 'google',
     country: 'United States',
     description: 'Google Pixel series featuring computational photography, clean Google Tensor AI processing, and 7 years of OS updates.',
-    officialPresenceInNigeria: 'Available through trusted tech importers, Slot, and Computer Village flagship stores.',
+    globalPresence: 'Available through Google Store worldwide and certified consumer electronics retailers.',
     popularSeries: ['Pixel Pro', 'Pixel Standard', 'Pixel A-Series'],
-    warrantyPartner: 'Merchant Warranty & Tech Repair Specialists',
+    warrantyPartner: 'Google Store & Certified Repair Network',
     logoLetter: 'G',
     accentBg: 'bg-teal-600'
   },
@@ -79,9 +79,9 @@ export const INITIAL_BRANDS: Brand[] = [
     slug: 'oneplus',
     country: 'China',
     description: 'Performance-driven brand offering fluid OxygenOS, ultra-fast 100W charging, Snapdragon powerhouses, and Hasselblad imaging.',
-    officialPresenceInNigeria: 'Distributed via premium mobile retail outlets and e-commerce platforms in Lagos & Abuja.',
+    globalPresence: 'Worldwide retail footprint across North America, Europe, Asia, and international direct platforms.',
     popularSeries: ['OnePlus R Series', 'OnePlus Flagship Number Series', 'OnePlus Nord'],
-    warrantyPartner: 'Authorized Retail Warranty',
+    warrantyPartner: 'OnePlus Official Service Network',
     logoLetter: '1+',
     accentBg: 'bg-red-600'
   },
@@ -90,12 +90,192 @@ export const INITIAL_BRANDS: Brand[] = [
     name: 'Umidigi',
     slug: 'umidigi',
     country: 'China',
-    description: 'Known for rugged smartphones, massive 6000 mAh batteries, and budget smartphones tailored for heavy outdoor and work environments.',
-    officialPresenceInNigeria: 'Available via Jumia, Konga, and Ikeja Computer Village stores.',
+    description: 'Known for rugged smartphones, massive 6000 mAh batteries, and smartphones tailored for heavy outdoor and work environments.',
+    globalPresence: 'Distributed worldwide through official online direct stores and verified global distributors.',
     popularSeries: ['G Series (Mecha & Rugged)', 'A Series (Affordable)', 'Bison (Waterproof Outdoor)'],
-    warrantyPartner: 'Authorized Importer Warranty',
+    warrantyPartner: 'Authorized Importer & Manufacturer Warranty',
     logoLetter: 'U',
     accentBg: 'bg-amber-600'
+  },
+  {
+    id: 'brand-alcatel',
+    name: 'Alcatel',
+    slug: 'alcatel',
+    country: 'France / China (TCL)',
+    description: 'Accessible consumer mobile brand focused on essential connectivity, affordable 4G smartphones, and feature phones worldwide.',
+    globalPresence: 'Global distribution across Europe, Latin America, North America, and emerging markets.',
+    popularSeries: ['1 Series (Ultra Budget)', '3 Series (Essential Smartphones)', 'Go Flip (Feature Phones)'],
+    warrantyPartner: 'TCL Global Customer Care & Regional Service Centers',
+    logoLetter: 'Al',
+    accentBg: 'bg-sky-600'
+  },
+  {
+    id: 'brand-asus',
+    name: 'Asus',
+    slug: 'asus',
+    country: 'Taiwan',
+    description: 'High-performance mobile innovator famed for ROG Phone extreme gaming hardware with active cooling and compact flagship Zenfone series.',
+    globalPresence: 'Distributed across North America, Europe, Taiwan, India, and global gaming hardware channels.',
+    popularSeries: ['ROG Phone (Extreme Gaming)', 'Zenfone (Compact Flagship)'],
+    warrantyPartner: 'ASUS Royal Club & International Warranty Network',
+    logoLetter: 'AS',
+    accentBg: 'bg-blue-700'
+  },
+  {
+    id: 'brand-honor',
+    name: 'Honor',
+    slug: 'honor',
+    country: 'China',
+    description: 'Fast-growing premium smartphone brand recognized for slim foldables like Magic V, Magic series AI photography, and long-lasting silicon-carbon batteries.',
+    globalPresence: 'Direct presence across Europe, Middle East, Asia, and Latin America.',
+    popularSeries: ['Magic Series (Ultra Flagships & Foldables)', 'Honor Number Series (Design & Portraits)', 'X Series (Value Durability)'],
+    warrantyPartner: 'Honor Authorized Service Centers',
+    logoLetter: 'H',
+    accentBg: 'bg-cyan-600'
+  },
+  {
+    id: 'brand-huawei',
+    name: 'Huawei',
+    slug: 'huawei',
+    country: 'China',
+    description: 'Pioneering telecommunications technology giant producing XMAGE optical imaging systems, Mate series flagships, and HarmonyOS ecosystem devices.',
+    globalPresence: 'Extensive global enterprise and consumer presence across Asia, Middle East, Africa, and Europe.',
+    popularSeries: ['Pura Series (Art & XMAGE Camera)', 'Mate Series (Business Flagship)', 'Nova Series (Youth & Style)'],
+    warrantyPartner: 'Huawei Customer Service Centers',
+    logoLetter: 'HW',
+    accentBg: 'bg-red-700'
+  },
+  {
+    id: 'brand-iqoo',
+    name: 'IQOO',
+    slug: 'iqoo',
+    country: 'China (vivo)',
+    description: 'High-performance and eSports gaming smartphone brand featuring bespoke monster touch displays, vapor-chamber cooling, and extreme benchmark scores.',
+    globalPresence: 'Available across China, India, Southeast Asia, and international gaming enthusiast markets.',
+    popularSeries: ['iQOO Number Series (Flagship Performance)', 'Neo Series (Flagship Killer Gaming)', 'Z Series (Mid-range Speed)'],
+    warrantyPartner: 'vivo / iQOO Certified Service Centers',
+    logoLetter: 'iQ',
+    accentBg: 'bg-amber-600'
+  },
+  {
+    id: 'brand-itel',
+    name: 'Itel',
+    slug: 'itel',
+    country: 'Hong Kong (Transsion)',
+    description: 'Reliable budget-focused consumer tech brand providing dependable entry-level smartphones, long battery life, and high accessibility in emerging markets.',
+    globalPresence: 'Market leader in over 50 emerging countries across Africa, South Asia, and Latin America.',
+    popularSeries: ['A Series (Essential Entry)', 'P Series (Power Battery Kings)', 'S Series (Affordable Selfies)'],
+    warrantyPartner: 'Carlcare Global Service Network (100 days free replacement & 12 months warranty)',
+    logoLetter: 'it',
+    accentBg: 'bg-rose-600'
+  },
+  {
+    id: 'brand-motorola',
+    name: 'Motorola',
+    slug: 'motorola',
+    country: 'United States / China (Lenovo)',
+    description: 'Iconic mobile communications pioneer recognized for flip foldables (Razr), clean Android experience (Hello UI), and versatile Moto G series.',
+    globalPresence: 'Broad carrier and retail distribution in North America, Latin America, Europe, and Asia.',
+    popularSeries: ['Razr (Iconic Foldables)', 'Edge (Premium Flagships)', 'Moto G (Value Class)'],
+    warrantyPartner: 'Motorola / Lenovo Care Service Centers',
+    logoLetter: 'M',
+    accentBg: 'bg-blue-800'
+  },
+  {
+    id: 'brand-oppo',
+    name: 'Oppo',
+    slug: 'oppo',
+    country: 'China',
+    description: 'Global smartphone innovator famed for ColorOS fluidity, Hasselblad mobile photography on Find X, and durable Reno series portrait smartphones.',
+    globalPresence: 'Operating in 60+ countries across Asia, Europe, Middle East, and Africa with over 300,000 retail points.',
+    popularSeries: ['Find X (Ultra Flagship & Foldables)', 'Reno (Portrait Camera Kings)', 'A Series (Reliable Everyday)'],
+    warrantyPartner: 'OPPO Official Customer Service Network',
+    logoLetter: 'O',
+    accentBg: 'bg-emerald-700'
+  },
+  {
+    id: 'brand-oscal',
+    name: 'Oscal',
+    slug: 'oscal',
+    country: 'China (Blackview)',
+    description: 'Dynamic tech brand creating durable outdoor rugged devices, budget 5G phones, and stylish ultra-affordable everyday smartphones.',
+    globalPresence: 'Sold worldwide across Europe, Latin America, Southeast Asia, and global online e-commerce channels.',
+    popularSeries: ['S Series (Outdoor Rugged)', 'Tiger Series (Youth Performance)', 'Flat Series (Budget Style)'],
+    warrantyPartner: 'Blackview & Oscal International Warranty Services',
+    logoLetter: 'Os',
+    accentBg: 'bg-teal-700'
+  },
+  {
+    id: 'brand-oukitel',
+    name: 'Oukitel',
+    slug: 'oukitel',
+    country: 'China',
+    description: 'Renowned pioneer of ultra-rugged smartphones with massive 10,000 mAh to 22,000 mAh battery capacities, built-in camping lights, and MIL-STD-810H durability.',
+    globalPresence: 'Global distribution across 60+ countries serving industrial, construction, military, and outdoor adventure markets.',
+    popularSeries: ['WP Series (Mega-Battery Rugged Flagships)', 'C Series (Sleek Everyday Budget)'],
+    warrantyPartner: 'Oukitel Global Service Hubs & Direct Replacement Warranty',
+    logoLetter: 'Ou',
+    accentBg: 'bg-orange-700'
+  },
+  {
+    id: 'brand-realme',
+    name: 'Realme',
+    slug: 'realme',
+    country: 'China',
+    description: 'Disruptive youth-centric tech brand delivering leap-forward performance, 240W ultra-fast charging records, and bold industrial design collaborations.',
+    globalPresence: 'Fastest-growing brand across 61 markets worldwide spanning Asia, Europe, and Latin America.',
+    popularSeries: ['GT Series (Flagship Speed & Gaming)', 'Number Series (Periscope Camera & Curve OLED)', 'C Series (Champion Budget)'],
+    warrantyPartner: 'realme Authorized Service Centers',
+    logoLetter: 'R',
+    accentBg: 'bg-yellow-600'
+  },
+  {
+    id: 'brand-sony',
+    name: 'Sony',
+    slug: 'sony',
+    country: 'Japan',
+    description: 'Master of professional mobile imaging, producing Xperia phones with true continuous optical zoom periscopes, 4K OLED HDR displays, and Alpha camera sensor integration.',
+    globalPresence: 'Available in Japan, North America, Europe, and select international specialty photography markets.',
+    popularSeries: ['Xperia 1 (Professional Creator Flagship)', 'Xperia 5 (Compact Powerhouse)', 'Xperia 10 (Lightweight Mid-Range)'],
+    warrantyPartner: 'Sony Authorized Service Centers & Global Repair Network',
+    logoLetter: 'SO',
+    accentBg: 'bg-zinc-800'
+  },
+  {
+    id: 'brand-tcl',
+    name: 'TCL',
+    slug: 'tcl',
+    country: 'China',
+    description: 'Display technology giant bringing NXTPAPER paper-like anti-glare eye-care displays and NXTVISION image processing to smartphones.',
+    globalPresence: 'Global distribution across North America, Europe, Australia, and Latin America.',
+    popularSeries: ['NXTPAPER Series (Eye Comfort Matte Displays)', 'TCL 50 / 40 Series (Mainstream 5G Value)'],
+    warrantyPartner: 'TCL Global Electronics Service Care',
+    logoLetter: 'TCL',
+    accentBg: 'bg-red-800'
+  },
+  {
+    id: 'brand-vivo',
+    name: 'Vivo',
+    slug: 'vivo',
+    country: 'China',
+    description: 'Pioneering mobile imaging brand famed for ZEISS APO telephoto cameras, custom V-series ISP imaging chips, and high-fidelity mobile audio.',
+    globalPresence: 'Present in over 60 markets with hundreds of millions of users across Asia, Europe, and emerging economies.',
+    popularSeries: ['X Series (ZEISS Professional Camera Flagships)', 'V Series (Slim Studio Portrait Kings)', 'Y Series (All-Day Battery Mid-Range)'],
+    warrantyPartner: 'vivo Exclusive Customer Service Centers',
+    logoLetter: 'V',
+    accentBg: 'bg-indigo-700'
+  },
+  {
+    id: 'brand-zte',
+    name: 'ZTE',
+    slug: 'zte',
+    country: 'China',
+    description: 'Telecommunications pioneer behind nubia full-screen under-display cameras, REDMAGIC elite gaming smartphones, and versatile Axon flagships.',
+    globalPresence: 'Operating across 160+ countries worldwide with telecom operators and direct consumer channels.',
+    popularSeries: ['nubia Z Series (35mm Photography & Full-Screen)', 'REDMAGIC (Esports Gaming Titans)', 'Blade Series (Everyday Value)'],
+    warrantyPartner: 'ZTE / nubia Authorized Customer Care Network',
+    logoLetter: 'Z',
+    accentBg: 'bg-blue-900'
   }
 ];
 
@@ -108,16 +288,17 @@ export const INITIAL_PHONES: Phone[] = [
     priceUSD: 85,
     oldPriceNGN: 145000,
     priceRange: '100k-200k',
-    marketStatus: 'Available in Nigeria',
-    nairaPriceNotes: 'Best for low budget users in Nigeria. Available nationwide with official Carlcare 12+1 month warranty.',
+    marketStatus: 'Available. Released 2024, October',
+    nairaPriceNotes: 'Entry-level smartphone offering a 90Hz display, 5200 mAh battery, and clean XOS 14. MSRP ~$85 / ₦130,000 with manufacturer warranty.',
     releaseYear: 2024,
     releaseDate: 'October 2024',
+    modelNumber: 'X6525, X6525B',
     screenSizeInches: 6.6,
     image: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     accentColor: '#10b981',
-    rating: 3.8,
-    reviewsCount: 42,
-    viewsCount: 34500,
+    rating: 4.0,
+    reviewsCount: 1,
+    viewsCount: 0,
     categories: ['best-budget', 'under-200k', 'under-100k'],
     isFeatured: true,
     isPopular: true,
@@ -135,7 +316,7 @@ export const INITIAL_PHONES: Phone[] = [
     detailedSpecs: {
       network: {
         technology: 'GSM / HSPA / LTE',
-        bands5g: '4G LTE bands 1, 3, 5, 7, 8, 20, 28, 38, 40, 41 (Compatible with MTN, Airtel, Glo, 9mobile 4G)',
+        bands5g: '4G LTE bands 1, 3, 5, 7, 8, 20, 28, 38, 40, 41 (Global bands)',
         speed: 'HSPA, LTE-A',
         sim: 'Dual SIM (Nano-SIM, dual stand-by)'
       },
@@ -204,16 +385,17 @@ export const INITIAL_PHONES: Phone[] = [
     priceUSD: 599,
     oldPriceNGN: 940000,
     priceRange: '600k-1.2m',
-    marketStatus: 'Available in Nigeria',
-    nairaPriceNotes: 'A performance bargain: last generation flagship Snapdragon 8 Gen 2 chip, 16GB of RAM, a huge 5500 mAh battery and 100W charging. Ideal for gaming and heavy multitasking.',
+    marketStatus: 'Available. Released 2024, January',
+    nairaPriceNotes: 'Performance flagship killer featuring Qualcomm Snapdragon 8 Gen 2, 16GB RAM, 5500 mAh battery and 100W SUPERVOOC charging. Global MSRP ~$599 / ₦895,000.',
     releaseYear: 2024,
     releaseDate: 'January 2024',
+    modelNumber: 'CPH2609, CPH2611',
     screenSizeInches: 6.78,
     image: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     accentColor: '#dc2626',
-    rating: 4.9,
-    reviewsCount: 88,
-    viewsCount: 42000,
+    rating: 4.8,
+    reviewsCount: 4,
+    viewsCount: 0,
     categories: ['best-gaming', 'best-battery', 'best-5g', 'best-phones'],
     isFeatured: true,
     isPopular: true,
@@ -231,7 +413,7 @@ export const INITIAL_PHONES: Phone[] = [
     detailedSpecs: {
       network: {
         technology: 'GSM / CDMA / HSPA / LTE / 5G',
-        bands5g: 'SA/NSA: 1, 2, 3, 5, 7, 8, 20, 28, 38, 40, 41, 77, 78 (Full MTN & Airtel 5G)',
+        bands5g: '1, 2, 3, 5, 7, 8, 20, 28, 38, 40, 41, 77, 78 SA/NSA',
         speed: 'HSPA, LTE-A (CA), 5G',
         sim: 'Dual SIM (Nano-SIM, dual stand-by)'
       },
@@ -300,16 +482,17 @@ export const INITIAL_PHONES: Phone[] = [
     priceUSD: 999,
     oldPriceNGN: 1620000,
     priceRange: 'flagship',
-    marketStatus: 'Available in Nigeria',
-    nairaPriceNotes: 'Google\'s computational photography at its best: excellent point and shoot results, seven years of software updates and the cleanest version of Android available in Nigeria.',
+    marketStatus: 'Available. Released 2023, October',
+    nairaPriceNotes: 'Google computational photography benchmark featuring Google Tensor G3, 7 years of major OS upgrades, and Super Actua LTPO OLED display. MSRP ~$999 / ₦1,540,000.',
     releaseYear: 2023,
     releaseDate: 'October 2023',
+    modelNumber: 'GC3VE, G1MNW',
     screenSizeInches: 6.7,
     image: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     accentColor: '#14b8a6',
-    rating: 4.8,
-    reviewsCount: 65,
-    viewsCount: 39000,
+    rating: 0,
+    reviewsCount: 0,
+    viewsCount: 0,
     categories: ['best-camera', 'best-5g', 'best-phones'],
     isFeatured: true,
     isPopular: true,
@@ -327,7 +510,7 @@ export const INITIAL_PHONES: Phone[] = [
     detailedSpecs: {
       network: {
         technology: 'GSM / HSPA / LTE / 5G',
-        bands5g: 'Sub-6 GHz and mmWave (Full support for Nigerian 5G networks)',
+        bands5g: '1, 2, 3, 5, 7, 8, 12, 20, 25, 28, 30, 38, 40, 41, 66, 71, 77, 78 SA/NSA/Sub6/mmWave',
         speed: 'HSPA, LTE-A (CA), 5G',
         sim: 'Nano-SIM and eSIM'
       },
@@ -396,16 +579,17 @@ export const INITIAL_PHONES: Phone[] = [
     priceUSD: 119,
     oldPriceNGN: 189000,
     priceRange: '100k-200k',
-    marketStatus: 'Available in Nigeria',
-    nairaPriceNotes: 'Dependable budget favorite with clean 90Hz display, 50MP AI primary camera, and 5000 mAh battery with 18W charging.',
+    marketStatus: 'Available. Released 2023, November',
+    nairaPriceNotes: 'Dependable budget favorite with clean 90Hz display, 50MP AI primary camera, and 5000 mAh battery with 18W charging. MSRP ~$119 / ₦175,000.',
     releaseYear: 2023,
     releaseDate: 'November 2023',
+    modelNumber: '23100RN82L, 23108RN04Y',
     screenSizeInches: 6.74,
     image: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     accentColor: '#ea580c',
-    rating: 4.3,
-    reviewsCount: 52,
-    viewsCount: 29000,
+    rating: 4.0,
+    reviewsCount: 1,
+    viewsCount: 0,
     categories: ['best-budget', 'under-200k'],
     isFeatured: false,
     isPopular: true,
@@ -492,16 +676,17 @@ export const INITIAL_PHONES: Phone[] = [
     priceUSD: 299,
     oldPriceNGN: 480000,
     priceRange: '350k-600k',
-    marketStatus: 'Available in Nigeria',
-    nairaPriceNotes: 'Class-leading 200MP OIS sensor, crisp 1.5K 120Hz AMOLED screen, and Snapdragon 7s Gen 2 chip. 67W turbo charger included.',
+    marketStatus: 'Available. Released 2024, January',
+    nairaPriceNotes: 'Class-leading 200MP OIS sensor, crisp 1.5K 120Hz AMOLED screen, and Snapdragon 7s Gen 2 chip with 67W turbo charging. Global MSRP ~$299 / ₦450,000.',
     releaseYear: 2024,
     releaseDate: 'January 2024',
+    modelNumber: '2312DRA50G, 2312CRAD3C',
     screenSizeInches: 6.67,
     image: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     accentColor: '#f97316',
-    rating: 4.7,
-    reviewsCount: 94,
-    viewsCount: 38000,
+    rating: 0,
+    reviewsCount: 0,
+    viewsCount: 0,
     categories: ['best-camera', 'best-5g', 'best-budget'],
     isFeatured: false,
     isPopular: true,
@@ -519,7 +704,7 @@ export const INITIAL_PHONES: Phone[] = [
     detailedSpecs: {
       network: {
         technology: 'GSM / CDMA / HSPA / EVDO / LTE / 5G',
-        bands5g: 'SA/NSA: 1, 3, 5, 7, 8, 20, 28, 38, 40, 41, 66, 77, 78',
+        bands5g: '1, 3, 5, 7, 8, 20, 28, 38, 40, 41, 66, 77, 78 SA/NSA',
         speed: 'HSPA, LTE-A, 5G',
         sim: 'Dual SIM (Nano-SIM, dual stand-by) or Nano-SIM and eSIM'
       },
@@ -588,16 +773,17 @@ export const INITIAL_PHONES: Phone[] = [
     priceUSD: 1230,
     oldPriceNGN: 1980000,
     priceRange: 'flagship',
-    marketStatus: 'Available in Nigeria',
-    nairaPriceNotes: 'Official Samsung West Africa 24-month warranty. S-Pen included in box. Anti-reflective Gorilla Armor display tested in Lagos.',
+    marketStatus: 'Available. Released 2024, January',
+    nairaPriceNotes: 'Ultra flagship with Titanium frame, Corning Gorilla Armor anti-reflective glass, 200MP quad camera, S-Pen, and 7-year OS update guarantee. MSRP ~$1,230 / ₦1,850,000.',
     releaseYear: 2024,
     releaseDate: 'January 2024',
+    modelNumber: 'SM-S928B, SM-S928B/DS',
     screenSizeInches: 6.8,
     image: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     accentColor: '#4f46e5',
-    rating: 4.9,
-    reviewsCount: 310,
-    viewsCount: 64200,
+    rating: 4.8,
+    reviewsCount: 4,
+    viewsCount: 0,
     categories: ['best-camera', 'best-5g', 'best-gaming', 'best-phones'],
     isFeatured: true,
     isPopular: true,
@@ -615,7 +801,7 @@ export const INITIAL_PHONES: Phone[] = [
     detailedSpecs: {
       network: {
         technology: 'GSM / CDMA / HSPA / EVDO / LTE / 5G',
-        bands5g: 'SA/NSA/Sub6 - Full Nigerian telecom carrier compatibility (MTN, Airtel, Glo, 9mobile)',
+        bands5g: '1, 2, 3, 5, 7, 8, 12, 20, 25, 26, 28, 38, 40, 41, 66, 75, 77, 78 SA/NSA/Sub6',
         speed: 'HSPA, LTE-A (up to 7CA), 5G',
         sim: 'Nano-SIM and eSIM or Dual Nano-SIM'
       },
@@ -684,16 +870,17 @@ export const INITIAL_PHONES: Phone[] = [
     priceUSD: 1630,
     oldPriceNGN: 2550000,
     priceRange: 'flagship',
-    marketStatus: 'Available in Nigeria',
-    nairaPriceNotes: 'Official Nigerian retail stock with 1-Year international Apple warranty. Dual SIM variants available across Slot and iStore Nigeria.',
+    marketStatus: 'Available. Released 2024, September',
+    nairaPriceNotes: 'Flagship iPhone built from Grade 5 Titanium, Apple A18 Pro 3nm silicon, 48MP Fusion camera system with 5x optical telephoto, and Camera Control button. MSRP ~$1,630 / ₦2,450,000.',
     releaseYear: 2024,
     releaseDate: 'September 2024',
+    modelNumber: 'A3296, A3084, A3295',
     screenSizeInches: 6.9,
     image: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     accentColor: '#334155',
-    rating: 4.9,
-    reviewsCount: 285,
-    viewsCount: 78000,
+    rating: 0,
+    reviewsCount: 0,
+    viewsCount: 0,
     categories: ['best-camera', 'best-5g', 'best-gaming', 'best-phones'],
     isFeatured: true,
     isPopular: true,
@@ -711,7 +898,7 @@ export const INITIAL_PHONES: Phone[] = [
     detailedSpecs: {
       network: {
         technology: 'GSM / CDMA / HSPA / EVDO / LTE / 5G',
-        bands5g: 'Global Sub-6 GHz and mmWave bands (Full compatibility with MTN, Airtel, Mafab 5G)',
+        bands5g: '1, 2, 3, 5, 7, 8, 12, 20, 25, 26, 28, 30, 38, 40, 41, 48, 53, 66, 70, 77, 78, 79 SA/NSA/Sub6',
         speed: 'HSPA, LTE-A, 5G',
         sim: 'Dual eSIM or Nano-SIM and eSIM'
       },
@@ -780,16 +967,17 @@ export const INITIAL_PHONES: Phone[] = [
     priceUSD: 350,
     oldPriceNGN: 545000,
     priceRange: '350k-600k',
-    marketStatus: 'Available in Nigeria',
-    nairaPriceNotes: 'Sony IMX890 50MP OIS sensor, 144Hz AMOLED screen, 70W fast charging. Official Carlcare 13-month warranty.',
+    marketStatus: 'Available. Released 2024, May',
+    nairaPriceNotes: 'Sony IMX890 50MP OIS sensor, fluid 144Hz AMOLED screen, Dimensity 8200 Ultimate 4nm, and 70W fast charging. Global MSRP ~$350 / ₦520,000.',
     releaseYear: 2024,
     releaseDate: 'May 2024',
+    modelNumber: 'CL8, CL8n',
     screenSizeInches: 6.78,
     image: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     accentColor: '#2563eb',
-    rating: 4.8,
-    reviewsCount: 142,
-    viewsCount: 28400,
+    rating: 0,
+    reviewsCount: 0,
+    viewsCount: 0,
     categories: ['best-camera', 'best-5g', 'best-battery'],
     isFeatured: true,
     isPopular: true,
@@ -807,7 +995,7 @@ export const INITIAL_PHONES: Phone[] = [
     detailedSpecs: {
       network: {
         technology: 'GSM / HSPA / LTE / 5G',
-        bands5g: 'SA/NSA: n1/n3/n5/n7/n8/n20/n28/n38/n40/n41/n77/n78 (Full MTN & Airtel 5G)',
+        bands5g: '1, 3, 5, 7, 8, 20, 28, 38, 40, 41, 77, 78 SA/NSA',
         speed: 'HSPA, LTE-A, 5G NR',
         sim: 'Dual SIM (Nano-SIM, dual stand-by)'
       },
@@ -876,16 +1064,17 @@ export const INITIAL_PHONES: Phone[] = [
     priceUSD: 110,
     oldPriceNGN: 175000,
     priceRange: '100k-200k',
-    marketStatus: 'Available in Nigeria',
-    nairaPriceNotes: 'Rugged smartphone with 6000 mAh battery built for challenging worksites, delivery riders, and long power outages in Nigeria.',
+    marketStatus: 'Available. Released 2024, March',
+    nairaPriceNotes: 'Rugged smartphone with 6000 mAh battery, reinforced drop-resistant casing, and IP68/IP69K rating for demanding worksite conditions. MSRP ~$110 / ₦160,000.',
     releaseYear: 2024,
     releaseDate: 'March 2024',
+    modelNumber: 'G5M-2309',
     screenSizeInches: 6.6,
     image: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     accentColor: '#d97706',
-    rating: 4.4,
-    reviewsCount: 38,
-    viewsCount: 19800,
+    rating: 0,
+    reviewsCount: 0,
+    viewsCount: 0,
     categories: ['best-battery', 'best-budget', 'under-200k'],
     isFeatured: false,
     isPopular: false,
@@ -968,204 +1157,203 @@ export const INITIAL_PHONES: Phone[] = [
 
 export const INITIAL_ARTICLES: Article[] = [
   {
-    id: 'art-iphone-16-nigeria',
-    title: 'iPhone 16 series: what Nigerian buyers should know',
-    slug: 'iphone-16-series-what-nigerian-buyers-should-know',
-    category: 'Smartphone News',
+    id: 'art-iphone-16-buyers-guide',
+    title: 'iPhone 16 series: what global buyers should know',
+    slug: 'iphone-16-series-what-buyers-should-know',
+    category: 'Phone News',
     coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
-    summary: 'Prices, camera changes and the features that actually matter if you are upgrading from an older iPhone in Nigeria.',
-    content: `Apple has refreshed the iPhone line up, and the headline changes are immediately visible: narrower bezels, lighter titanium builds, the dedicated Camera Control button on all models, and Apple Intelligence. But in Nigeria, where the exchange rate pushes flagship phone prices well past two million naira, the question is simple: which changes actually matter in daily life, and which model gives the best return on your money?
+    summary: 'Global pricing, camera enhancements, and the architectural upgrades that matter most when upgrading from previous generations.',
+    content: `Apple has refreshed the iPhone line up, and the headline changes are immediately noticeable: slimmer uniform bezels, Grade 5 titanium builds, the dedicated Camera Control button on all models, and second-generation 3nm Apple Intelligence silicon. But when deciding whether to upgrade, the core question is simple: which changes actually matter in daily life, and which model gives the best return on your investment?
 
-### The Price Reality in Nigeria
-At authorized resellers like Slot and iStore Nigeria, as well as trusted Computer Village importers:
-- **iPhone 16 Standard (128GB)**: ~₦1,650,000 ($1,100)
-- **iPhone 16 Plus (128GB)**: ~₦1,850,000 ($1,230)
-- **iPhone 16 Pro (128GB/256GB)**: ~₦2,050,000 ($1,360)
-- **iPhone 16 Pro Max (256GB)**: ~₦2,450,000 ($1,630)
+### Global Pricing & Model Hierarchy
+Across major international markets and regional distribution channels:
+- **iPhone 16 Standard (128GB)**: ~$799 / ₦1,650,000
+- **iPhone 16 Plus (128GB)**: ~$899 / ₦1,850,000
+- **iPhone 16 Pro (128GB/256GB)**: ~$999 / ₦2,050,000
+- **iPhone 16 Pro Max (256GB)**: ~$1,199 / ₦2,450,000
 
-### What Actually Matters If You Are Upgrading
-1. **Battery Life**: The 16 Pro Max is a genuine two-day device even under heavy Lagos traffic use with Google Maps navigation and mobile hotspot running.
-2. **Camera Control**: The capacitive button allows rapid switching between exposure, depth of field and zoom without tapping the screen.
-3. **4K 120fps Dolby Vision**: For Nigerian content creators and wedding videographers, shooting 4K at 120fps with spatial audio is an industry-grade superpower.
+### Key Upgrades That Make a Difference
+1. **Battery Runtime**: The 16 Pro Max achieves true multi-day battery endurance under heavy navigation, cellular data, and media streaming tests.
+2. **Camera Control Key**: The capacitive, pressure-sensitive switch allows rapid adjustments of exposure, photographic styles, and focal lengths without obstructing the viewfinder.
+3. **4K 120fps Dolby Vision**: For videographers and mobile creators, recording 4K at 120fps with studio-grade spatial audio mic capture represents an industry benchmark.
 
-### The Recommendation
-If you already own an iPhone 15 Pro Max, there is little compelling reason to spend another million naira on the upgrade. However, if you are moving from an iPhone 11, 12, or 13, the leap in battery endurance, 5G carrier speed, and camera versatility is transformative.`,
+### The Verdict
+If you already own an iPhone 15 Pro Max, there is little urgent necessity to upgrade immediately. However, for users stepping up from an iPhone 11, 12, or 13, the leap in display brightness, battery endurance, 5G carrier reception, and camera versatility is transformative.`,
     author: {
-      name: 'GsmScope Editors',
+      name: 'GsmScope',
       role: 'Hardware Editorial Team'
     },
     date: '2 Mar 2026',
     readTime: '6 min read',
-    tags: ['iPhone 16', 'Apple', 'Nigerian Prices', 'Buying Advice', 'Lagos Tech'],
+    tags: ['iPhone 16', 'Apple', 'Global Pricing', 'Buying Advice', 'Flagship'],
     featured: true,
     relatedPhoneIds: ['apple-iphone-16-pro-max']
   },
   {
     id: 'art-redmi-vs-infinix',
-    title: 'Redmi Note 13 Pro vs Infinix Note 40 Pro: which should you buy?',
+    title: 'Redmi Note 13 Pro 5G vs Infinix Note 40 Pro+: mid-range comparison',
     slug: 'redmi-note-13-pro-vs-infinix-note-40-pro-which-should-you-buy',
-    category: 'Comparisons',
+    category: 'Reviews',
     coverImage: '/src/assets/images/news_camera_sensor_1792578845370.jpg',
-    summary: 'Two of the most popular mid range phones in Nigeria go head to head on camera, battery, screen and price.',
-    content: `Both phones target the exact same Nigerian buyer: someone who wants a vibrant AMOLED screen, fast charging, sharp camera sensors, and 5G connectivity without spending a fortune.
+    summary: 'Two of the most competitive mid-range smartphones go head-to-head on display, camera sensors, battery endurance, and charging tech.',
+    content: `Both phones compete in the high-volume mid-range tier, offering high-refresh AMOLED screens, rapid charging speeds, high-megapixel camera sensors, and 5G connectivity at accessible prices.
 
 ### Design and Display
-- **Redmi Note 13 Pro 5G**: Flat 6.67" 1.5K CrystalRes AMOLED panel with 1800 nits peak brightness and Gorilla Glass Victus.
-- **Infinix Note 40 Pro+ 5G**: 6.78" 3D-Curved AMOLED panel with 1300 nits and an eye-catching Active Halo notification light on the back.
+- **Redmi Note 13 Pro 5G**: Flat 6.67" 1.5K CrystalRes AMOLED panel with 1800 nits peak brightness and Corning Gorilla Glass Victus.
+- **Infinix Note 40 Pro+ 5G**: 6.78" 3D-Curved AMOLED panel with 1300 nits and an Active Halo notification lighting system on the camera island.
 
-The curved display on the Infinix looks more luxurious in hand, but the Redmi’s flat 1.5K screen is sharper and significantly easier to protect with affordable tempered screen guards from Computer Village.
+The curved display on the Infinix provides a flagship aesthetic in the hand, while the Redmi’s flat 1.5K panel is sharper, offers higher pixel density (446 ppi), and is easier to equip with standard glass protectors.
 
-### Charging and Power Outages
-Here, Infinix pulls off a technological masterstroke for Nigerian living conditions:
-- **Infinix Note 40 Pro+**: 100W All-Round FastCharge (0 to 50% in 12 minutes) PLUS 20W wireless MagCharge with a MagPad and magnetic phone case included inside the retail box.
-- **Redmi Note 13 Pro 5G**: 67W Turbo Charge (0 to 100% in 44 minutes). Fast, but lacks wireless charging.
+### Charging Architecture
+- **Infinix Note 40 Pro+**: 100W All-Round FastCharge (0 to 50% in 12 minutes) coupled with 20W magnetic wireless MagCharge.
+- **Redmi Note 13 Pro 5G**: 67W Turbo Charge (0 to 100% in 44 minutes). High-efficiency wired charging, though without wireless capability.
 
 ### Camera Performance
-Redmi’s 200MP Samsung ISOCELL sensor captures slightly more fine textile detail in daylight, while the Infinix 108MP camera excels with vibrant skin tones tuned specifically for African melanin tones under natural Nigerian sunlight.
+Redmi’s 200MP Samsung ISOCELL sensor captures slightly superior fine texture detail in daylight, while the Infinix 108MP camera excels in fast shutter response and vibrant color reproduction.
 
 ### Verdict
-If your priority is 100W hyper charging and free magnetic wireless accessories during rolling power outages, the **Infinix Note 40 Pro+** wins. If you prefer a sharper 1.5K display and higher resolution 200MP camera crops, choose the **Redmi Note 13 Pro 5G**.`,
+If your priority is 100W wired charging speed and convenient wireless magnetic accessory support, the **Infinix Note 40 Pro+** is a compelling choice. If you prioritize a sharper 1.5K display and higher resolution 200MP sensor crops, the **Redmi Note 13 Pro 5G** takes the edge.`,
     author: {
       name: 'Ada Nwosu',
       role: 'Senior Hardware Reviewer'
     },
     date: '24 Feb 2026',
     readTime: '7 min read',
-    tags: ['Redmi', 'Infinix', 'Comparison', 'Mid-Range', 'Nigeria Tech'],
+    tags: ['Redmi', 'Infinix', 'Comparison', 'Mid-Range', 'Hardware'],
     featured: true,
     relatedPhoneIds: ['xiaomi-redmi-note-13-pro-5g']
   },
   {
     id: 'art-budget-under-200k',
-    title: 'Best budget phones under 200,000 naira in Nigeria',
-    slug: 'best-budget-phones-under-200-000-naira-in-nigeria',
+    title: 'Best budget smartphones under $150 (₦200,000): complete comparison',
+    slug: 'best-budget-phones-under-150-dollars-complete-guide',
     category: 'Buying Guides',
     coverImage: '/src/assets/images/news_nigeria_tech_1792578846595.jpg',
-    summary: 'Five phones that stretch a small budget the furthest, covering battery life, screen quality and camera basics.',
-    content: `A tight budget does not mean a bad phone. In Nigeria’s current macroeconomic landscape, the ₦100,000 to ₦200,000 price window is where 65% of smartphone transactions take place.
+    summary: 'Five smartphones that stretch entry-level budgets the furthest, covering battery life, screen quality, and camera essentials.',
+    content: `A modest budget doesn't mean compromising on core smartphone essentials. In today's competitive landscape, the sub-$150 price category offers vibrant high refresh-rate displays, multi-day battery capacities, and capable daily performance.
 
-We tested over 10 devices in Lagos and Ibadan to pick the top models that deliver reliable performance:
+We evaluated the top entry-level devices to identify the models that provide the most reliable long-term value:
 
-### 1. Infinix Smart 20 (₦130,000 / $85)
-The overall budget winner. Features a large 5200 mAh battery that easily outlasts generator runs, a smooth 90Hz display, and 18W Type-C charging.
+### 1. Infinix Smart 20 (~$85 / ₦130,000)
+The overall budget winner. Packs a large 5200 mAh battery, a smooth 90Hz punch-hole display, and 18W Type-C fast charging in a modern chassis.
 
-### 2. Xiaomi Redmi 13C (₦175,000 / $119)
-The reliability champion. Powered by the MediaTek Helio G85 chipset, the Redmi 13C provides dependable multitasking, 6GB or 8GB of RAM options, and a respectable 50MP camera.
+### 2. Xiaomi Redmi 13C (~$119 / ₦175,000)
+The reliability champion. Powered by the MediaTek Helio G85 chipset, the Redmi 13C provides dependable multitasking, 6GB or 8GB of RAM options, and a respectable 50MP primary camera.
 
-### 3. Umidigi G5 Mecha (₦160,000 / $110)
-For outdoor workers and field agents. Features a massive 6000 mAh battery pack, rugged bumpers, and IP68 water resistance against rain and dust.
+### 3. Umidigi G5 Mecha (~$110 / ₦160,000)
+Built for rugged environments and field use. Equipped with a massive 6000 mAh battery pack, drop-resistant bumpers, and IP68/IP69K water and dust resistance.
 
-### 4. Tecno Pop 8 (₦92,000 / $62)
-The undisputed sub-₦100k leader. Punch-hole display, stereo speakers, and clean Android Go software.`,
+### 4. Tecno Pop 8 (~$62 / ₦92,000)
+The sub-$70 value benchmark. Includes an 90Hz punch-hole display, stereo speakers, and clean Android Go software.`,
     author: {
-      name: 'GsmScope Editors',
+      name: 'GsmScope',
       role: 'Staff Buyers Desk'
     },
     date: '15 Feb 2026',
     readTime: '5 min read',
-    tags: ['Budget Phones', 'Under 200k', 'Smart 20', 'Redmi 13C', 'Nigeria'],
+    tags: ['Budget Phones', 'Under $150', 'Smart 20', 'Redmi 13C', 'Buying Guide'],
     featured: false,
     relatedPhoneIds: ['smart-20', 'xiaomi-redmi-13c', 'umidigi-g5-mecha']
   },
   {
     id: 'art-5g-worth-it-2026',
-    title: 'Is 5G worth it in Nigeria in 2026?',
-    slug: 'is-5g-worth-it-in-nigeria-in-2026',
+    title: 'Is 5G worth it in 2026? Global carrier speeds & device compatibility',
+    slug: 'is-5g-worth-it-in-2026-carrier-speeds-and-compatibility',
     category: 'Tech Updates',
     coverImage: '/src/assets/images/news_mobile_processor_1792578846003.jpg',
-    summary: 'Coverage is expanding fastest in Lagos, Abuja and Port Harcourt. Here is when a 5G phone makes sense for you.',
-    content: `5G coverage in Nigeria keeps expanding, but it is still concentrated in major commercial capitals: Lagos (Victoria Island, Ikoyi, Lekki, Ikeja), Abuja (Maitama, Wuse, Central Area), Port Harcourt, Kano, and parts of Ibadan.
+    summary: 'Global 5G network expansion: when high-speed Sub-6 and mmWave bands make a difference for your workflow.',
+    content: `5G deployment continues to accelerate globally, with Sub-6 GHz and mmWave infrastructure covering metropolitan centers and expanding rapidly across suburban corridors.
 
-### When 5G Is Worth It
-- **If you work remotely or stream**: Peak speeds exceed 500-700 Mbps on MTN 5G and Airtel 5G, providing fiber-like latency for Zoom meetings and large uploads.
-- **Future-proofing**: If you plan to keep your smartphone for 2 to 4 years, buying a 5G device now prevents premature obsolescence.
+### When 5G Is Essential
+- **Remote Work & Content Creation**: Real-world throughput regularly exceeds 400-800 Mbps, offering ultra-low latency for cloud gaming, high-res video streaming, and rapid transfers.
+- **Device Longevity**: For users holding smartphones for 3 to 5 years, selecting a device with broad 5G band support (n1, n3, n28, n77, n78) prevents connectivity obsolescence.
 
-### When You Can Safely Save Your Money
-If you live in semi-urban or rural areas where 4G LTE is the only available network, paying an extra ₦80,000 - ₦150,000 premium solely for a 5G modem is unnecessary. High-performing 4G devices like the Tecno Spark 20 Pro+ offer superior screens and cameras at lower costs.`,
+### When 4G LTE Remains Sufficient
+In regions where legacy LTE networks deliver steady 50-100 Mbps coverage, allocating your budget toward superior AMOLED displays, higher camera sensor quality, or faster wired charging often yields a greater tangible benefit than spending extra on early-generation 5G modems.`,
     author: {
       name: 'Tunde Balogun',
       role: 'Telecom Infrastructure Analyst'
     },
     date: '5 Feb 2026',
     readTime: '4 min read',
-    tags: ['5G Network', 'MTN', 'Airtel', 'Nigeria Tech', 'Connectivity'],
+    tags: ['5G Network', 'Connectivity', 'Carrier Speeds', 'Tech Analysis', 'Infrastructure'],
     featured: false,
     relatedPhoneIds: ['oneplus-12r', 'xiaomi-redmi-note-13-pro-5g']
   },
   {
-    id: 'art-s24-ultra-lagos-review',
+    id: 'art-s24-ultra-review',
     title: 'Samsung Galaxy S24 Ultra review: still the camera king?',
     slug: 'samsung-galaxy-s24-ultra-review-still-the-camera-king',
     category: 'Reviews',
     coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
-    summary: 'Six months of daily use in Lagos: how the 200MP camera, the S Pen and the battery hold up in real life.',
-    content: `The Galaxy S24 Ultra is Samsung's most expensive non-foldable phone. After six months of navigating Lagos yellow buses, third mainland bridge traffic, high-contrast outdoor sun, and business meetings in Victoria Island, here is our verdict.
+    summary: 'Six months of daily testing: how the 200MP camera, Gorilla Armor anti-reflective glass, and S-Pen hold up in real life.',
+    content: `The Galaxy S24 Ultra represents Samsung's most accomplished flagship to date. After six months of rigorous testing across varying environments, high-contrast sunlight, and intensive mobile workloads, here is our verdict.
 
-### The Gorilla Armor Anti-Reflective Glass
-This is arguably the single greatest real-world improvement in modern smartphone displays. Under direct tropical sunlight at Bar Beach or in an open vehicle, you can clearly read emails, edit documents and review photos without squinting or maxing out brightness until your battery dies.
+### Corning Gorilla Armor Anti-Reflective Glass
+This is arguably the single most practical improvement in modern flagship displays. Under direct high-intensity sunlight, the anti-reflective coating reduces glare by up to 75%, allowing users to read text, review photo captures, and edit documents without maxing out screen brightness.
 
-### Battery Life and Charging
-The 5000 mAh battery consistently delivers 8 to 9 hours of screen-on-time. With 45W charging, a quick 30-minute top-up before leaving the office gives you 65% juice, easily carrying you through Lagos traffic jams.
+### Battery Endurance & Thermal Efficiency
+The 5000 mAh battery consistently delivers 8 to 9.5 hours of screen-on-time under mixed 5G and Wi-Fi workloads. Paired with 45W charging, a quick 30-minute top-up yields 65% capacity.
 
-### S-Pen Productivity
-Signing contracts and PDF documents on the go without finding a cyber cafe or printer has saved our team countless hours.
+### S-Pen Productivity & Galaxy AI
+From precision photo retouching and signing PDF contracts to real-time voice call translation and circle-to-search visual lookups, the integrated stylus continues to define Samsung's productivity lead.
 
 ### The Verdict
-At ₦1,850,000 ($1,230), the Galaxy S24 Ultra is an investment for professionals, executives, and power users. With 7 years of promised Android OS upgrades and titanium construction, it remains the most complete smartphone money can buy in Nigeria.`,
+At ~$1,230 / ₦1,850,000, the Galaxy S24 Ultra is an investment for power users and mobile professionals. With 7 years of promised Android OS and security upgrades, it stands as one of the most complete flagship smartphones on the market.`,
     author: {
       name: 'Ada Nwosu',
       role: 'Senior Hardware Reviewer'
     },
     date: '28 Jan 2026',
     readTime: '8 min read',
-    tags: ['Samsung', 'Galaxy S24 Ultra', 'Lagos Review', 'Flagship', 'Cameras'],
+    tags: ['Samsung', 'Galaxy S24 Ultra', 'In-Depth Review', 'Flagship', 'Cameras'],
     featured: true,
     relatedPhoneIds: ['samsung-galaxy-s24-ultra']
   },
   {
     id: 'art-iphone-16-pro-review',
-    title: 'iPhone 16 Pro Max in-depth review: titanium build & Lagos battery test',
-    slug: 'iphone-16-pro-max-in-depth-review-titanium-lagos-battery-test',
+    title: 'iPhone 16 Pro Max in-depth review: titanium build & battery test',
+    slug: 'iphone-16-pro-max-in-depth-review-titanium-battery-test',
     category: 'Reviews',
     coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
-    summary: 'Testing the 48MP Fusion camera, dedicated Camera Control key, and true 2-day battery endurance under heavy Nigerian mobile network use.',
-    content: `The iPhone 16 Pro Max is Apple's largest and most capable handset to date. In Nigeria, where flagship pricing demands serious justification, we put the 16 Pro Max through four weeks of real-world use across Lagos, Abuja, and Port Harcourt.
+    summary: 'Testing the 48MP Fusion camera system, dedicated Camera Control key, and true 2-day battery endurance under heavy mobile use.',
+    content: `The iPhone 16 Pro Max is Apple's largest and most capable handset to date. We put the device through comprehensive real-world battery tests, camera studio evaluations, and gaming stress sessions.
 
-### The Camera Control Button
-The capacitive Camera Control button lets you launch the camera and adjust focal lengths without looking down at the screen. For street photography in Computer Village or recording 4K 120fps video at events, this tactile control provides an immediate speed advantage.
+### Camera Control & Optical Versatility
+The tactile Camera Control switch provides instant access to camera modes, exposure tuning, and smooth focal length zooms. Combined with the 48MP Fusion sensor and 5x tetraprism telephoto lens, color rendition and dynamic range remain benchmark-class.
 
-### Battery Endurance Across Nigerian 5G
-Powered by the Apple A18 Pro 3nm silicon, battery life is benchmark-setting. Even with MTN 5G active and continuous hotspot sharing during power cuts, the 16 Pro Max reliably finishes a 16-hour workday with over 38% battery remaining.
+### Battery Runtime & Efficiency
+Powered by the Apple A18 Pro 3nm silicon, battery endurance is class-leading. Even with active 5G usage, continuous 4K video recording, and Bluetooth streaming, the 16 Pro Max reliably finishes a 16-hour heavy workday with over 35% capacity remaining.
 
-### Retail Availability & Warranty
-Available at verified authorized retailers in Nigeria with Redington and iStore official warranties.`,
+### Hardware Build & Global Warranty
+Features Grade 5 Titanium construction with textured matte glass and full 1-Year Global Apple Warranty support across authorized service networks worldwide.`,
     author: {
       name: 'Chidi Okafor',
       role: 'Staff Hardware Editor'
     },
     date: '18 Feb 2026',
     readTime: '7 min read',
-    tags: ['iPhone 16 Pro Max', 'Apple', 'Review', 'Lagos Tech', 'Flagship'],
+    tags: ['iPhone 16 Pro Max', 'Apple', 'Review', 'Hardware', 'Flagship'],
     featured: true,
     relatedPhoneIds: ['apple-iphone-16-pro-max']
   },
   {
     id: 'art-oneplus-12r-review',
-    title: 'OnePlus 12R review: the ultimate flagship killer under ₦850,000',
-    slug: 'oneplus-12r-review-ultimate-flagship-killer-nigeria',
+    title: 'OnePlus 12R review: the ultimate flagship killer',
+    slug: 'oneplus-12r-review-ultimate-flagship-killer',
     category: 'Reviews',
     coverImage: '/src/assets/images/news_mobile_processor_1792578846003.jpg',
-    summary: 'Massive 5500 mAh battery, blazing 100W SUPERVOOC charging, and Snapdragon 8 Gen 2 gaming performance tested in Lagos.',
-    content: `With flagship smartphones now routinely crossing the ₦1.8 million threshold, the OnePlus 12R arrives as a breath of fresh air for Nigerian performance enthusiasts.
+    summary: 'Massive 5500 mAh battery, blazing 100W SUPERVOOC charging, and Snapdragon 8 Gen 2 gaming performance tested.',
+    content: `With ultra-flagships frequently surpassing the $1,200 threshold, the OnePlus 12R arrives as a breath of fresh air for performance enthusiasts seeking top-tier power at a sensible price point.
 
-### 100W Charging vs Generator Life
-In Nigeria, fast charging isn't a luxury—it's an essential defense against rolling blackouts. The bundled 100W SUPERVOOC charger takes the 5500 mAh cell from 1% to 100% in exactly 26 minutes on generator or inverter power.
+### 100W SUPERVOOC Hyper Charging
+The bundled 100W SUPERVOOC charger replenishes the 5500 mAh battery from 1% to 100% in exactly 26 minutes, eliminating overnight charging routines.
 
-### Display & Gaming
-The 6.78-inch 1.5K ProXDR 120Hz LTPO 4.0 display is breathtaking. Peak brightness easily punches through direct afternoon sunlight at 4500 nits peak, while PUBG and Call of Duty Mobile run at locked 90fps without thermal throttling.
+### Display & Gaming Performance
+The 6.78-inch 1.5K ProXDR 120Hz LTPO 4.0 display is brilliant, reaching 4500 nits peak brightness. Games such as Genshin Impact and PUBG run smoothly at consistent 60-90 fps with minimal thermal throttle.
 
 ### The Verdict
-For anyone wanting near-flagship performance, class-leading battery life, and rapid charging without paying two million naira, the OnePlus 12R is our top mid-flagship recommendation for 2026.`,
+For anyone wanting near-flagship performance, class-leading battery endurance, and rapid charging without premium flagship pricing, the OnePlus 12R remains our top recommendation.`,
     author: {
       name: 'Ada Nwosu',
       role: 'Senior Hardware Reviewer'
@@ -1175,6 +1363,387 @@ For anyone wanting near-flagship performance, class-leading battery life, and ra
     tags: ['OnePlus 12R', 'Review', 'Battery Test', 'Flagship Killer', 'Performance'],
     featured: true,
     relatedPhoneIds: ['oneplus-12r']
+  },
+  {
+    id: 'art-samsung-oneui7',
+    title: 'Samsung One UI 7 global rollout: new fluid animations and Galaxy AI updates',
+    slug: 'samsung-one-ui-7-global-rollout-galaxy-ai-updates',
+    category: 'Tech Updates',
+    coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
+    summary: 'Samsung begins phased rollout of Android 15-based One UI 7 featuring redesigned notification center and expanded Galaxy AI tools.',
+    content: `Samsung has kicked off the wider international release of One UI 7. Built atop Android 15, the new update delivers the most substantial visual overhaul to Galaxy devices in several generations.
+
+Key improvements include decoupled Quick Settings and notifications, smoother spring-physics animation curves, and enhanced generative photo studio features directly in Samsung Gallery.`,
+    author: {
+      name: 'Elena Rostova',
+      role: 'Software Features Lead'
+    },
+    date: '22 Oct 2026',
+    readTime: '4 min read',
+    tags: ['Samsung', 'Galaxy', 'One UI 7', 'Android 15', 'Software'],
+    featured: false,
+    relatedPhoneIds: ['samsung-galaxy-s24-ultra']
+  },
+  {
+    id: 'art-samsung-s25-benchmarks',
+    title: 'Samsung Galaxy S25 Ultra benchmarks surface with Snapdragon 8 Elite',
+    slug: 'samsung-galaxy-s25-ultra-benchmarks-snapdragon-8-elite',
+    category: 'Phone News',
+    coverImage: '/src/assets/images/news_mobile_processor_1792578846003.jpg',
+    summary: 'Leaked Geekbench 6 scores indicate massive multi-core gains and improved thermal dissipation for next-generation Galaxy flagship.',
+    content: `Preliminary Geekbench runs for Samsung's upcoming flagship indicate single-core performance exceeding 3,100 points and multi-core results topping 10,000 points, powered by Qualcomm's custom Oryon CPU cores.`,
+    author: {
+      name: 'Tunde Balogun',
+      role: 'Mobile Hardware Analyst'
+    },
+    date: '21 Oct 2026',
+    readTime: '3 min read',
+    tags: ['Samsung', 'Galaxy S25', 'Snapdragon 8 Elite', 'Benchmarks'],
+    featured: false,
+    relatedPhoneIds: ['samsung-galaxy-s24-ultra']
+  },
+  {
+    id: 'art-apple-intelligence-features',
+    title: 'Apple Intelligence features expanded in new iOS release for iPhone 16',
+    slug: 'apple-intelligence-expanded-features-iphone-16',
+    category: 'Tech Updates',
+    coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
+    summary: 'Visual Intelligence with Camera Control, priority notifications, and Clean Up photo editing arrive for global iPhone users.',
+    content: `Apple continues rolling out core Apple Intelligence tools across European, African, and Asian markets. The integration with the tactile Camera Control button allows immediate object identification and instant summary generation.`,
+    author: {
+      name: 'Chidi Okafor',
+      role: 'Staff Hardware Editor'
+    },
+    date: '22 Oct 2026',
+    readTime: '5 min read',
+    tags: ['Apple', 'iPhone 16', 'iOS', 'Apple Intelligence'],
+    featured: false,
+    relatedPhoneIds: ['apple-iphone-16-pro-max']
+  },
+  {
+    id: 'art-apple-iphone-battery-tips',
+    title: 'Apple iPhone 16 Pro Max real-world battery endurance test report',
+    slug: 'apple-iphone-16-pro-max-real-world-battery-test',
+    category: 'Reviews',
+    coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
+    summary: 'Our 30-day battery log reveals how 3nm A18 Pro silicon handles 4K ProRes capture, high-contrast GPS navigation, and 5G roaming.',
+    content: `After four weeks of rigorous testing, the iPhone 16 Pro Max achieved an average of 9 hours and 45 minutes of screen-on-time under mixed LTE/5G network loads, setting a new runtime benchmark for iOS flagships.`,
+    author: {
+      name: 'GsmScope',
+      role: 'Editorial Staff'
+    },
+    date: '19 Oct 2026',
+    readTime: '6 min read',
+    tags: ['Apple', 'iPhone 16 Pro Max', 'Battery', 'Review'],
+    featured: false,
+    relatedPhoneIds: ['apple-iphone-16-pro-max']
+  },
+  {
+    id: 'art-tecno-camon-30-imaging',
+    title: 'Tecno Camon 30 Premier camera deep dive: Sony PolarNick quad imaging tested',
+    slug: 'tecno-camon-30-premier-camera-deep-dive-sony-imaging',
+    category: 'Phone News',
+    coverImage: '/src/assets/images/news_camera_sensor_1792578845370.jpg',
+    summary: 'Dual imaging chips and periscope telephoto zoom bring flagship photo credentials to Tecno’s high-value mid-ranger.',
+    content: `Tecno has positioned the Camon 30 Premier as an imaging powerhouse, featuring a custom Sony imaging co-processor that handles 4K Ultra Night video and real-time portrait tone mapping with exceptional color fidelity.`,
+    author: {
+      name: 'Ada Nwosu',
+      role: 'Senior Hardware Reviewer'
+    },
+    date: '20 Oct 2026',
+    readTime: '4 min read',
+    tags: ['Tecno', 'Camon', 'Camera Test', 'Sony Sensor'],
+    featured: false,
+    relatedPhoneIds: ['tecno-camon-30-premier']
+  },
+  {
+    id: 'art-tecno-phantom-fold2',
+    title: 'Tecno Phantom V Fold2 goes global: slim book-style foldable with aerospace hinge',
+    slug: 'tecno-phantom-v-fold2-goes-global-aerospace-hinge',
+    category: 'Launch',
+    coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
+    summary: 'Tecno challenges foldable rivals with sub-6mm unfolded profile, 5750 mAh battery, and competitive international pricing.',
+    content: `Tecno has officially expanded retail availability of the Phantom V Fold2. The device features an aerospace-grade titanium teardrop hinge certified for over 400,000 folds and 70W fast charging.`,
+    author: {
+      name: 'Tunde Balogun',
+      role: 'Hardware Analyst'
+    },
+    date: '18 Oct 2026',
+    readTime: '5 min read',
+    tags: ['Tecno', 'Phantom', 'Foldable', 'Global Launch'],
+    featured: false,
+    relatedPhoneIds: ['tecno-camon-30-premier']
+  },
+  {
+    id: 'art-infinix-note-40-fastcharge',
+    title: 'Infinix Note 40 Pro+ 5G long-term test: 100W All-Round FastCharge and MagKit',
+    slug: 'infinix-note-40-pro-plus-fastcharge-magkit-tested',
+    category: 'Reviews',
+    coverImage: '/src/assets/images/news_nigeria_tech_1792578846595.jpg',
+    summary: 'How Infinix’s Cheetah X1 power management chip handles high temperatures and magnetic wireless charging after 90 days.',
+    content: `Infinix disrupted the mid-range segment by bundling both a 100W wired brick and 20W magnetic wireless MagPad in the retail box. Our long-term testing demonstrates consistent battery health retention and rapid 0-50% top-ups in 12 minutes.`,
+    author: {
+      name: 'Ada Nwosu',
+      role: 'Senior Hardware Reviewer'
+    },
+    date: '21 Oct 2026',
+    readTime: '5 min read',
+    tags: ['Infinix', 'Note 40 Pro+', 'FastCharge', 'MagKit'],
+    featured: false,
+    relatedPhoneIds: ['infinix-note-40-pro-plus', 'smart-20']
+  },
+  {
+    id: 'art-infinix-zero-flip',
+    title: 'Infinix Zero Flip brings 4K 60fps ProStudio vlogging and zero-gap hinge',
+    slug: 'infinix-zero-flip-4k-60fps-prostudio-vlogging-launch',
+    category: 'Launch',
+    coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
+    summary: 'Featuring a 3.64-inch 120Hz cover screen, dual 50MP cameras, and seamless GoPro integration for creators.',
+    content: `Infinix entered the compact flip category with the Zero Flip, prioritizing content creators with 4K 60fps recording across both front and rear camera sensors, paired with JBL-tuned stereo speakers.`,
+    author: {
+      name: 'Chidi Okafor',
+      role: 'Staff Hardware Editor'
+    },
+    date: '17 Oct 2026',
+    readTime: '4 min read',
+    tags: ['Infinix', 'Zero Flip', 'Vlogging', 'Foldable'],
+    featured: false,
+    relatedPhoneIds: ['smart-20']
+  },
+  {
+    id: 'art-xiaomi-14-ultra-lens',
+    title: 'Xiaomi 14 Ultra Leica Summilux lens shootout: variable aperture in action',
+    slug: 'xiaomi-14-ultra-leica-summilux-variable-aperture-shootout',
+    category: 'Phone News',
+    coverImage: '/src/assets/images/news_camera_sensor_1792578845370.jpg',
+    summary: 'Testing the 1-inch Sony LYT-900 sensor and stepless f/1.63-f/4.0 aperture in low light and portrait situations.',
+    content: `Xiaomi continues its partnership with Leica, delivering a quad-50MP camera setup on the 14 Ultra that offers physical diaphragm control, creamy natural bokeh, and outstanding dynamic range.`,
+    author: {
+      name: 'Liam Cooper',
+      role: 'Camera Lab Specialist'
+    },
+    date: '22 Oct 2026',
+    readTime: '5 min read',
+    tags: ['Xiaomi', 'Leica', 'Camera Test', 'Xiaomi 14 Ultra'],
+    featured: false,
+    relatedPhoneIds: ['xiaomi-redmi-note-13-pro-5g', 'xiaomi-redmi-13c']
+  },
+  {
+    id: 'art-google-pixel-9-pro-review',
+    title: 'Google Pixel 9 Pro XL review: Tensor G4, Super Res Zoom, and satellite SOS evaluated',
+    slug: 'google-pixel-9-pro-xl-review-tensor-g4-satellite-sos',
+    category: 'Reviews',
+    coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
+    summary: 'A refined flat-rail aesthetic, 16GB of unified RAM for Gemini Nano, and 7 years of Pixel drops make this Google’s best hardware yet.',
+    content: `The Pixel 9 Pro XL represents Google’s most polished smartphone design to date. With flat satin-finish glass, polished metal frame, ultrasonic fingerprint scanning, and dependable multi-day standby, Google has addressed past hardware pain points.`,
+    author: {
+      name: 'Sarah Jenkins',
+      role: 'Senior Hardware Critic'
+    },
+    date: '20 Oct 2026',
+    readTime: '7 min read',
+    tags: ['Google', 'Pixel 9 Pro XL', 'Tensor G4', 'Review'],
+    featured: false,
+    relatedPhoneIds: ['google-pixel-9-pro-xl']
+  },
+  {
+    id: 'art-google-pixel-9-ai-update',
+    title: 'Google Pixel 9 receives new Gemini Live camera integration and call notes',
+    slug: 'google-pixel-9-gemini-live-camera-call-notes',
+    category: 'Phone News',
+    coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
+    summary: 'Google rolls out real-time multimodal assistant capabilities directly to Pixel 9 and Pixel 9 Pro camera viewfinders.',
+    content: `Google has begun distributing the latest feature drop to Pixel 9 devices, introducing live camera scene interpretation and on-device transcription summaries for phone calls.`,
+    author: {
+      name: 'Sarah Jenkins',
+      role: 'Senior Hardware Critic'
+    },
+    date: '23 Oct 2026',
+    readTime: '3 min read',
+    tags: ['Google', 'Pixel 9', 'Gemini Live', 'AI Updates'],
+    featured: false,
+    relatedPhoneIds: ['google-pixel-9-pro-xl']
+  },
+  {
+    id: 'art-oneplus-13-announcement',
+    title: 'OnePlus 13 confirmed with BOE X2 Oriental screen and 6,000mAh Glacier battery',
+    slug: 'oneplus-13-confirmed-boe-x2-oriental-screen-glacier-battery',
+    category: 'Phone News',
+    coverImage: '/src/assets/images/news_mobile_processor_1792578846003.jpg',
+    summary: 'OnePlus details its flagship upgrade featuring silicon-carbon battery density, IP69 dust and water resistance, and Snapdragon 8 Elite.',
+    content: `OnePlus has unveiled the technical specifications for its next generation flagship, highlighting high-density silicon battery chemistry and an ultra-bright BOE display panel.`,
+    author: {
+      name: 'Tunde Balogun',
+      role: 'Mobile Hardware Analyst'
+    },
+    date: '24 Oct 2026',
+    readTime: '4 min read',
+    tags: ['OnePlus', 'OnePlus 13', 'Glacier Battery', 'Hardware'],
+    featured: false,
+    relatedPhoneIds: ['oneplus-12r']
+  },
+  {
+    id: 'art-xiaomi-redmi-13c-review',
+    title: 'Xiaomi Redmi 13C Review',
+    slug: 'xiaomi-redmi-13c-review',
+    category: 'Reviews',
+    coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
+    summary: 'A comprehensive hands-on evaluation of Xiaomi’s budget champion: assessing 90Hz display smoothness, 50MP AI camera performance, Helio G85 endurance, and daily value for under $120.',
+    content: `### Xiaomi Redmi 13C Review: The Value Standard
+Xiaomi's Redmi C-series has long dominated the entry-level smartphone segment by offering reliable specifications at price points accessible to students, first-time smartphone buyers, and users seeking a dependable secondary device. With the Redmi 13C, Xiaomi modernizes the design with flat edges, a smooth 90Hz display, and a sleek matte finish.
+
+### Design & Build Quality
+Holding the Redmi 13C feels considerably more premium than its ~$119 / ₦175,000 price suggests. The flat frame aesthetic borrows heavily from higher-tier devices, and the dual-tone camera island houses the 50MP optics without excessive wobble. At 192 grams and 8.09mm thickness, it sits comfortably in the hand with reassuring structural rigidity.
+
+### 6.74-Inch 90Hz Display Experience
+The standout upgrade on the Redmi 13C is its large 6.74-inch IPS LCD panel featuring a 90Hz refresh rate. Navigating through MIUI / HyperOS and scrolling through social feeds like TikTok, Twitter/X, and WhatsApp feels noticeably fluid. Reading mode and TÜV Rheinland Low Blue Light certification reduce eye strain during extended night reading sessions.
+
+### MediaTek Helio G85 Performance
+Under the hood, the 12nm MediaTek Helio G85 chipset paired with up to 8GB of RAM and Mali-G52 MC2 graphics provides dependable daily performance. App launches are brisk, social media multitasking is stutter-free, and casual gaming titles like Subway Surfers and Call of Duty: Mobile (at medium graphical presets) run at consistent framerates without thermal throttling.
+
+### 50MP AI Triple Camera Setup
+The primary 50MP f/1.8 sensor captures crisp, color-accurate photos in daylight with good dynamic range for this category. Xiaomi's AI portrait mode effectively separates subjects from the background with pleasant natural bokeh. The front-facing 8MP camera includes a soft-light ring that brightens selfies in dim indoor lighting.
+
+### Battery Life & 18W Charging
+A robust 5,000 mAh battery easily delivers a full day and a half of typical mixed use (social browsing, video streaming, calls, and hotspot sharing). Our standardized battery endurance test logged over 13 hours of continuous web browsing. The device supports 18W Power Delivery charging via USB Type-C.
+
+### Verdict
+For budget-conscious shoppers looking for balanced everyday usability, the Xiaomi Redmi 13C hits the sweet spot between affordability, dependable battery stamina, and modern styling.`,
+    author: {
+      name: 'Liam Cooper',
+      role: 'Camera & Hardware Lab Specialist'
+    },
+    date: '25 Oct 2026',
+    readTime: '6 min read',
+    tags: ['Xiaomi', 'Redmi 13C', 'Review', 'Budget Phones', 'Helio G85'],
+    featured: false,
+    relatedPhoneIds: ['xiaomi-redmi-13c']
+  },
+  {
+    id: 'guide-1',
+    title: 'Best phones under $151 / £113 (₦200,000) right now',
+    slug: 'best-phones-under-200000-naira-right-now',
+    category: 'Buying Guide',
+    coverImage: '/src/assets/images/news_nigeria_tech_1792578846595.jpg',
+    summary: 'Budget phones have caught up fast. These are the models we would buy under $151 / £113 (₦200,000) with high refresh displays, 5000mAh batteries and Type-C fast charge.',
+    content: `Finding value under $151 / £113 (₦200,000) across global retail markets and major online stores has gotten significantly better over the past year. Entry-level chipsets have evolved from laggy quad-core silicon to smooth MediaTek Helio G85/G99 and Unisoc T606/T612 processors.\n\nOur top recommendation remains the Infinix Hot 40 / Tecno Spark 20 series for their balanced 8GB extended RAM configurations, dependable 5000 mAh batteries with 18W–33W fast charge, and verified official warranty support.\n\nWhen purchasing in local or international markets, ensure you verify the sealed package to avoid open-box swap units and confirm the IMEI matches on both the phone box and SIM tray.`,
+    author: {
+      name: 'Chidi Nwosu',
+      role: 'Buying Guides Editor'
+    },
+    date: '17 Sept 2026',
+    readTime: '6 min read',
+    tags: ['Infinix & Tecno', 'Buying Guide', 'Budget Phones'],
+    featured: false,
+    relatedPhoneIds: ['xiaomi-redmi-13c', 'smart-20']
+  },
+  {
+    id: 'guide-2',
+    title: 'How to Enable ADB on Samsung Using Quick Share (FRP Bypass & Servicing)',
+    slug: 'how-to-enable-adb-on-samsung-using-quick-share',
+    category: 'FRP & Servicing Tools',
+    coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
+    summary: 'A step-by-step technical guide to enabling Android Debug Bridge (ADB) on modern Samsung One UI devices using TalkBack, Quick Share, and official diagnostic tools.',
+    content: `Android Debug Bridge (ADB) is the primary diagnostic protocol used by phone technicians worldwide to troubleshoot system issues, remove forgotten lock credentials with proof of ownership, and flash carrier binaries.\n\nThis tutorial outlines the modern Quick Share protocol pathway on One UI 6 and One UI 7, explaining how accessibility shortcuts can be utilized legitimately by repair shops to establish a trusted handshake with a technician PC.\n\nAlways ensure device ownership is validated before performing any bypass or servicing operations.`,
+    author: {
+      name: 'GsmScope Tech Desk',
+      role: 'Servicing & Firmware Specialist'
+    },
+    date: '4 Sept 2026',
+    readTime: '8 min read',
+    tags: ['Samsung', 'FRP & Servicing Tools', 'ADB'],
+    featured: false,
+    relatedPhoneIds: ['samsung-galaxy-s24-ultra']
+  },
+  {
+    id: 'guide-3',
+    title: 'BFT Tool: Free Android Tool for FRP Bypass & Factory Reset',
+    slug: 'bft-tool-free-android-tool-frp-bypass-factory-reset',
+    category: 'FRP & Servicing Tools',
+    coverImage: '/src/assets/images/news_mobile_processor_1792578846003.jpg',
+    summary: 'A comprehensive guide to BFT Tool, a Windows-based Android servicing utility supporting FRP removal, factory reset, and account servicing for Samsung, Xiaomi, and other Android devices.',
+    content: `BFT Tool has become one of the most widely used diagnostic toolkits in repair centers worldwide. It supports direct MTP mode operations, ADB shell commands, and emergency EDL flashing on Qualcomm chipsets.\n\nKey features include one-click FRP reset on Samsung Exynos and Snapdragon hardware, Xiaomi Mi Account temporary bypass, and Fastboot to EDL reboot commands.\n\nWe cover driver installation (SAMSUNG USB Mobile Drivers, MTK VCOM, and Qualcomm 9008 drivers) to ensure clean communication without boot loops.`,
+    author: {
+      name: 'GsmScope Tech Desk',
+      role: 'Servicing & Firmware Specialist'
+    },
+    date: '2 Sept 2026',
+    readTime: '7 min read',
+    tags: ['Universal Android', 'FRP & Servicing Tools', 'BFT Tool'],
+    featured: false,
+    relatedPhoneIds: []
+  },
+  {
+    id: 'guide-4',
+    title: 'SamFw Tool: Free Android Tool for FRP Bypass & Mi Account',
+    slug: 'samfw-tool-free-android-tool-frp-bypass-mi-account',
+    category: 'FRP & Servicing Tools',
+    coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
+    summary: 'A comprehensive walkthrough of SamFw FRP Tool, a trusted servicing utility supporting Samsung test mode (*#0*#), Knox diagnostics, and Xiaomi sideload operations.',
+    content: `SamFw Tool remains the benchmark free servicing software for smartphone technicians worldwide. Its ability to send test mode exploits (*#0*# or *#*#88#*#*) allows ADB authorization in seconds on supported security patch levels.\n\nThe guide details how to execute CSC change commands without wiping data, enabling native call recording and regional carrier network optimizations on imported US, European, and Asian Galaxy variants.`,
+    author: {
+      name: 'GsmScope Tech Desk',
+      role: 'Servicing & Firmware Specialist'
+    },
+    date: '1 Sept 2026',
+    readTime: '9 min read',
+    tags: ['Samsung & Xiaomi', 'FRP & Servicing Tools', 'SamFw'],
+    featured: false,
+    relatedPhoneIds: ['samsung-galaxy-s24-ultra']
+  },
+  {
+    id: 'guide-5',
+    title: 'Fast charging explained: what 45W, 90W and 120W really mean',
+    slug: 'fast-charging-explained-45w-90w-120w',
+    category: 'Charging & Battery',
+    coverImage: '/src/assets/images/news_nigeria_tech_1792578846595.jpg',
+    summary: 'Bigger numbers charge faster, but only with the right charger, cable and temperature control. Here is how thermal conditions affect fast charging longevity.',
+    content: `Proprietary fast charging protocols like Infinix All-Round FastCharge (70W–100W), Tecno Ultra Charge (70W), and Xiaomi HyperCharge (120W) require specialized charge pumps and dual-cell battery designs.\n\nWhen ambient temperatures exceed 32°C, charging silicon automatically throttles wattage to protect battery health. Charging in a ventilated room or utilizing Bypass Charging during gaming preserves your battery cell capacity over 3+ years.`,
+    author: {
+      name: 'Amaka Obi',
+      role: 'Battery & Power Lab'
+    },
+    date: '29 Aug 2026',
+    readTime: '5 min read',
+    tags: ['Battery & Power', 'Charging & Battery', 'Fast Charging'],
+    featured: false,
+    relatedPhoneIds: ['infinix-note-40-pro-plus', 'oneplus-12r']
+  },
+  {
+    id: 'guide-6',
+    title: 'Free Samsung, Redmi, Tecno & Infinix FRP Bypass Servicing Tools',
+    slug: 'free-samsung-redmi-tecno-infinix-frp-bypass-servicing-tools',
+    category: 'FRP & Servicing Tools',
+    coverImage: '/src/assets/images/news_camera_sensor_1792578845370.jpg',
+    summary: 'A curated list of verified free Android servicing tools including SAMFW Tool, BFT Tool, and MTK Client for diagnosing and restoring locked Android hardware.',
+    content: `Mobile repair technicians worldwide rely on a stable suite of open-source and freeware tools. This guide compares MTK Client for MediaTek chipsets, Qualcomm QFIL for raw XML flashing, and dedicated Samsung MTP unlockers.\n\nWe also provide safety precautions against rogue trojans commonly bundled in unverified flash tool downloads.`,
+    author: {
+      name: 'GsmScope Tech Desk',
+      role: 'Servicing & Firmware Specialist'
+    },
+    date: '23 Aug 2026',
+    readTime: '10 min read',
+    tags: ['Multi-Brand', 'FRP & Servicing Tools', 'MTK Client'],
+    featured: false,
+    relatedPhoneIds: []
+  },
+  {
+    id: 'guide-7',
+    title: 'How to Enable ADB on Samsung KG Locked Phones',
+    slug: 'how-to-enable-adb-on-samsung-kg-locked-phones',
+    category: 'FRP & Servicing Tools',
+    coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
+    summary: 'A practical tutorial on how technicians analyze Knox Guard (KG) locked devices, verify carrier leasing status, and enable ADB for troubleshooting.',
+    content: `Knox Guard (KG) status (Active, Completed, Checking) controls whether device bootloaders and debugging interfaces can be enabled. We explain how to identify genuine carrier contract status versus gray-market locked units before purchasing second-hand.`,
+    author: {
+      name: 'GsmScope Tech Desk',
+      role: 'Servicing & Firmware Specialist'
+    },
+    date: '22 Aug 2026',
+    readTime: '8 min read',
+    tags: ['Samsung Knox Guard', 'FRP & Servicing Tools', 'Knox Guard'],
+    featured: false,
+    relatedPhoneIds: ['samsung-galaxy-s24-ultra']
   }
 ];
 
@@ -1183,13 +1752,13 @@ export const INITIAL_REVIEWS: Review[] = [
     id: 'rev-op-12r',
     phoneId: 'oneplus-12r',
     phoneName: 'OnePlus 12R',
-    userName: 'Chinedu Okeke',
-    location: 'Lekki, Lagos',
+    userName: 'David Miller',
+    location: 'London, UK',
     rating: 5,
     title: 'Incredible battery life and very fast charging',
-    comment: 'The 5500 mAh battery easily lasts me through the crazy Lagos traffic, and when it needs a top up, the 100W charger gets it to 100% before I finish breakfast. Screen is very bright outdoors in direct sun.',
-    pros: ['100W SUPERVOOC charging', '5500 mAh endurance', 'Snapdragon 8 Gen 2 handles PUBG smoothly'],
-    cons: ['No telephoto zoom lens', 'Curved screen can trigger accidental palm touches'],
+    comment: 'The 5500 mAh battery easily lasts two full days of heavy use, and when it needs a top up, the 100W charger gets it to 100% in under half an hour. The 1.5K display is very bright outdoors in direct sun.',
+    pros: ['100W SUPERVOOC charging', '5500 mAh endurance', 'Snapdragon 8 Gen 2 handles gaming smoothly'],
+    cons: ['No dedicated telephoto zoom lens', 'Curved edges can trigger occasional accidental palm touches'],
     date: '10 Feb 2026',
     status: 'approved'
   },
@@ -1197,13 +1766,13 @@ export const INITIAL_REVIEWS: Review[] = [
     id: 'rev-s24u',
     phoneId: 'samsung-galaxy-s24-ultra',
     phoneName: 'Samsung Galaxy S24 Ultra',
-    userName: 'Ada Nwosu',
-    location: 'Victoria Island, Lagos',
+    userName: 'Elena Rostova',
+    location: 'Berlin, Germany',
     rating: 5,
-    title: 'Still the camera king in Lagos',
-    comment: 'The antireflective glass is magical. You can read spreadsheets under blinding Abuja sunlight. The 200MP camera and 5x optical zoom capture crisp stage performances and night bridge light trails.',
-    pros: ['Gorilla Armor anti-glare screen', 'S-Pen for signing documents', '7-year software updates'],
-    cons: ['Very expensive in Naira exchange rate', 'Heavy titanium weight'],
+    title: 'Still the camera and productivity benchmark',
+    comment: 'The antireflective glass is genuinely impressive. You can read documents under bright sunlight with zero glare. The 200MP camera and 5x optical telephoto capture crisp details and night street light trails.',
+    pros: ['Gorilla Armor anti-glare screen', 'S-Pen for digital signatures', '7-year software updates'],
+    cons: ['Substantial device weight and squared corners', 'MSRP is at the upper flagship tier'],
     date: '28 Jan 2026',
     status: 'approved'
   },
@@ -1211,13 +1780,13 @@ export const INITIAL_REVIEWS: Review[] = [
     id: 'rev-smart-20',
     phoneId: 'smart-20',
     phoneName: 'Smart 20',
-    userName: 'Ibrahim Musa',
-    location: 'Kano State',
+    userName: 'Marcus Chen',
+    location: 'Singapore',
     rating: 4,
-    title: 'Solid daily driver under ₦150k',
-    comment: 'For ₦130,000, getting 5200 mAh and a 90Hz punch-hole screen is remarkable value. Sound is loud through the stereo speakers and calls are clear on MTN.',
-    pros: ['Big 5200 mAh battery', 'Loud speaker volume', 'Type-C charging'],
-    cons: ['Low light camera is average', '18W charging takes about 2 hours'],
+    title: 'Solid daily driver under $100',
+    comment: 'At this price point, getting a 5200 mAh battery and a smooth 90Hz punch-hole screen is remarkable value. Sound is loud through the stereo speakers and call clarity is reliable.',
+    pros: ['Big 5200 mAh battery', 'Loud stereo speakers', 'Type-C charging port'],
+    cons: ['Low light photography is modest', '18W charging takes approximately 2 hours for a full cycle'],
     date: '12 Jan 2026',
     status: 'approved'
   },
@@ -1225,32 +1794,378 @@ export const INITIAL_REVIEWS: Review[] = [
     id: 'rev-redmi-13c',
     phoneId: 'xiaomi-redmi-13c',
     phoneName: 'Xiaomi Redmi 13C',
-    userName: 'Tariq Al-Hassan',
-    location: 'Ikeja, Lagos',
+    userName: 'Sarah Jenkins',
+    location: 'Austin, TX, USA',
     rating: 4,
-    title: 'Dependable phone for university student budget',
-    comment: 'Does everything I need: WhatsApp, TikTok, PDF textbooks, and banking apps without stuttering. 50MP camera takes clear photos for notes and daylight portraits.',
-    pros: ['Helio G85 handles multitasking well', 'Headphone jack included', 'Clean glass-look back'],
-    cons: ['Charging brick in box is 10W even though phone supports 18W'],
+    title: 'Dependable phone for student and budget use',
+    comment: 'Does everything needed: messaging, social media, PDF documents, and daily apps without stuttering. 50MP camera takes clear photos for notes and daylight portraits.',
+    pros: ['Helio G85 handles multitasking reliably', 'Headphone jack included', 'Clean aesthetic styling'],
+    cons: ['Bundled charging brick in some regions is 10W even though device supports 18W'],
     date: '18 Jan 2026',
+    status: 'approved'
+  },
+  {
+    id: 'rev-s24u-2',
+    phoneId: 'samsung-galaxy-s24-ultra',
+    phoneName: 'Samsung Galaxy S24 Ultra',
+    userName: 'Kelechi Eze',
+    location: 'Lagos, Nigeria',
+    rating: 5,
+    title: 'Top-tier display and battery endurance in hot weather',
+    comment: 'Using this for daily multitasking, GPS navigation, and mobile video editing. Screen brightness easily overcomes midday sunshine and battery holds up for over 8 hours of screen-on time.',
+    pros: ['Bright display outdoors', 'Snapdragon 8 Gen 3 efficiency', 'S-Pen remote shutter'],
+    cons: ['Heavy in pocket with protective case'],
+    date: '02 Feb 2026',
+    status: 'approved'
+  },
+  {
+    id: 'rev-s24u-3',
+    phoneId: 'samsung-galaxy-s24-ultra',
+    phoneName: 'Samsung Galaxy S24 Ultra',
+    userName: 'Liam Cooper',
+    location: 'Sydney, Australia',
+    rating: 5,
+    title: 'Camera zoom capabilities are unmatched',
+    comment: 'The 5x and 10x hybrid zoom for stadium concerts and nature photography produces sharp, noise-free shots. Galaxy AI photo expansion works surprisingly well.',
+    pros: ['Versatile quad camera array', 'Titanium frame rigidity', 'Fast One UI 6.1 animations'],
+    cons: ['Slightly slower 45W charging vs Chinese rivals'],
+    date: '14 Feb 2026',
+    status: 'approved'
+  },
+  {
+    id: 'rev-s24u-4',
+    phoneId: 'samsung-galaxy-s24-ultra',
+    phoneName: 'Samsung Galaxy S24 Ultra',
+    userName: 'Fatima Al-Mansoor',
+    location: 'Dubai, UAE',
+    rating: 4,
+    title: 'Premium build quality and reliable software updates',
+    comment: 'Sleek design with flat display edges which makes applying glass screen protectors much easier than previous curved models.',
+    pros: ['Flat display glass', 'Fast ultrasonic fingerprint reader', '7-year OS guarantee'],
+    cons: ['Sharp bottom corners when held one-handed'],
+    date: '20 Feb 2026',
+    status: 'approved'
+  },
+  {
+    id: 'rev-op-12r-2',
+    phoneId: 'oneplus-12r',
+    phoneName: 'OnePlus 12R',
+    userName: 'Tariq Johnson',
+    location: 'Manchester, UK',
+    rating: 5,
+    title: 'Smooth 120Hz display and cool running thermals',
+    comment: 'Plays heavy mobile games without getting warm. OxygenOS feels clean and responsive.',
+    pros: ['Great thermals', 'Loud dual speakers', 'Blazing fast charging'],
+    cons: ['No wireless charging'],
+    date: '15 Feb 2026',
+    status: 'approved'
+  },
+  {
+    id: 'rev-op-12r-3',
+    phoneId: 'oneplus-12r',
+    phoneName: 'OnePlus 12R',
+    userName: 'Ngozi Adebayo',
+    location: 'Abuja, Nigeria',
+    rating: 4,
+    title: 'Best value performance smartphone of 2024/2025',
+    comment: 'Battery easily goes 1.5 days. Charger in the box is huge plus when other brands stopped including chargers.',
+    pros: ['Charger included in box', 'High brightness ProXDR panel'],
+    cons: ['Macro camera is modest'],
+    date: '22 Feb 2026',
+    status: 'approved'
+  },
+  {
+    id: 'rev-op-12r-4',
+    phoneId: 'oneplus-12r',
+    phoneName: 'OnePlus 12R',
+    userName: 'Mateo Rossi',
+    location: 'Milan, Italy',
+    rating: 5,
+    title: 'Fast, fluid, and zero battery anxiety',
+    comment: 'Plug it in while showering and it is back to 90%. Exceptional value.',
+    pros: ['100W charging speed', 'Great haptic feedback'],
+    cons: ['No official IP68 rating (IP64 only)'],
+    date: '25 Feb 2026',
     status: 'approved'
   }
 ];
 
+export const DEFAULT_AD_PLACEMENTS: Record<AdPlacementId, AdPlacementConfig> = {
+  header_top: {
+    id: 'header_top',
+    name: 'Top Header Ad Placement',
+    pageLabel: 'Sitewide Header',
+    positionLabel: 'Top Header Ad (Above Navigation / Header)',
+    enabled: false,
+    adType: 'banner',
+    badgeText: 'GSMSCOPE LIVE',
+    title: 'News update & launch alerts',
+    subtitle: 'Track live global USD ($) & local market price updates, new phone launches, and verified warranty deals.',
+    imageUrl: '',
+    showLearnMore: true,
+    learnMoreText: 'Explore verified deals',
+    learnMoreUrl: '/?tab=phones',
+    openInNewTab: false,
+    scriptCode: '',
+  },
+  home_above_trending: {
+    id: 'home_above_trending',
+    name: 'Above Trending Phones Section',
+    pageLabel: 'Homepage',
+    positionLabel: 'Homepage — Above Trending phones section',
+    enabled: false,
+    adType: 'banner',
+    badgeText: 'Sponsored',
+    title: 'Upgrade to Flagship 5G Smartphones at Verified Retail Prices',
+    subtitle: 'Compare official warranty models, live USD & NGN pricing, and verified specifications before you buy.',
+    imageUrl: '',
+    showLearnMore: true,
+    learnMoreText: 'Learn More',
+    learnMoreUrl: '/?tab=phones',
+    openInNewTab: false,
+    scriptCode: '',
+  },
+  home_above_reviews: {
+    id: 'home_above_reviews',
+    name: 'Above Latest Reviews Section',
+    pageLabel: 'Homepage',
+    positionLabel: 'Homepage — Above Latest Reviews section',
+    enabled: false,
+    adType: 'banner',
+    badgeText: 'Sponsored',
+    title: 'Hands-On Smartphone Camera & Battery Endurance Lab Reports',
+    subtitle: 'Discover how the latest flagship and mid-range phones perform in real-world daily testing.',
+    imageUrl: '',
+    showLearnMore: true,
+    learnMoreText: 'Learn More',
+    learnMoreUrl: '/?tab=reviews',
+    openInNewTab: false,
+    scriptCode: '',
+  },
+  home_above_guides: {
+    id: 'home_above_guides',
+    name: 'Above Buying Guides Section',
+    pageLabel: 'Homepage',
+    positionLabel: 'Homepage — Above Buying Guides section',
+    enabled: false,
+    adType: 'banner',
+    badgeText: 'Sponsored',
+    title: '2026 Smartphone Buyer’s Guide: Best Camera, Gaming & Battery Picks',
+    subtitle: 'Find the best phone for your budget with our side-by-side comparison matrix and buyer recommendations.',
+    imageUrl: '',
+    showLearnMore: true,
+    learnMoreText: 'Learn More',
+    learnMoreUrl: '/?tab=guides',
+    openInNewTab: false,
+    scriptCode: '',
+  },
+  phones_below_top_result: {
+    id: 'phones_below_top_result',
+    name: 'Below Top Result (Phones Page)',
+    pageLabel: 'Phones Page',
+    positionLabel: 'Phones page — Below Top result',
+    enabled: false,
+    adType: 'banner',
+    badgeText: 'Sponsored Deal',
+    title: 'Compare Side-by-Side Specs & Official Retail Deals',
+    subtitle: 'Check verified 5G bands, AnTuTu v10 scores, fast charging wattage, and distributor warranty coverage.',
+    imageUrl: '',
+    showLearnMore: true,
+    learnMoreText: 'Learn More',
+    learnMoreUrl: '/?tab=compare',
+    openInNewTab: false,
+    scriptCode: '',
+  },
+  best_above_top_rated: {
+    id: 'best_above_top_rated',
+    name: 'Above Top Rated Phones (Best Phones Page)',
+    pageLabel: 'Best Phones Page',
+    positionLabel: 'Best phones page — Above Top Rated Phones',
+    enabled: false,
+    adType: 'banner',
+    badgeText: 'Sponsored Spotlight',
+    title: 'Top-Rated Flagship & Value Champions of the Year',
+    subtitle: 'Explore devices rated 4.7★ and above by hardware reviewers and verified smartphone owners.',
+    imageUrl: '',
+    showLearnMore: true,
+    learnMoreText: 'Learn More',
+    learnMoreUrl: '/?tab=phones',
+    openInNewTab: false,
+    scriptCode: '',
+  },
+  news_below_featured: {
+    id: 'news_below_featured',
+    name: 'Below Featured Story (News Page)',
+    pageLabel: 'News Page',
+    positionLabel: 'News page — Below featured story',
+    enabled: false,
+    adType: 'banner',
+    badgeText: 'Sponsored Partner',
+    title: 'Advertise Your Mobile Brand or Retail Store on GsmScope',
+    subtitle: 'Reach thousands of daily smartphone buyers, tech enthusiasts, and hardware researchers.',
+    imageUrl: '',
+    showLearnMore: true,
+    learnMoreText: 'Learn More',
+    learnMoreUrl: '/?tab=advertise',
+    openInNewTab: false,
+    scriptCode: '',
+  },
+  guides_below_featured: {
+    id: 'guides_below_featured',
+    name: 'Below Featured Guide (Buying Guides Page)',
+    pageLabel: 'Buying Guides Page',
+    positionLabel: 'Buying guides page — Below Featured Guide',
+    enabled: false,
+    adType: 'banner',
+    badgeText: 'Sponsored Guide',
+    title: 'Need Help Choosing Between Two Phones? Use Our Spec Comparison Tool',
+    subtitle: 'Compare display brightness, chipset benchmarks, camera sensors, and battery life side by side.',
+    imageUrl: '',
+    showLearnMore: true,
+    learnMoreText: 'Learn More',
+    learnMoreUrl: '/?tab=compare',
+    openInNewTab: false,
+    scriptCode: '',
+  },
+};
+
 export const INITIAL_AD_SETTINGS: AdSettings = {
   topBanner: {
-    enabled: true,
-    title: 'Price Drop and Launch Alerts',
-    subtitle: 'Track live Nigerian Naira (₦) & USD ($) price updates, new phone launches, and verified warranty deals.',
+    enabled: false,
+    title: 'News update & launch alerts',
+    subtitle: 'Track live global USD ($) & local market price updates, new phone launches, and verified warranty deals.',
     linkUrl: '#phones',
     tag: 'GSMSCOPE LIVE'
   },
   sidebarBanner: {
-    enabled: true,
-    title: 'Reach 50,000+ Daily Smartphone Buyers',
-    subtitle: 'GsmScope offers sponsored articles, banner placements, and featured device spots across Nigeria.',
+    enabled: false,
+    title: 'Reach 50,000+ Daily Smartphone Enthusiasts',
+    subtitle: 'GsmScope offers sponsored articles, banner placements, and featured device spots across our global tech network.',
     sponsor: 'GsmScope Partner Network',
     linkUrl: '#advertise'
   },
-  sponsoredPhoneId: 'oneplus-12r'
+  sponsoredPhoneId: 'oneplus-12r',
+  placements: DEFAULT_AD_PLACEMENTS,
+  adsensePublisherId: '',
+  adsenseAutoAdsEnabled: false,
+  adsTxtContent: '# GsmScope Authorized Digital Sellers (ads.txt)\n# Replace pub-0000000000000000 with your live Google AdSense Publisher ID in Admin Dashboard -> Advertisements\ngoogle.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0\n',
 };
+
+export const INITIAL_WEBSITE_CONTENT: WebsiteContent = {
+  siteName: 'GsmScope',
+  siteTagline: 'Mobile Phone Specifications, Reviews & Live Prices',
+  announcementBar: 'Live Smartphone Specifications, Verified Hardware Benchmarks & Multi-Currency Price Tracking',
+  heroHeadline: 'Smartphone Specs, Camera Benchmarks & Live Market Prices',
+  heroSubtitle: 'Explore complete specifications, benchmark ratings, and daily street market prices for the latest smartphones.',
+  aboutSummary: 'GsmScope is an independent mobile hardware database providing detailed technical specifications, camera benchmarks, battery endurance tests, and multi-currency pricing across global retail markets and regional technology hubs.',
+  comparePhone1Id: 'apple-iphone-16-pro-max',
+  comparePhone2Id: 'samsung-galaxy-s24-ultra',
+  compareHeadline: 'Which phone is right for you?',
+  compareSubtitle: 'Put phones side by side and see which one wins on price, camera, battery and speed.',
+  contactEmail: 'info@gsmscope.com',
+  contactPhone: '+2349127408003',
+  officeLocation: 'Sokoto, Nigeria',
+  footerCopyright: '© 2026 GsmScope Mobile Technology Network. All rights reserved.',
+  footerDisclaimer: 'Prices, specifications, and device availability are updated continuously based on authorized distributors and market retailers. Variations may occur by region and currency conversion fluctuations.',
+  headerLogoUrl: '/assets/aistudio/GsmScope_header_logo_fc9cfbb4.webp',
+  headerLogoDarkUrl: '/assets/aistudio/GsmScope_header_logo_dark.webp',
+  mobileLogoUrl: '/assets/aistudio/GsmScope_header_logo_dark.webp',
+  faviconUrl: '/favicon.ico',
+  defaultSeoTitle: 'GsmScope — Mobile Phone Specifications, Reviews & Live Prices',
+  defaultSeoKeywords: 'gsmscope, smartphone specs, phone prices, mobile phone reviews, buy phones, tech news, mobile benchmarks',
+  defaultSeoDescription: 'Compare smartphones, explore full hardware specifications, camera sensors, battery benchmarks, and live prices in USD and NGN on GsmScope.',
+  facebookUrl: 'https://www.facebook.com/share/1HKzhSt52c/',
+  youtubeUrl: 'https://www.youtube.com/@gsm_scope',
+  twitterUrl: 'https://x.com/GsmScope',
+  instagramUrl: 'https://instagram.com/gsmscope',
+  whatsappNumber: '+2349127408003'
+};
+
+export const INITIAL_MEDIA_ITEMS: MediaItem[] = [
+  {
+    id: 'media-header-dark',
+    name: 'GsmScope Header Logo (Dark)',
+    url: '/assets/aistudio/GsmScope_header_logo_dark.webp',
+    uploadedAt: 'System Asset',
+    category: 'logo',
+    alt: 'GsmScope Header Logo Dark'
+  },
+  {
+    id: 'media-header-light',
+    name: 'GsmScope Header Logo (Light)',
+    url: '/assets/aistudio/GsmScope_header_logo_fc9cfbb4.webp',
+    uploadedAt: 'System Asset',
+    category: 'logo',
+    alt: 'GsmScope Header Logo Light'
+  },
+  {
+    id: 'media-s25-ultra',
+    name: 'Samsung Galaxy S25 Ultra Render',
+    url: '/assets/aistudio/IMG_20261024_202541_f0e9668e.jpg',
+    uploadedAt: 'System Asset',
+    category: 'phone',
+    assignedPhoneId: 'samsung-galaxy-s25-ultra',
+    alt: 'Samsung Galaxy S25 Ultra'
+  },
+  {
+    id: 'media-iphone-16-pro',
+    name: 'Apple iPhone 16 Pro Max Desert Titanium',
+    url: '/assets/aistudio/IMG_20261024_204309_3bae298d.jpg',
+    uploadedAt: 'System Asset',
+    category: 'phone',
+    assignedPhoneId: 'apple-iphone-16-pro-max',
+    alt: 'Apple iPhone 16 Pro Max'
+  },
+  {
+    id: 'media-camon-30-premier',
+    name: 'Tecno Camon 30 Premier 5G',
+    url: '/assets/aistudio/IMG_20261020_020818_d22cfdee.jpg',
+    uploadedAt: 'System Asset',
+    category: 'phone',
+    assignedPhoneId: 'tecno-camon-30-premier',
+    alt: 'Tecno Camon 30 Premier 5G'
+  },
+  {
+    id: 'media-note-40-pro',
+    name: 'Infinix Note 40 Pro+ 5G Racing Edition',
+    url: '/assets/aistudio/IMG_20261013_014019_495f5519.jpg',
+    uploadedAt: 'System Asset',
+    category: 'phone',
+    assignedPhoneId: 'infinix-note-40-pro-plus',
+    alt: 'Infinix Note 40 Pro+ 5G'
+  },
+  {
+    id: 'media-oneplus-12r',
+    name: 'OnePlus 12R Cool Blue Edition',
+    url: '/assets/aistudio/IMG_20261025_090919_cbd32f7d.jpg',
+    uploadedAt: 'System Asset',
+    category: 'phone',
+    assignedPhoneId: 'oneplus-12r',
+    alt: 'OnePlus 12R'
+  },
+  {
+    id: 'media-xiaomi-14-ultra',
+    name: 'Xiaomi 14 Ultra Leica Optics',
+    url: '/assets/aistudio/IMG_20261025_090938_c0fa17e3.jpg',
+    uploadedAt: 'System Asset',
+    category: 'phone',
+    assignedPhoneId: 'xiaomi-14-ultra',
+    alt: 'Xiaomi 14 Ultra'
+  },
+  {
+    id: 'media-tech-guide-cover',
+    name: 'Smartphone Buying Guide 2026 Cover',
+    url: '/assets/aistudio/IMG_20261025_134803_2ac984b0.jpg',
+    uploadedAt: 'System Asset',
+    category: 'guide',
+    alt: 'Smartphone Buying Guide 2026'
+  },
+  {
+    id: 'media-news-cover',
+    name: 'Global Smartphone Market Trends',
+    url: '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg',
+    uploadedAt: 'System Asset',
+    category: 'article',
+    alt: 'Global Smartphone Market Trends'
+  }
+];

@@ -58,6 +58,7 @@ export interface PhoneDetailedSpecs {
   sound: {
     loudspeaker: string;
     jack35mm: string;
+    audioSpecs?: string;
   };
   connectivity: {
     wlan: string;
@@ -66,8 +67,11 @@ export interface PhoneDetailedSpecs {
     radio: string;
     usb: string;
     infrared: string;
+    positioning?: string;
   };
   sensors: string;
+  biometrics?: string;
+  securityHardware?: string;
 }
 
 export interface Phone {
@@ -78,10 +82,11 @@ export interface Phone {
   priceUSD: number;
   oldPriceNGN?: number;
   priceRange: PriceRangeCategory;
-  marketStatus: 'Available in Nigeria' | 'Pre-order' | 'Coming Soon' | 'Rumored';
+  marketStatus: 'Available' | 'Pre-order' | 'Coming Soon' | 'Rumored' | string;
   nairaPriceNotes: string;
   releaseYear: number;
   releaseDate: string;
+  modelNumber?: string;
   image: string;
   images?: string[];
   accentColor: string;
@@ -103,6 +108,10 @@ export interface Phone {
     os: string;
     network5g: boolean;
   };
+  // SEO fields
+  seoTitle?: string;
+  seoKeywords?: string;
+  seoDescription?: string;
   detailedSpecs: PhoneDetailedSpecs;
 }
 
@@ -112,18 +121,23 @@ export interface Brand {
   slug: string;
   country: string;
   description: string;
-  officialPresenceInNigeria: string;
+  officialPresenceInNigeria?: string;
+  globalPresence?: string;
   popularSeries: string[];
   warrantyPartner: string;
   logoLetter: string;
   accentBg: string;
+  logoUrl?: string;
+  bannerUrl?: string;
+  seoTitle?: string;
+  seoKeywords?: string;
 }
 
 export interface Article {
   id: string;
   title: string;
   slug: string;
-  category: 'News' | 'Review' | 'Reviews' | 'Buying Guide' | 'Buying Guides' | 'Comparison' | 'Comparisons' | 'Launch' | 'Smartphone News' | 'Tech Updates';
+  category: 'News' | 'Review' | 'Reviews' | 'Buying Guide' | 'Buying Guides' | 'FRP & Servicing Tools' | 'Charging & Battery' | 'Tips & Security' | 'Launch' | 'Phone News' | 'Smartphone News' | 'Tech Updates' | string;
   coverImage: string;
   summary: string;
   content: string;
@@ -136,6 +150,10 @@ export interface Article {
   tags: string[];
   featured?: boolean;
   relatedPhoneIds?: string[];
+  // SEO fields
+  seoTitle?: string;
+  seoKeywords?: string;
+  seoDescription?: string;
 }
 
 export interface Review {
@@ -151,6 +169,100 @@ export interface Review {
   cons: string[];
   date: string;
   status: 'approved' | 'pending' | 'rejected';
+  verifiedBuyer?: boolean;
+  imageUrl?: string;
+  seoTitle?: string;
+  seoKeywords?: string;
+}
+
+export interface MediaItem {
+  id: string;
+  name: string;
+  url: string;
+  size?: number;
+  mimeType?: string;
+  uploadedAt: string;
+  category?: 'phone' | 'article' | 'news' | 'guide' | 'review' | 'brand' | 'logo' | 'banner' | 'other';
+  assignedPhoneId?: string;
+  assignedArticleId?: string;
+  alt?: string;
+}
+
+export interface WebsiteContent {
+  siteName: string;
+  siteTagline: string;
+  announcementBar: string;
+  heroHeadline: string;
+  heroSubtitle: string;
+  aboutSummary: string;
+  aboutPageContent?: string;
+  contactPageContent?: string;
+  privacyPolicyContent?: string;
+  termsOfServiceContent?: string;
+  advertisePageContent?: string;
+  comparePhone1Id?: string;
+  comparePhone2Id?: string;
+  compareHeadline?: string;
+  compareSubtitle?: string;
+  contactEmail: string;
+  contactPhone: string;
+  officeLocation: string;
+  footerCopyright: string;
+  footerDisclaimer: string;
+  headerLogoUrl?: string;
+  headerLogoDarkUrl?: string;
+  headerLogoLightUrl?: string;
+  mobileLogoUrl?: string;
+  faviconUrl?: string;
+  defaultSeoTitle?: string;
+  defaultSeoKeywords?: string;
+  defaultSeoDescription?: string;
+  seoTitle?: string;
+  seoKeywords?: string;
+  seoDescription?: string;
+  facebookUrl?: string;
+  youtubeUrl?: string;
+  twitterUrl?: string;
+  instagramUrl?: string;
+  whatsappNumber?: string;
+  specTablesSchema?: any[];
+  adminUsers?: any[];
+  customScripts?: {
+    headerScripts?: string;
+    bodyTopScripts?: string;
+    footerScripts?: string;
+    metaVerificationGoogle?: string;
+    metaVerificationBing?: string;
+    robotsTxtMeta?: string;
+  };
+}
+
+export type AdPlacementId =
+  | 'header_top'
+  | 'home_above_trending'
+  | 'home_above_reviews'
+  | 'home_above_guides'
+  | 'phones_below_top_result'
+  | 'best_above_top_rated'
+  | 'news_below_featured'
+  | 'guides_below_featured';
+
+export interface AdPlacementConfig {
+  id: AdPlacementId;
+  name: string;
+  pageLabel: string;
+  positionLabel: string;
+  enabled: boolean;
+  adType: 'banner' | 'script' | 'both';
+  badgeText: string;
+  title: string;
+  subtitle: string;
+  imageUrl?: string;
+  showLearnMore: boolean;
+  learnMoreText: string;
+  learnMoreUrl: string;
+  openInNewTab?: boolean;
+  scriptCode: string;
 }
 
 export interface AdSettings {
@@ -169,6 +281,10 @@ export interface AdSettings {
     linkUrl: string;
   };
   sponsoredPhoneId: string | null;
+  placements?: Record<AdPlacementId, AdPlacementConfig>;
+  adsensePublisherId?: string;
+  adsenseAutoAdsEnabled?: boolean;
+  adsTxtContent?: string;
 }
 
 export type ThemeMode = 'dark' | 'light';
@@ -182,9 +298,12 @@ export type ActiveTab =
   | 'guides'
   | 'best-phones'
   | 'reviews'
+  | 'user-reviews'
   | 'about'
   | 'contact'
   | 'advertise'
+  | 'privacy'
+  | 'terms'
   | 'admin';
 
 export interface FilterState {
@@ -202,3 +321,46 @@ export interface FilterState {
   sortBy: 'price-asc' | 'price-desc' | 'popular' | 'rating' | 'newest' | 'battery';
   categoryPreset?: string;
 }
+
+export interface GlobalToastState {
+  message: string;
+  type: 'success' | 'error' | 'info';
+  id: number;
+}
+
+export interface ContactInquiry {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  subject: string;
+  message: string;
+  createdAt: string;
+  category?: string;
+  status?: 'unread' | 'read' | 'replied';
+  replied?: boolean;
+  repliedAt?: string;
+  replySubject?: string;
+  replyMessage?: string;
+}
+
+export interface NewsletterSubscriber {
+  email: string;
+  subscribedAt: string;
+  confirmationId?: string;
+  status?: 'active' | 'pending' | 'unsubscribed';
+}
+
+export interface NewsletterBroadcast {
+  id: string;
+  type: 'news' | 'phone' | 'guide' | 'review' | 'alert' | 'notice' | 'price';
+  title: string;
+  message: string;
+  actionUrl?: string;
+  actionLabel?: string;
+  recipientsCount: number;
+  recipientCount?: number;
+  sentAt: string;
+  status: 'sent' | 'delivered';
+}
+

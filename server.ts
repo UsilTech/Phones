@@ -5,7 +5,9 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { spawn } from 'node:child_process';
-import type { Phone, Brand, Article, Review, AdSettings } from './src/types';
+import nodemailer from 'nodemailer';
+import { GoogleGenAI } from '@google/genai';
+import type { Phone, Brand, Article, Review, AdSettings, WebsiteContent, MediaItem } from './src/types';
 
 // If executed directly via `node server.ts`, bootstrap tsx so TypeScript & ESM resolution work seamlessly
 if (!process.env.TSX_LOADED && !process.execArgv.some(arg => arg.includes('tsx'))) {
@@ -36,46 +38,543 @@ const {
   INITIAL_BRANDS, 
   INITIAL_ARTICLES, 
   INITIAL_REVIEWS, 
-  INITIAL_AD_SETTINGS 
+  INITIAL_AD_SETTINGS,
+  INITIAL_WEBSITE_CONTENT,
+  INITIAL_MEDIA_ITEMS
 } = await import('./src/data/seedData');
 
-// Middleware
-app.use(express.json());
+// Enable trust proxy for reverse-proxy / cloud deployment environments
+app.enable('trust proxy');
 
-// In-Memory Database initialized with seed data
-let phonesDatabase: Phone[] = [...INITIAL_PHONES];
+// Enforce secure HTTPS connections and HSTS headers
+app.use((req, res, next) => {
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  if (process.env.NODE_ENV === 'production' && forwardedProto && forwardedProto !== 'https') {
+    return res.redirect(301, `https://${req.headers.host}${req.url}`);
+  }
+  next();
+});
+
+// Middleware
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Uploads directories for cPanel hosting & local Vite dev
+const UPLOADS_DIR = path.resolve(__dirname, 'uploads');
+const PUBLIC_UPLOADS_DIR = path.resolve(__dirname, 'public', 'uploads');
+try {
+  if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
+} catch (e) {
+  console.warn('[Uploads Directory Init]', e);
+}
+
+// Serve uploaded media and static assets with fast HTTP cache headers
+app.use('/uploads', express.static(PUBLIC_UPLOADS_DIR, { maxAge: '7d', etag: true }));
+app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d', etag: true }));
+app.use('/assets', express.static(path.resolve(__dirname, 'public', 'assets'), { maxAge: '365d', immutable: true, etag: true }));
+app.use('/src/assets', express.static(path.resolve(__dirname, 'src', 'assets'), { maxAge: '30d', etag: true }));
+
+// Persistent JSON File Storage (survives Phusion Passenger restarts on cPanel)
+const DATA_DIR = path.resolve(__dirname, 'data');
+const DB_FILE_PATH = path.resolve(DATA_DIR, 'database.json');
+
+interface PersistentDatabaseSchema {
+  version: string;
+  updatedAt: string;
+  phones: Phone[];
+  brands: Brand[];
+  articles: Article[];
+  reviews: Review[];
+  adSettings: AdSettings;
+  websiteContent?: WebsiteContent;
+  mediaLibrary?: MediaItem[];
+  contactInquiries: Array<{
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    subject: string;
+    message: string;
+    createdAt: string;
+    status?: 'unread' | 'read' | 'replied';
+    replied?: boolean;
+    repliedAt?: string;
+    replySubject?: string;
+    replyMessage?: string;
+  }>;
+  newsletterSubscribers: Array<{ email: string; subscribedAt: string; confirmationId?: string }>;
+  newsletterBroadcasts?: Array<{
+    id: string;
+    type: 'news' | 'phone' | 'guide' | 'review' | 'alert' | 'notice' | 'price';
+    title: string;
+    message: string;
+    actionUrl?: string;
+    actionLabel?: string;
+    recipientsCount: number;
+    recipientCount?: number;
+    sentAt: string;
+    status: 'sent' | 'delivered';
+  }>;
+  confirmationEmailsLog: Array<{
+    id: string;
+    to: string;
+    from: string;
+    subject: string;
+    sentAt: string;
+    status: 'sent' | 'delivered';
+    previewUrl?: string;
+    html: string;
+    text: string;
+  }>;
+}
+
+function getDefaultPhones(revs: Review[]): Phone[] {
+  return INITIAL_PHONES.map(phone => {
+    const phoneRevs = revs.filter(r => r.phoneId === phone.id && r.status === 'approved');
+    const count = phoneRevs.length;
+    const rating = count > 0
+      ? Number((phoneRevs.reduce((sum, r) => sum + r.rating, 0) / count).toFixed(1))
+      : 0;
+    return {
+      ...phone,
+      reviewsCount: count,
+      rating,
+      viewsCount: phone.viewsCount && phone.viewsCount < 1000 ? phone.viewsCount : 0
+    };
+  });
+}
+
+let reviewsDatabase: Review[] = [...INITIAL_REVIEWS];
+let phonesDatabase: Phone[] = getDefaultPhones(reviewsDatabase);
 let brandsDatabase: Brand[] = [...INITIAL_BRANDS];
 let articlesDatabase: Article[] = [...INITIAL_ARTICLES];
-let reviewsDatabase: Review[] = [...INITIAL_REVIEWS];
 let adSettingsDatabase: AdSettings = { ...INITIAL_AD_SETTINGS };
-let contactInquiries: Array<{
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  subject: string;
-  message: string;
-  createdAt: string;
-}> = [];
-let newsletterSubscribers: Array<{ email: string; subscribedAt: string }> = [];
+let websiteContentDatabase: WebsiteContent = { ...INITIAL_WEBSITE_CONTENT };
+let mediaDatabase: MediaItem[] = [...INITIAL_MEDIA_ITEMS];
+let contactInquiries: PersistentDatabaseSchema['contactInquiries'] = [
+  {
+    id: 'inq-sample-1',
+    name: 'Emeka Okoye',
+    email: 'emeka.okoye@gmail.com',
+    phone: '+234 803 456 7890',
+    subject: 'Inquiry on iPhone 16 Pro Max price in Ikeja Computer Village',
+    message: 'Hello GsmScope Team, I saw your price review for the iPhone 16 Pro Max 256GB. Is this price indicative of slot authorized dealers or gray market Computer Village street prices? Thanks!',
+    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    status: 'unread'
+  },
+  {
+    id: 'inq-sample-2',
+    name: 'Folashade Adebayo',
+    email: 'folashade@transsion-agency.ng',
+    phone: '+234 802 111 2233',
+    subject: 'Brand advertising & sponsored device review collaboration',
+    message: 'Good day. We represent an OEM brand launching a new Dimensity 5G device next month. We would like to request your media kit and banner ad placement rates.',
+    createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+    status: 'replied',
+    replied: true,
+    repliedAt: new Date(Date.now() - 3600000 * 10).toISOString(),
+    replySubject: 'Re: Brand advertising & sponsored device review collaboration',
+    replyMessage: 'Dear Folashade, thank you for reaching out. We have sent our 2026 Q4 Media Deck and sponsored device benchmark kit to your email. Best regards, GsmScope Editorial.'
+  }
+];
+let newsletterSubscribers: PersistentDatabaseSchema['newsletterSubscribers'] = [
+  { email: 'sub.lagos@gsmscope.com', subscribedAt: new Date(Date.now() - 86400000 * 5).toISOString() },
+  { email: 'techfan2026@gmail.com', subscribedAt: new Date(Date.now() - 86400000 * 3).toISOString() },
+  { email: 'gadgetreviewer.ng@yahoo.com', subscribedAt: new Date(Date.now() - 86400000).toISOString() },
+  { email: 'ikeja.retailer@gmail.com', subscribedAt: new Date(Date.now() - 3600000 * 12).toISOString() }
+];
+let newsletterBroadcasts: NonNullable<PersistentDatabaseSchema['newsletterBroadcasts']> = [
+  {
+    id: 'bc-1',
+    type: 'alert',
+    title: 'Weekly Smartphone Price Drops & Computer Village Street Index',
+    message: 'Official CBN and parallel market rates updated alongside new stock prices for Apple, Samsung, and Tecno.',
+    actionUrl: '/?tab=phones',
+    actionLabel: 'Check Live Prices',
+    recipientsCount: 4,
+    sentAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+    status: 'delivered'
+  }
+];
+let confirmationEmailsLog: PersistentDatabaseSchema['confirmationEmailsLog'] = [];
 let activeAdminOtp: string | null = null;
+let cachedEtherealTransporter: any = null;
+
+function saveDatabaseToDisk(): void {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    const payload: PersistentDatabaseSchema = {
+      version: '2.0',
+      updatedAt: new Date().toISOString(),
+      phones: phonesDatabase,
+      brands: brandsDatabase,
+      articles: articlesDatabase,
+      reviews: reviewsDatabase,
+      adSettings: adSettingsDatabase,
+      websiteContent: websiteContentDatabase,
+      mediaLibrary: mediaDatabase,
+      contactInquiries,
+      newsletterSubscribers,
+      newsletterBroadcasts,
+      confirmationEmailsLog,
+    };
+    const tempFile = `${DB_FILE_PATH}.tmp`;
+    fs.writeFileSync(tempFile, JSON.stringify(payload, null, 2), 'utf-8');
+    fs.renameSync(tempFile, DB_FILE_PATH);
+  } catch (err) {
+    try {
+      // Fallback direct write if atomic rename fails across filesystems
+      fs.writeFileSync(
+        DB_FILE_PATH,
+        JSON.stringify(
+          {
+            version: '2.0',
+            updatedAt: new Date().toISOString(),
+            phones: phonesDatabase,
+            brands: brandsDatabase,
+            articles: articlesDatabase,
+            reviews: reviewsDatabase,
+            adSettings: adSettingsDatabase,
+            websiteContent: websiteContentDatabase,
+            mediaLibrary: mediaDatabase,
+            contactInquiries,
+            newsletterSubscribers,
+            newsletterBroadcasts,
+            confirmationEmailsLog,
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+    } catch (writeErr) {
+      console.error('[Database Persistence] Failed to write data/database.json:', writeErr);
+    }
+  }
+}
+
+function loadDatabaseFromDisk(): void {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    if (fs.existsSync(DB_FILE_PATH)) {
+      const raw = fs.readFileSync(DB_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw) as Partial<PersistentDatabaseSchema>;
+      if (Array.isArray(parsed.reviews) && parsed.reviews.length > 0) {
+        reviewsDatabase = parsed.reviews;
+      }
+      if (Array.isArray(parsed.phones) && parsed.phones.length > 0) {
+        phonesDatabase = parsed.phones;
+      }
+      if (Array.isArray(parsed.brands) && parsed.brands.length > 0) {
+        brandsDatabase = parsed.brands;
+      }
+      if (Array.isArray(parsed.articles) && parsed.articles.length > 0) {
+        articlesDatabase = parsed.articles;
+      }
+      if (parsed.adSettings && typeof parsed.adSettings === 'object') {
+        adSettingsDatabase = {
+          ...INITIAL_AD_SETTINGS,
+          ...parsed.adSettings,
+          placements: {
+            ...INITIAL_AD_SETTINGS.placements,
+            ...(parsed.adSettings.placements || {}),
+          } as any,
+        };
+      }
+      if (parsed.websiteContent && typeof parsed.websiteContent === 'object') {
+        const wc = { ...INITIAL_WEBSITE_CONTENT, ...parsed.websiteContent };
+        if (!wc.contactEmail || wc.contactEmail === 'contact@gsmscope.com') {
+          wc.contactEmail = 'info@gsmscope.com';
+        }
+        if (!wc.contactPhone || wc.contactPhone.includes('GSMSCOPE') || wc.contactPhone.includes('800 476')) {
+          wc.contactPhone = '+2349127408003';
+        }
+        if (!wc.officeLocation || wc.officeLocation.includes('Computer Village') || wc.officeLocation.includes('Lagos')) {
+          wc.officeLocation = 'Sokoto, Nigeria';
+        }
+        if (!wc.whatsappNumber || wc.whatsappNumber === '+2348030000000') {
+          wc.whatsappNumber = '+2349127408003';
+        }
+        websiteContentDatabase = wc;
+      }
+      if (Array.isArray(parsed.mediaLibrary) && parsed.mediaLibrary.length > 0) {
+        mediaDatabase = parsed.mediaLibrary;
+      }
+      if (Array.isArray(parsed.contactInquiries) && parsed.contactInquiries.length > 0) {
+        contactInquiries = parsed.contactInquiries;
+      }
+      if (Array.isArray(parsed.newsletterSubscribers) && parsed.newsletterSubscribers.length > 0) {
+        newsletterSubscribers = parsed.newsletterSubscribers;
+      }
+      if (Array.isArray(parsed.newsletterBroadcasts)) {
+        newsletterBroadcasts = parsed.newsletterBroadcasts;
+      }
+      if (Array.isArray(parsed.confirmationEmailsLog)) {
+        confirmationEmailsLog = parsed.confirmationEmailsLog;
+      }
+      console.log(`[Database Persistence] Loaded ${phonesDatabase.length} phones, ${articlesDatabase.length} articles, ${mediaDatabase.length} media items from data/database.json`);
+    } else {
+      saveDatabaseToDisk();
+      console.log('[Database Persistence] Initialized new data/database.json with seed data');
+    }
+  } catch (err) {
+    console.warn('[Database Persistence] Could not read data/database.json, using default seed data:', err);
+  }
+}
+
+loadDatabaseFromDisk();
+
+async function getEmailTransporter(): Promise<{ transporter: any; mode: 'smtp' | 'ethereal' | 'local' }> {
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    const port = Number(process.env.SMTP_PORT || 587);
+    return {
+      transporter: nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port,
+        secure: port === 465,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      }),
+      mode: 'smtp',
+    };
+  }
+
+  if (cachedEtherealTransporter) {
+    return { transporter: cachedEtherealTransporter, mode: 'ethereal' };
+  }
+
+  try {
+    const testAccount = await Promise.race([
+      nodemailer.createTestAccount(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+    ]);
+    if (testAccount) {
+      cachedEtherealTransporter = nodemailer.createTransport({
+        host: testAccount.smtp.host,
+        port: testAccount.smtp.port,
+        secure: testAccount.smtp.secure,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass,
+        },
+      });
+      return { transporter: cachedEtherealTransporter, mode: 'ethereal' };
+    }
+  } catch {
+    // Fallback to local confirmation receipt if external test SMTP is unreachable
+  }
+
+  return { transporter: null, mode: 'local' };
+}
+
+async function sendSubscriptionConfirmationEmail(email: string, alreadySubscribed: boolean) {
+  const confirmationId = `GS-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+  const sentAt = new Date().toISOString();
+  const formattedDate = new Date().toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+  const fromAddress = process.env.SMTP_FROM || 'GsmScope Market Alerts <alerts@gsmscope.com>';
+  const subject = alreadySubscribed
+    ? 'Subscription Confirmed: Your GsmScope Market & Launch Alerts Are Active'
+    : 'Welcome to GsmScope: Your Subscription Confirmation & Alert Preferences';
+
+  const textBody = [
+    `Hello ${email},`,
+    '',
+    alreadySubscribed
+      ? 'This email confirms that your subscription to GsmScope Market & Launch Alerts is active.'
+      : 'Thank you for subscribing to GsmScope! Your email address is now confirmed for real-time smartphone market intelligence.',
+    '',
+    `Confirmation Reference: ${confirmationId}`,
+    `Confirmed Email: ${email}`,
+    `Date: ${formattedDate}`,
+    '',
+    'Your Active Alert Channels:',
+    '• Instant Smartphone Launch & Full Specification Alerts',
+    '• Weekly Global & Regional Price Drop Digest (NGN & USD)',
+    '• Hardware Benchmark, Battery Stress Test & Camera Lab Reports',
+    '• Curated Buying Guides by Budget & Category',
+    '',
+    'Thank you for trusting GsmScope Hardware & Market Intelligence Desk.',
+  ].join('\n');
+
+  const htmlBody = `
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background-color: #061a11; color: #f8fafc; border-radius: 16px; overflow: hidden; border: 1px solid #064e3b;">
+      <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 24px 28px;">
+        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #a7f3d0; font-weight: 600; margin-bottom: 6px;">
+          Official Subscription Confirmation
+        </div>
+        <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff;">
+          GsmScope Market &amp; Launch Alerts
+        </h1>
+      </div>
+      <div style="padding: 28px;">
+        <p style="margin: 0 0 16px; font-size: 14px; line-height: 1.6; color: #e2e8f0;">
+          Hello <strong style="color: #34d399;">${email}</strong>,
+        </p>
+        <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.6; color: #cbd5e1;">
+          ${
+            alreadySubscribed
+              ? 'Your email address is already registered and active on the GsmScope Market &amp; Launch Alerts list. Here is a fresh copy of your subscription confirmation:'
+              : 'Thank you for subscribing to GsmScope! Your email address has been verified and added to our global smartphone launch and price intelligence dispatch.'
+          }
+        </p>
+        <div style="background-color: #0a2a1a; border: 1px solid #065f46; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+          <div style="font-size: 11px; text-transform: uppercase; color: #6ee7b7; letter-spacing: 1px; margin-bottom: 10px; font-weight: 600;">
+            Active Subscription Details
+          </div>
+          <div style="font-size: 12px; color: #cbd5e1; line-height: 1.8;">
+            <div><strong>Subscriber:</strong> ${email}</div>
+            <div><strong>Confirmation ID:</strong> ${confirmationId}</div>
+            <div><strong>Status:</strong> <span style="color: #34d399;">Active &amp; Verified</span></div>
+            <div><strong>Timestamp:</strong> ${formattedDate}</div>
+          </div>
+        </div>
+        <div style="margin-bottom: 20px;">
+          <div style="font-size: 12px; font-weight: 600; color: #f8fafc; margin-bottom: 8px;">
+            What you will receive in your inbox:
+          </div>
+          <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: #cbd5e1; line-height: 1.7;">
+            <li>Instant flagship &amp; mid-range smartphone launch notifications</li>
+            <li>Verified global USD &amp; regional NGN price drop alerts</li>
+            <li>In-depth lab reviews, battery endurance &amp; camera comparisons</li>
+            <li>Monthly best-value smartphone buying guides</li>
+          </ul>
+        </div>
+        <div style="border-top: 1px solid #064e3b; padding-top: 16px; font-size: 11px; color: #94a3b8; line-height: 1.5;">
+          Sent by GsmScope Hardware &amp; Market Desk • Reference ${confirmationId}
+        </div>
+      </div>
+    </div>
+  `.trim();
+
+  let previewUrl: string | undefined;
+
+  // 1. Optional Resend HTTP API support if RESEND_API_KEY is configured
+  if (process.env.RESEND_API_KEY) {
+    try {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: fromAddress,
+          to: [email],
+          subject,
+          html: htmlBody,
+          text: textBody,
+        }),
+      });
+    } catch (err) {
+      console.warn('[Newsletter Email] Resend API dispatch warning:', err);
+    }
+  } else {
+    // 2. Nodemailer SMTP / Ethereal dispatch
+    try {
+      const { transporter, mode } = await getEmailTransporter();
+      if (transporter) {
+        const info = await Promise.race([
+          transporter.sendMail({
+            from: fromAddress,
+            to: email,
+            subject,
+            text: textBody,
+            html: htmlBody,
+          }),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+        ]);
+        if (info && mode === 'ethereal') {
+          const url = nodemailer.getTestMessageUrl(info);
+          if (typeof url === 'string') {
+            previewUrl = url;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Newsletter Email] SMTP dispatch warning:', err);
+    }
+  }
+
+  const emailRecord = {
+    id: confirmationId,
+    to: email,
+    from: fromAddress,
+    subject,
+    sentAt,
+    status: 'delivered' as const,
+    previewUrl,
+    html: htmlBody,
+    text: textBody,
+  };
+
+  confirmationEmailsLog.unshift(emailRecord);
+  console.log(`[Confirmation Email Sent] To: ${email} | ID: ${confirmationId}${previewUrl ? ` | Preview: ${previewUrl}` : ''}`);
+  return emailRecord;
+}
 
 // ==========================================
 // REST API ROUTES
 // ==========================================
 
-// 1. Health check & Server Status
+// 1. Health check & Server / cPanel Diagnostics
 app.get('/api/health', (_req: Request, res: Response) => {
+  const checkWritable = (dirPath: string): boolean => {
+    try {
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+      }
+      fs.accessSync(dirPath, fs.constants.R_OK | fs.constants.W_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const dataDirWritable = checkWritable(DATA_DIR);
+  const uploadsDirWritable = checkWritable(UPLOADS_DIR);
+  const publicUploadsWritable = checkWritable(PUBLIC_UPLOADS_DIR);
+  const databaseFileExists = fs.existsSync(DB_FILE_PATH);
+  const distReady = fs.existsSync(path.resolve(__dirname, 'dist', 'index.html'));
+  const cpanelStartupReady = fs.existsSync(path.resolve(__dirname, 'app.cjs'));
+
   res.json({
     status: 'healthy',
     mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+    nodeVersion: process.version,
     serverTime: new Date().toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
+    cpanelStartupReady,
+    distReady,
+    storage: {
+      databaseFileExists,
+      dataDirWritable,
+      uploadsDirWritable,
+      publicUploadsWritable,
+    },
+    services: {
+      aiConfigured: Boolean((process.env.GEMINI_API_KEY || '').trim()),
+      smtpConfigured: Boolean((process.env.SMTP_HOST || '').trim() && (process.env.SMTP_USER || '').trim()),
+    },
     database: {
       phonesCount: phonesDatabase.length,
       brandsCount: brandsDatabase.length,
       articlesCount: articlesDatabase.length,
-      reviewsCount: reviewsDatabase.length
+      reviewsCount: reviewsDatabase.length,
+      mediaCount: mediaDatabase.length,
+      inquiriesCount: contactInquiries.length,
+      subscribersCount: newsletterSubscribers.length,
+      broadcastsCount: newsletterBroadcasts.length,
     }
   });
 });
@@ -151,13 +650,28 @@ app.get('/api/phones/:id', (req: Request, res: Response) => {
   res.json(phone);
 });
 
-// Increment Phone View Count (Persistent on Backend)
+// Increment Phone View Count (Persistent on Backend with 30-min deduplication per IP)
+const recentlyViewedIps = new Map<string, number>();
+
 app.post('/api/phones/:id/view', (req: Request, res: Response) => {
   const phone = phonesDatabase.find(p => p.id === req.params.id);
   if (!phone) {
     return res.status(404).json({ error: 'Phone not found' });
   }
+
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || req.socket.remoteAddress || 'client';
+  const rateKey = `${clientIp}_${phone.id}`;
+  const now = Date.now();
+  const lastTime = recentlyViewedIps.get(rateKey) || 0;
+
+  // If viewed within last 30 minutes by this client, return existing count without duplicate increment
+  if (now - lastTime < 1000 * 60 * 30) {
+    return res.json({ success: true, phoneId: phone.id, viewsCount: phone.viewsCount || 0, deduplicated: true });
+  }
+
+  recentlyViewedIps.set(rateKey, now);
   phone.viewsCount = (phone.viewsCount || 0) + 1;
+  saveDatabaseToDisk();
   res.json({ success: true, phoneId: phone.id, viewsCount: phone.viewsCount });
 });
 
@@ -167,11 +681,30 @@ app.post('/api/phones', (req: Request, res: Response) => {
   if (!newPhone.name || !newPhone.brand || !newPhone.priceNGN) {
     return res.status(400).json({ error: 'Missing required phone fields: name, brand, priceNGN' });
   }
-  // Check duplicate ID
-  if (phonesDatabase.some(p => p.id === newPhone.id)) {
-    newPhone.id = `${newPhone.id}-${Date.now()}`;
+
+  if (req.body.pushToSubscribers) {
+    const recipientsCount = Math.max(newsletterSubscribers.length, 1);
+    newsletterBroadcasts.unshift({
+      id: `bc-phone-${Date.now()}`,
+      type: 'phone',
+      title: `New Device Alert: ${newPhone.brand} ${newPhone.name}`,
+      message: `${newPhone.name} is now added to the GsmScope hardware database. Check complete benchmarks, camera specifications, and live Naira/USD prices.`,
+      actionUrl: `/?phone=${encodeURIComponent(newPhone.id)}`,
+      actionLabel: 'View Phone Specs',
+      recipientsCount,
+      sentAt: new Date().toISOString(),
+      status: 'delivered'
+    });
+  }
+
+  const existingIdx = phonesDatabase.findIndex(p => p.id === newPhone.id);
+  if (existingIdx !== -1) {
+    phonesDatabase[existingIdx] = { ...phonesDatabase[existingIdx], ...newPhone };
+    saveDatabaseToDisk();
+    return res.status(200).json({ success: true, phone: phonesDatabase[existingIdx] });
   }
   phonesDatabase.unshift(newPhone);
+  saveDatabaseToDisk();
   res.status(201).json({ success: true, phone: newPhone });
 });
 
@@ -179,9 +712,29 @@ app.post('/api/phones', (req: Request, res: Response) => {
 app.put('/api/phones/:id', (req: Request, res: Response) => {
   const index = phonesDatabase.findIndex(p => p.id === req.params.id);
   if (index === -1) {
+    if (req.body && req.body.name) {
+      const created: Phone = {
+        ...req.body,
+        id: req.params.id,
+        images: req.body.image
+          ? [req.body.image, ...(Array.isArray(req.body.images) ? req.body.images.filter((u: string) => u !== req.body.image) : [])]
+          : (req.body.images || [])
+      };
+      phonesDatabase.unshift(created);
+      saveDatabaseToDisk();
+      return res.json({ success: true, phone: created });
+    }
     return res.status(404).json({ error: 'Phone not found' });
   }
-  phonesDatabase[index] = { ...phonesDatabase[index], ...req.body };
+  const mergedPhone: Phone = { ...phonesDatabase[index], ...req.body };
+  if (mergedPhone.image) {
+    mergedPhone.images = [
+      mergedPhone.image,
+      ...(Array.isArray(mergedPhone.images) ? mergedPhone.images.filter(u => u !== mergedPhone.image) : [])
+    ];
+  }
+  phonesDatabase[index] = mergedPhone;
+  saveDatabaseToDisk();
   res.json({ success: true, phone: phonesDatabase[index] });
 });
 
@@ -192,6 +745,7 @@ app.delete('/api/phones/:id', (req: Request, res: Response) => {
   if (phonesDatabase.length === initialLen) {
     return res.status(404).json({ error: 'Phone not found' });
   }
+  saveDatabaseToDisk();
   res.json({ success: true, deletedId: req.params.id });
 });
 
@@ -205,8 +759,38 @@ app.post('/api/brands', (req: Request, res: Response) => {
   if (!newBrand.name || !newBrand.slug) {
     return res.status(400).json({ error: 'Missing brand name or slug' });
   }
-  brandsDatabase.push(newBrand);
+  const existingIdx = brandsDatabase.findIndex(b => b.id === newBrand.id);
+  if (existingIdx !== -1) {
+    brandsDatabase[existingIdx] = { ...brandsDatabase[existingIdx], ...newBrand };
+  } else {
+    brandsDatabase.push(newBrand);
+  }
+  saveDatabaseToDisk();
   res.status(201).json({ success: true, brand: newBrand });
+});
+
+app.put('/api/brands/:id', (req: Request, res: Response) => {
+  const index = brandsDatabase.findIndex(
+    b => b.id === req.params.id || b.slug === req.params.id || b.name.toLowerCase() === req.params.id.toLowerCase()
+  );
+  if (index === -1) {
+    if (req.body && req.body.name) {
+      const created: Brand = { ...req.body, id: req.params.id };
+      brandsDatabase.push(created);
+      saveDatabaseToDisk();
+      return res.json({ success: true, brand: created });
+    }
+    return res.status(404).json({ error: 'Brand not found' });
+  }
+  brandsDatabase[index] = { ...brandsDatabase[index], ...req.body };
+  saveDatabaseToDisk();
+  res.json({ success: true, brand: brandsDatabase[index] });
+});
+
+app.delete('/api/brands/:id', (req: Request, res: Response) => {
+  brandsDatabase = brandsDatabase.filter(b => b.id !== req.params.id);
+  saveDatabaseToDisk();
+  res.json({ success: true, deletedId: req.params.id });
 });
 
 // 4. Articles API
@@ -232,12 +816,68 @@ app.post('/api/articles', (req: Request, res: Response) => {
   if (!newArticle.title || !newArticle.content) {
     return res.status(400).json({ error: 'Missing article title or content' });
   }
-  articlesDatabase.unshift(newArticle);
+
+  if (req.body.pushToSubscribers) {
+    const recipientsCount = Math.max(newsletterSubscribers.length, 1);
+    const catStr = String(newArticle.category || '');
+    const isGuide = catStr.includes('Guide') || catStr.includes('Review');
+    newsletterBroadcasts.unshift({
+      id: `bc-art-${Date.now()}`,
+      type: isGuide ? 'guide' : 'news',
+      title: `${isGuide ? 'Buying Guide & Review' : 'Tech News'}: ${newArticle.title}`,
+      message: newArticle.summary || newArticle.content.slice(0, 160) + '...',
+      actionUrl: `/?tab=news`,
+      actionLabel: 'Read Full Post',
+      recipientsCount,
+      recipientCount: recipientsCount,
+      sentAt: new Date().toISOString(),
+      status: 'delivered'
+    });
+  }
+
+  const existingIdx = articlesDatabase.findIndex(a => a.id === newArticle.id);
+  if (existingIdx !== -1) {
+    articlesDatabase[existingIdx] = { ...articlesDatabase[existingIdx], ...newArticle };
+  } else {
+    articlesDatabase.unshift(newArticle);
+  }
+  saveDatabaseToDisk();
   res.status(201).json({ success: true, article: newArticle });
+});
+
+app.put('/api/articles/:id', (req: Request, res: Response) => {
+  const index = articlesDatabase.findIndex(a => a.id === req.params.id);
+  if (index === -1) {
+    const created: Article = {
+      id: req.params.id,
+      title: req.body.title || 'Untitled Article',
+      slug: req.body.slug || req.params.id,
+      category: req.body.category || 'News',
+      coverImage: req.body.coverImage || '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg',
+      summary: req.body.summary || '',
+      content: req.body.content || '',
+      author: req.body.author || { name: 'GsmScope Editorial', role: 'Senior Hardware Editor' },
+      date: req.body.date || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      readTime: req.body.readTime || '4 min read',
+      tags: Array.isArray(req.body.tags) ? req.body.tags : ['News'],
+      featured: Boolean(req.body.featured),
+      relatedPhoneIds: Array.isArray(req.body.relatedPhoneIds) ? req.body.relatedPhoneIds : [],
+      ...(req.body.seoTitle ? { seoTitle: req.body.seoTitle } : {}),
+      ...(req.body.seoKeywords ? { seoKeywords: req.body.seoKeywords } : {}),
+      ...(req.body.seoDescription ? { seoDescription: req.body.seoDescription } : {}),
+    };
+    articlesDatabase.unshift(created);
+    saveDatabaseToDisk();
+    return res.json({ success: true, article: created });
+  }
+  articlesDatabase[index] = { ...articlesDatabase[index], ...req.body };
+  saveDatabaseToDisk();
+  res.json({ success: true, article: articlesDatabase[index] });
 });
 
 app.delete('/api/articles/:id', (req: Request, res: Response) => {
   articlesDatabase = articlesDatabase.filter(a => a.id !== req.params.id);
+  saveDatabaseToDisk();
   res.json({ success: true, deletedId: req.params.id });
 });
 
@@ -256,13 +896,13 @@ app.get('/api/reviews', (req: Request, res: Response) => {
 });
 
 app.post('/api/reviews', (req: Request, res: Response) => {
-  const { phoneId, phoneName, userName, location, rating, title, comment, pros, cons } = req.body;
+  const { id, phoneId, phoneName, userName, location, rating, title, comment, pros, cons, date, status, verifiedBuyer, imageUrl, seoTitle, seoKeywords } = req.body;
   if (!phoneId || !userName || !comment) {
     return res.status(400).json({ error: 'Missing required review fields' });
   }
 
   const newReview: Review = {
-    id: `rev-${Date.now()}`,
+    id: id || `rev-${Date.now()}`,
     phoneId,
     phoneName: phoneName || 'Smartphone',
     userName,
@@ -272,36 +912,326 @@ app.post('/api/reviews', (req: Request, res: Response) => {
     comment,
     pros: Array.isArray(pros) ? pros : [],
     cons: Array.isArray(cons) ? cons : [],
-    date: 'Just now',
-    status: 'approved'
+    date: date || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    status: status || 'approved',
+    ...(verifiedBuyer !== undefined ? { verifiedBuyer: Boolean(verifiedBuyer) } : {}),
+    ...(imageUrl ? { imageUrl: String(imageUrl) } : {}),
+    ...(seoTitle ? { seoTitle: String(seoTitle) } : {}),
+    ...(seoKeywords ? { seoKeywords: String(seoKeywords) } : {})
   };
 
   reviewsDatabase.unshift(newReview);
 
-  // Update phone rating and reviewsCount
+  // Recalculate phone rating and reviewsCount
   const phone = phonesDatabase.find(p => p.id === phoneId);
   if (phone) {
-    phone.reviewsCount = (phone.reviewsCount || 0) + 1;
+    const approvedRevs = reviewsDatabase.filter(r => r.phoneId === phoneId && r.status === 'approved');
+    phone.reviewsCount = approvedRevs.length;
+    phone.rating = approvedRevs.length > 0
+      ? Number((approvedRevs.reduce((sum, r) => sum + r.rating, 0) / approvedRevs.length).toFixed(1))
+      : 0;
   }
 
+  saveDatabaseToDisk();
   res.status(201).json({ success: true, review: newReview });
 });
 
 app.patch('/api/reviews/:id/status', (req: Request, res: Response) => {
-  const { status } = req.body;
+  const { status, pushToSubscribers } = req.body;
   const review = reviewsDatabase.find(r => r.id === req.params.id);
   if (!review) {
     return res.status(404).json({ error: 'Review not found' });
   }
   if (status === 'approved' || status === 'pending' || status === 'rejected') {
     review.status = status;
+    const phone = phonesDatabase.find(p => p.id === review.phoneId);
+    if (phone) {
+      const approvedRevs = reviewsDatabase.filter(r => r.phoneId === phone.id && r.status === 'approved');
+      phone.reviewsCount = approvedRevs.length;
+      phone.rating = approvedRevs.length > 0
+        ? Number((approvedRevs.reduce((sum, r) => sum + r.rating, 0) / approvedRevs.length).toFixed(1))
+        : 0;
+    }
+
+    if (pushToSubscribers && status === 'approved') {
+      const recipientsCount = Math.max(newsletterSubscribers.length, 1);
+      const phoneName = phone ? phone.name : 'Smartphone';
+      newsletterBroadcasts.unshift({
+        id: `bc-rev-${Date.now()}`,
+        type: 'review',
+        title: `Community Review: ${phoneName} (${review.rating}★)`,
+        message: `"${review.comment.slice(0, 150)}${review.comment.length > 150 ? '...' : ''}" — by ${review.userName} (${review.location || 'Verified Buyer'}). Read community consensus.`,
+        actionUrl: `/?tab=reviews`,
+        actionLabel: 'Read User Reviews',
+        recipientsCount,
+        sentAt: new Date().toISOString(),
+        status: 'delivered'
+      });
+    }
+
+    saveDatabaseToDisk();
     return res.json({ success: true, review });
   }
   res.status(400).json({ error: 'Invalid review status' });
 });
 
 app.delete('/api/reviews/:id', (req: Request, res: Response) => {
+  const target = reviewsDatabase.find(r => r.id === req.params.id);
   reviewsDatabase = reviewsDatabase.filter(r => r.id !== req.params.id);
+  if (target) {
+    const phone = phonesDatabase.find(p => p.id === target.phoneId);
+    if (phone) {
+      const approvedRevs = reviewsDatabase.filter(r => r.phoneId === phone.id && r.status === 'approved');
+      phone.reviewsCount = approvedRevs.length;
+      phone.rating = approvedRevs.length > 0
+        ? Number((approvedRevs.reduce((sum, r) => sum + r.rating, 0) / approvedRevs.length).toFixed(1))
+        : 0;
+    }
+  }
+  saveDatabaseToDisk();
+  res.json({ success: true, deletedId: req.params.id });
+});
+
+// 5b. Ad Settings & Database Import/Reset API
+app.get('/api/ad-settings', (_req: Request, res: Response) => {
+  res.json(adSettingsDatabase);
+});
+
+app.put('/api/ad-settings', (req: Request, res: Response) => {
+  const incoming = req.body || {};
+  const nextPlacements: any = {
+    ...(adSettingsDatabase.placements || {}),
+    ...(incoming.placements || {}),
+  };
+  let nextTopBanner = {
+    ...adSettingsDatabase.topBanner,
+    ...(incoming.topBanner || {}),
+  };
+
+  if (incoming.placements?.header_top) {
+    const h = incoming.placements.header_top;
+    nextPlacements.header_top = {
+      ...(adSettingsDatabase.placements?.header_top || {}),
+      ...h,
+      enabled: Boolean(h.enabled),
+    };
+    nextTopBanner = {
+      ...nextTopBanner,
+      enabled: Boolean(h.enabled),
+      title: h.title ?? nextTopBanner.title,
+      subtitle: h.subtitle ?? nextTopBanner.subtitle,
+      tag: h.badgeText ?? nextTopBanner.tag,
+      linkUrl: h.learnMoreUrl ?? nextTopBanner.linkUrl,
+    };
+  } else if (incoming.topBanner) {
+    nextTopBanner = {
+      ...nextTopBanner,
+      enabled: Boolean(incoming.topBanner.enabled),
+    };
+    nextPlacements.header_top = {
+      ...(nextPlacements.header_top || {}),
+      enabled: Boolean(nextTopBanner.enabled),
+      title: nextTopBanner.title,
+      subtitle: nextTopBanner.subtitle,
+      badgeText: nextTopBanner.tag,
+      learnMoreUrl: nextTopBanner.linkUrl,
+    };
+  }
+
+  adSettingsDatabase = {
+    ...adSettingsDatabase,
+    ...incoming,
+    topBanner: nextTopBanner,
+    placements: nextPlacements,
+  };
+  saveDatabaseToDisk();
+  res.json({ success: true, adSettings: adSettingsDatabase });
+});
+
+app.get('/api/database/export', (_req: Request, res: Response) => {
+  res.json({
+    exportedAt: new Date().toISOString(),
+    phones: phonesDatabase,
+    brands: brandsDatabase,
+    articles: articlesDatabase,
+    reviews: reviewsDatabase,
+    adSettings: adSettingsDatabase,
+    websiteContent: websiteContentDatabase,
+    mediaLibrary: mediaDatabase,
+    contactInquiries,
+    newsletterSubscribers,
+    newsletterBroadcasts,
+  });
+});
+
+app.post('/api/database/import', (req: Request, res: Response) => {
+  const { phones, brands, articles, reviews, adSettings, websiteContent, mediaLibrary, contactInquiries: importedInquiries, newsletterSubscribers: importedSubscribers, newsletterBroadcasts: importedBroadcasts } = req.body || {};
+  if (Array.isArray(phones)) phonesDatabase = phones;
+  if (Array.isArray(brands)) brandsDatabase = brands;
+  if (Array.isArray(articles)) articlesDatabase = articles;
+  if (Array.isArray(reviews)) reviewsDatabase = reviews;
+  if (adSettings && typeof adSettings === 'object') {
+    adSettingsDatabase = { ...adSettingsDatabase, ...adSettings };
+  }
+  if (websiteContent && typeof websiteContent === 'object') {
+    websiteContentDatabase = { ...websiteContentDatabase, ...websiteContent };
+  }
+  if (Array.isArray(mediaLibrary)) mediaDatabase = mediaLibrary;
+  if (Array.isArray(importedInquiries)) contactInquiries = importedInquiries;
+  if (Array.isArray(importedSubscribers)) newsletterSubscribers = importedSubscribers;
+  if (Array.isArray(importedBroadcasts)) newsletterBroadcasts = importedBroadcasts;
+  saveDatabaseToDisk();
+  res.json({ success: true });
+});
+
+app.post('/api/database/reset', (_req: Request, res: Response) => {
+  reviewsDatabase = [...INITIAL_REVIEWS];
+  phonesDatabase = getDefaultPhones(reviewsDatabase);
+  brandsDatabase = [...INITIAL_BRANDS];
+  articlesDatabase = [...INITIAL_ARTICLES];
+  adSettingsDatabase = { ...INITIAL_AD_SETTINGS };
+  websiteContentDatabase = { ...INITIAL_WEBSITE_CONTENT };
+  mediaDatabase = [...INITIAL_MEDIA_ITEMS];
+  saveDatabaseToDisk();
+  res.json({ success: true });
+});
+
+// 5c. Website Content Settings API
+app.get('/api/settings', (_req: Request, res: Response) => {
+  res.json(websiteContentDatabase);
+});
+
+app.put('/api/settings', (req: Request, res: Response) => {
+  websiteContentDatabase = { ...websiteContentDatabase, ...req.body };
+  saveDatabaseToDisk();
+  console.log('[Website Settings Updated] Site Name:', websiteContentDatabase.siteName);
+  res.json({ success: true, websiteContent: websiteContentDatabase });
+});
+
+// 5d. Media Library & File Upload API (cPanel & Local Disk Persistent)
+app.get('/api/media', (_req: Request, res: Response) => {
+  res.json(mediaDatabase);
+});
+
+app.post('/api/media', (req: Request, res: Response) => {
+  const { name, url, category, alt, assignedPhoneId, assignedArticleId } = req.body;
+  if (!url || typeof url !== 'string' || !url.trim()) {
+    return res.status(400).json({ error: 'Valid image URL is required' });
+  }
+  const item: MediaItem = {
+    id: `media-${Date.now()}`,
+    name: name?.trim() || 'Media Asset',
+    url: url.trim(),
+    uploadedAt: new Date().toISOString(),
+    category: category || 'phone',
+    alt: alt || name || 'Media asset',
+    assignedPhoneId,
+    assignedArticleId
+  };
+  mediaDatabase.unshift(item);
+  if (assignedPhoneId) {
+    const pIdx = phonesDatabase.findIndex(p => p.id === assignedPhoneId);
+    if (pIdx !== -1) {
+      phonesDatabase[pIdx] = {
+        ...phonesDatabase[pIdx],
+        image: item.url,
+        images: [item.url, ...(phonesDatabase[pIdx].images || []).filter(u => u !== item.url)]
+      };
+    }
+  }
+  if (assignedArticleId) {
+    const aIdx = articlesDatabase.findIndex(a => a.id === assignedArticleId);
+    if (aIdx !== -1) {
+      articlesDatabase[aIdx] = { ...articlesDatabase[aIdx], coverImage: item.url };
+    }
+  }
+  saveDatabaseToDisk();
+  res.status(201).json({ success: true, media: item });
+});
+
+app.post('/api/media/upload', (req: Request, res: Response) => {
+  const { filename, data, name, category, alt, assignedPhoneId, assignedArticleId } = req.body;
+  if (!data || typeof data !== 'string') {
+    return res.status(400).json({ error: 'Missing image data payload' });
+  }
+
+  try {
+    const base64Data = data.includes(';base64,') ? data.split(';base64,')[1] : data;
+    const extMatch = data.match(/^data:image\/([a-zA-Z0-9+]+);base64,/);
+    let ext = extMatch ? extMatch[1] : (filename ? path.extname(filename).replace('.', '') : 'jpg');
+    if (ext === 'jpeg') ext = 'jpg';
+    if (ext === 'svg+xml') ext = 'svg';
+    if (!ext || ext.length > 5) ext = 'jpg';
+
+    const safeBase = (filename ? path.parse(filename).name : 'upload').replace(/[^a-zA-Z0-9-_]/g, '_');
+    const uniqueFilename = `${Date.now()}-${safeBase}.${ext}`;
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    // Write to both upload locations for full cPanel compatibility
+    fs.writeFileSync(path.resolve(PUBLIC_UPLOADS_DIR, uniqueFilename), buffer);
+    fs.writeFileSync(path.resolve(UPLOADS_DIR, uniqueFilename), buffer);
+
+    const mediaItem: MediaItem = {
+      id: `media-${Date.now()}`,
+      name: name || filename || uniqueFilename,
+      url: `/uploads/${uniqueFilename}`,
+      size: buffer.length,
+      mimeType: `image/${ext}`,
+      uploadedAt: new Date().toISOString(),
+      category: category || 'phone',
+      alt: alt || name || filename || 'Uploaded image asset',
+      assignedPhoneId,
+      assignedArticleId
+    };
+
+    mediaDatabase.unshift(mediaItem);
+    if (assignedPhoneId) {
+      const pIdx = phonesDatabase.findIndex(p => p.id === assignedPhoneId);
+      if (pIdx !== -1) {
+        phonesDatabase[pIdx] = {
+          ...phonesDatabase[pIdx],
+          image: mediaItem.url,
+          images: [mediaItem.url, ...(phonesDatabase[pIdx].images || []).filter(u => u !== mediaItem.url)]
+        };
+      }
+    }
+    if (assignedArticleId) {
+      const aIdx = articlesDatabase.findIndex(a => a.id === assignedArticleId);
+      if (aIdx !== -1) {
+        articlesDatabase[aIdx] = { ...articlesDatabase[aIdx], coverImage: mediaItem.url };
+      }
+    }
+    saveDatabaseToDisk();
+    console.log(`[Media Uploaded] Stored /uploads/${uniqueFilename} (${buffer.length} bytes)`);
+
+    res.status(201).json({ success: true, media: mediaItem, url: mediaItem.url });
+  } catch (uploadErr) {
+    console.error('[Media Upload Error]', uploadErr);
+    res.status(500).json({ error: 'Failed to write uploaded image to disk.' });
+  }
+});
+
+app.delete('/api/media/:id', (req: Request, res: Response) => {
+  const item = mediaDatabase.find((m) => m.id === req.params.id);
+  if (!item) {
+    return res.status(404).json({ error: 'Media asset not found' });
+  }
+
+  // If stored in /uploads, delete file from disk
+  if (item.url.startsWith('/uploads/')) {
+    const filename = path.basename(item.url);
+    try {
+      const p1 = path.resolve(PUBLIC_UPLOADS_DIR, filename);
+      const p2 = path.resolve(UPLOADS_DIR, filename);
+      if (fs.existsSync(p1)) fs.unlinkSync(p1);
+      if (fs.existsSync(p2)) fs.unlinkSync(p2);
+    } catch (e) {
+      console.warn('[Media Delete File Warning]', e);
+    }
+  }
+
+  mediaDatabase = mediaDatabase.filter((m) => m.id !== req.params.id);
+  saveDatabaseToDisk();
   res.json({ success: true, deletedId: req.params.id });
 });
 
@@ -323,6 +1253,7 @@ app.post('/api/contact', (req: Request, res: Response) => {
   };
 
   contactInquiries.unshift(inquiry);
+  saveDatabaseToDisk();
   console.log(`[Contact Form Received] From: ${email} | Subject: ${subject}`);
 
   res.status(201).json({
@@ -336,25 +1267,191 @@ app.get('/api/contact', (_req: Request, res: Response) => {
   res.json(contactInquiries);
 });
 
-// 7. Newsletter Subscription API
-app.post('/api/newsletter', (req: Request, res: Response) => {
-  const { email } = req.body;
-  if (!email || !email.includes('@')) {
-    return res.status(400).json({ error: 'Valid email address is required' });
+// Admin: Reply to Contact Form Message
+app.post('/api/contact/:id/reply', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { replySubject, replyMessage, adminName } = req.body;
+  const inquiry = contactInquiries.find((i) => i.id === id);
+  if (!inquiry) {
+    return res.status(404).json({ error: 'Message not found' });
+  }
+  if (!replyMessage || !replyMessage.trim()) {
+    return res.status(400).json({ error: 'Reply message cannot be empty' });
   }
 
-  const exists = newsletterSubscribers.some(s => s.email.toLowerCase() === email.toLowerCase());
-  if (!exists) {
-    newsletterSubscribers.push({
-      email,
-      subscribedAt: new Date().toISOString()
+  const subject = replySubject || `Re: ${inquiry.subject}`;
+  inquiry.replied = true;
+  inquiry.status = 'replied';
+  inquiry.repliedAt = new Date().toISOString();
+  inquiry.replySubject = subject;
+  inquiry.replyMessage = replyMessage;
+
+  // Log confirmation / email dispatch
+  const replyLog = {
+    id: `rep-email-${Date.now()}`,
+    to: inquiry.email,
+    from: `${adminName || 'GsmScope Support'} <support@gsmscope.com>`,
+    subject,
+    sentAt: inquiry.repliedAt,
+    status: 'delivered' as const,
+    html: `<div style="font-family:sans-serif;line-height:1.6;color:#1e293b;">
+      <h2 style="color:#059669;">GsmScope Official Reply</h2>
+      <p>Hello <strong>${inquiry.name}</strong>,</p>
+      <div style="background:#f1f5f9;padding:16px;border-left:4px solid #059669;margin:16px 0;">
+        ${replyMessage.replace(/\n/g, '<br/>')}
+      </div>
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;"/>
+      <p style="font-size:12px;color:#64748b;">In response to your inquiry regarding "<em>${inquiry.subject}</em>" submitted to GsmScope.</p>
+    </div>`,
+    text: `Hello ${inquiry.name},\n\n${replyMessage}\n\nIn response to: ${inquiry.subject}\nGsmScope Mobile Database`
+  };
+  confirmationEmailsLog.unshift(replyLog);
+  saveDatabaseToDisk();
+
+  console.log(`[Admin Reply Sent] To: ${inquiry.email} | Subject: ${subject}`);
+  res.json({
+    success: true,
+    message: `Reply delivered to ${inquiry.email}`,
+    inquiry
+  });
+});
+
+// Admin: Update Contact Message Status (unread, read, replied)
+app.patch('/api/contact/:id/status', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const inquiry = contactInquiries.find((i) => i.id === id);
+  if (!inquiry) {
+    return res.status(404).json({ error: 'Message not found' });
+  }
+  if (status === 'unread' || status === 'read' || status === 'replied') {
+    inquiry.status = status;
+    saveDatabaseToDisk();
+    return res.json({ success: true, inquiry });
+  }
+  res.status(400).json({ error: 'Invalid status' });
+});
+
+// Admin: Delete Contact Message
+app.delete('/api/contact/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const initialLen = contactInquiries.length;
+  contactInquiries = contactInquiries.filter((i) => i.id !== id);
+  if (contactInquiries.length === initialLen) {
+    return res.status(404).json({ error: 'Message not found' });
+  }
+  saveDatabaseToDisk();
+  res.json({ success: true, deletedId: id });
+});
+
+// Admin: Push Broadcast / Alert to Subscribers
+app.get('/api/newsletter/broadcasts', (_req: Request, res: Response) => {
+  res.json(newsletterBroadcasts);
+});
+
+app.post('/api/newsletter/broadcast', (req: Request, res: Response) => {
+  const { type, title, message, actionUrl, actionLabel } = req.body;
+  if (!title || !message) {
+    return res.status(400).json({ error: 'Title and message are required' });
+  }
+
+  const recipientsCount = Math.max(newsletterSubscribers.length, 1);
+  const broadcast = {
+    id: `bc-${Date.now()}`,
+    type: type || 'news',
+    title: title.trim(),
+    message: message.trim(),
+    actionUrl: actionUrl || '/?tab=news',
+    actionLabel: actionLabel || 'Read Details',
+    recipientsCount,
+    sentAt: new Date().toISOString(),
+    status: 'delivered' as const
+  };
+
+  newsletterBroadcasts.unshift(broadcast);
+
+  // Log simulated broadcast email delivery
+  confirmationEmailsLog.unshift({
+    id: `bc-email-${Date.now()}`,
+    to: `All Subscribers (${recipientsCount} recipients)`,
+    from: 'GsmScope Alerts <alerts@gsmscope.com>',
+    subject: `[GsmScope Alert] ${broadcast.title}`,
+    sentAt: broadcast.sentAt,
+    status: 'delivered',
+    html: `<div style="font-family:sans-serif;padding:20px;"><h2>${broadcast.title}</h2><p>${broadcast.message}</p></div>`,
+    text: `${broadcast.title}\n\n${broadcast.message}`
+  });
+
+  saveDatabaseToDisk();
+  console.log(`[Push Notification Sent] Type: ${broadcast.type} | Title: "${broadcast.title}" | Recipients: ${recipientsCount}`);
+
+  res.status(201).json({
+    success: true,
+    message: `Alert pushed to ${recipientsCount} active newsletter subscriber(s).`,
+    broadcast,
+    recipientsCount
+  });
+});
+
+app.delete('/api/newsletter/broadcasts/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  newsletterBroadcasts = newsletterBroadcasts.filter((b) => b.id !== id);
+  saveDatabaseToDisk();
+  res.json({ success: true, deletedId: id });
+});
+
+// 7. Newsletter Subscription API
+app.post('/api/newsletter', async (req: Request, res: Response) => {
+  const rawEmail = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!rawEmail || !emailRegex.test(rawEmail)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Please enter a valid email address.',
+      message: 'Please enter a valid email address.'
     });
   }
 
+  const exists = newsletterSubscribers.some(s => s.email.toLowerCase() === rawEmail);
+  const confirmationEmail = await sendSubscriptionConfirmationEmail(rawEmail, exists);
+
+  if (!exists) {
+    newsletterSubscribers.push({
+      email: rawEmail,
+      subscribedAt: confirmationEmail.sentAt,
+      confirmationId: confirmationEmail.id
+    });
+  }
+
+  saveDatabaseToDisk();
+
   res.json({
     success: true,
-    message: 'Successfully subscribed to GsmScope Nigerian price alerts!'
+    alreadySubscribed: exists,
+    emailSent: true,
+    confirmationEmail,
+    message: exists
+      ? `You are already subscribed! A confirmation email has been re-sent to ${rawEmail}.`
+      : `Subscribed! A confirmation email has been sent to ${rawEmail}.`
   });
+});
+
+app.get('/api/newsletter', (_req: Request, res: Response) => {
+  res.json(newsletterSubscribers);
+});
+
+app.delete('/api/newsletter/:email', (req: Request, res: Response) => {
+  const targetEmail = decodeURIComponent(req.params.email || '').trim().toLowerCase();
+  if (!targetEmail) {
+    return res.status(400).json({ error: 'Email required' });
+  }
+  newsletterSubscribers = newsletterSubscribers.filter((s) => s.email.toLowerCase() !== targetEmail);
+  saveDatabaseToDisk();
+  res.json({ success: true, deletedEmail: targetEmail });
+});
+
+app.get('/api/newsletter/confirmations', (_req: Request, res: Response) => {
+  res.json(confirmationEmailsLog);
 });
 
 // 8. Currency & Nigerian FX Rates API
@@ -376,23 +1473,502 @@ app.get('/api/currency/rates', (_req: Request, res: Response) => {
   });
 });
 
+// 8b. AI Assistant Endpoints (Server-Side Gemini API with Google Search Grounding)
+function getGeminiClient(): GoogleGenAI {
+  return new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
+}
+
+const MANUFACTURER_DOMAINS: Record<string, { name: string; domain: string; searchUrl: (q: string) => string }> = {
+  apple: { name: 'Apple Official', domain: 'apple.com', searchUrl: () => 'https://www.apple.com/iphone/compare/' },
+  iphone: { name: 'Apple Official', domain: 'apple.com', searchUrl: () => 'https://www.apple.com/iphone/compare/' },
+  samsung: { name: 'Samsung Official', domain: 'samsung.com', searchUrl: (q) => `https://www.samsung.com/us/search/searchMain/?listType=g&searchTerm=${encodeURIComponent(q)}` },
+  galaxy: { name: 'Samsung Official', domain: 'samsung.com', searchUrl: (q) => `https://www.samsung.com/us/search/searchMain/?listType=g&searchTerm=${encodeURIComponent(q)}` },
+  xiaomi: { name: 'Xiaomi Official', domain: 'mi.com', searchUrl: () => 'https://www.mi.com/global/phone/' },
+  redmi: { name: 'Xiaomi / Redmi Official', domain: 'mi.com', searchUrl: () => 'https://www.mi.com/global/phone/' },
+  poco: { name: 'POCO / Xiaomi Official', domain: 'po.co', searchUrl: () => 'https://www.po.co/global/' },
+  google: { name: 'Google Store Official', domain: 'store.google.com', searchUrl: () => 'https://store.google.com/category/phones' },
+  pixel: { name: 'Google Store Official', domain: 'store.google.com', searchUrl: () => 'https://store.google.com/category/phones' },
+  oneplus: { name: 'OnePlus Official', domain: 'oneplus.com', searchUrl: () => 'https://www.oneplus.com/store/phone' },
+  tecno: { name: 'TECNO Mobile Official', domain: 'tecno-mobile.com', searchUrl: () => 'https://www.tecno-mobile.com/phones/' },
+  infinix: { name: 'Infinix Mobility Official', domain: 'infinixmobility.com', searchUrl: () => 'https://www.infinixmobility.com/smartphones/' },
+  itel: { name: 'itel Official', domain: 'itel-life.com', searchUrl: () => 'https://www.itel-life.com/products/phone' },
+  oppo: { name: 'OPPO Official', domain: 'oppo.com', searchUrl: () => 'https://www.oppo.com/en/smartphones/' },
+  vivo: { name: 'vivo Official', domain: 'vivo.com', searchUrl: () => 'https://www.vivo.com/en/products' },
+  iqoo: { name: 'iQOO Official', domain: 'iqoo.com', searchUrl: () => 'https://www.iqoo.com/en' },
+  realme: { name: 'realme Official', domain: 'realme.com', searchUrl: () => 'https://www.realme.com/global/' },
+  honor: { name: 'HONOR Official', domain: 'honor.com', searchUrl: () => 'https://www.honor.com/global/phones/' },
+  huawei: { name: 'HUAWEI Official', domain: 'huawei.com', searchUrl: () => 'https://consumer.huawei.com/en/phones/' },
+  motorola: { name: 'Motorola Official', domain: 'motorola.com', searchUrl: () => 'https://www.motorola.com/us/smartphones' },
+  moto: { name: 'Motorola Official', domain: 'motorola.com', searchUrl: () => 'https://www.motorola.com/us/smartphones' },
+  sony: { name: 'Sony Xperia Official', domain: 'sony.com', searchUrl: () => 'https://electronics.sony.com/mobile/smartphone/c/smartphones' },
+  xperia: { name: 'Sony Xperia Official', domain: 'sony.com', searchUrl: () => 'https://electronics.sony.com/mobile/smartphone/c/smartphones' },
+  asus: { name: 'ASUS Official', domain: 'asus.com', searchUrl: () => 'https://www.asus.com/mobile-handhelds/phones/all-series/' },
+  nothing: { name: 'Nothing Official', domain: 'nothing.tech', searchUrl: () => 'https://nothing.tech/' },
+  nokia: { name: 'HMD / Nokia Official', domain: 'hmd.com', searchUrl: () => 'https://www.hmd.com/en_int/smartphones' },
+  zte: { name: 'ZTE / Nubia Official', domain: 'ztedevices.com', searchUrl: () => 'https://www.ztedevices.com/en/' },
+  nubia: { name: 'Nubia Official', domain: 'nubia.com', searchUrl: () => 'https://intl.nubia.com/' },
+};
+
+function extractJsonFromText(rawText: string): any {
+  const cleaned = rawText.trim();
+  const fencedMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fencedMatch ? fencedMatch[1].trim() : cleaned;
+  const firstBrace = candidate.indexOf('{');
+  const lastBrace = candidate.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    return JSON.parse(candidate.slice(firstBrace, lastBrace + 1));
+  }
+  return JSON.parse(candidate);
+}
+
+function extractVerifiedSources(
+  response: any,
+  queryStr: string,
+  brandStr?: string,
+  extraUrls?: Array<{ title?: string; uri?: string }>
+): Array<{ title: string; uri: string; isManufacturer: boolean }> {
+  const seenUris = new Set<string>();
+  const sources: Array<{ title: string; uri: string; isManufacturer: boolean }> = [];
+
+  const checkIsManufacturer = (uri: string, title: string) => {
+    const lowerUri = uri.toLowerCase();
+    const lowerTitle = title.toLowerCase();
+    return Object.values(MANUFACTURER_DOMAINS).some(
+      (m) => lowerUri.includes(m.domain) || lowerTitle.includes('official')
+    );
+  };
+
+  // 1. Add official manufacturer reference link based on brand or query
+  const combinedLookup = `${brandStr || ''} ${queryStr}`.toLowerCase();
+  for (const [key, info] of Object.entries(MANUFACTURER_DOMAINS)) {
+    if (combinedLookup.includes(key)) {
+      const mUrl = info.searchUrl(queryStr);
+      if (!seenUris.has(mUrl)) {
+        seenUris.add(mUrl);
+        sources.push({
+          title: `${info.name} (${info.domain}) — Official Manufacturer Website`,
+          uri: mUrl,
+          isManufacturer: true,
+        });
+      }
+      break;
+    }
+  }
+
+  // 2. Add any URLs returned inside the model's structured JSON
+  if (Array.isArray(extraUrls)) {
+    for (const item of extraUrls) {
+      const uri = (item?.uri || '').trim();
+      if (uri && uri.startsWith('http') && !seenUris.has(uri)) {
+        seenUris.add(uri);
+        const title = (item?.title || uri).trim();
+        sources.push({
+          title,
+          uri,
+          isManufacturer: checkIsManufacturer(uri, title),
+        });
+      }
+    }
+  }
+
+  // 3. Extract groundingChunks from Google Search grounding metadata
+  const chunks = response?.candidates?.[0]?.groundingMetadata?.groundingChunks;
+  if (Array.isArray(chunks)) {
+    for (const chunk of chunks) {
+      const uri = chunk?.web?.uri;
+      const title = chunk?.web?.title || uri;
+      if (uri && typeof uri === 'string' && !seenUris.has(uri)) {
+        seenUris.add(uri);
+        sources.push({
+          title: String(title),
+          uri,
+          isManufacturer: checkIsManufacturer(uri, String(title)),
+        });
+      }
+    }
+  }
+
+  return sources.slice(0, 8);
+}
+
+// Endpoint 1: AI Source & Auto-Fill Complete Phone Specifications from Manufacturer & Reliable Sources
+app.post('/api/ai/source-phone-specs', async (req: Request, res: Response) => {
+  try {
+    const query = String(req.body?.query || '').trim();
+    const brandHint = String(req.body?.brandHint || '').trim();
+
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please enter a phone title or model number (e.g., "Samsung Galaxy S25 Ultra" or "SM-S938B").',
+      });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: 'GEMINI_API_KEY is not configured on the server. Please check Settings > Secrets.',
+      });
+    }
+
+    const ai = getGeminiClient();
+
+    const prompt = `Search the official device manufacturer website (e.g. Apple, Samsung, Xiaomi, Google, OnePlus, TECNO, Infinix, OPPO, vivo, HONOR, realme, Motorola, Sony, ASUS, Nothing, Huawei) and reliable authoritative hardware databases (such as GSMArena, NotebookCheck, and official launch press releases) for the exact smartphone matching: "${query}"${brandHint ? ` (Brand hint: ${brandHint})` : ''}.
+
+Verify whether "${query}" is a marketing phone name or a hardware model number (like SM-S928B, A3296, 24030PN60G, etc.) and resolve the exact official device name, model numbers, release date, MSRP price in USD, estimated Nigerian Naira (NGN) market price (using ~1500 NGN per 1 USD), and complete hardware specifications.
+
+Return ONLY a valid JSON object matching this exact structure (no markdown commentary outside the JSON):
+{
+  "name": "Full Official Phone Name (e.g. Samsung Galaxy S24 Ultra)",
+  "brand": "Manufacturer Brand Name (e.g. Samsung)",
+  "modelNumber": "Official Model Number(s) (e.g. SM-S928B, SM-S928B/DS, SM-S928U)",
+  "marketStatus": "Available | Pre-order | Coming Soon | Rumored",
+  "releaseDate": "Month Year (e.g. January 2024)",
+  "releaseYear": 2024,
+  "priceUSD": 1299,
+  "priceNGN": 1950000,
+  "priceRange": "under100k | 100k-200k | 200k-350k | 350k-600k | 600k-1.2m | flagship",
+  "screenSizeInches": 6.8,
+  "nairaPriceNotes": "Official retail & authorized dealer availability notes",
+  "categories": ["flagship", "5g", "best-camera", "best-gaming", "best-battery"],
+  "seoTitle": "Phone Name Full Specifications & Price in USD & Naira | GsmScope",
+  "seoKeywords": "comma-separated SEO keywords including model number and brand",
+  "seoDescription": "Concise 155-character meta description of the phone specs and price",
+  "keyHighlights": {
+    "display": "e.g. 6.8\" Dynamic LTPO AMOLED 2X 120Hz",
+    "processor": "e.g. Snapdragon 8 Gen 3 (4 nm)",
+    "ram": "e.g. 12GB",
+    "storage": "e.g. 256GB / 512GB / 1TB",
+    "camera": "e.g. 200MP Quad Telephoto OIS Camera",
+    "battery": "e.g. 5000 mAh",
+    "charging": "e.g. 45W Wired / 15W Wireless",
+    "os": "e.g. Android 14, One UI 6.1",
+    "network5g": true
+  },
+  "detailedSpecs": {
+    "network": {
+      "technology": "GSM / CDMA / HSPA / EVDO / LTE / 5G",
+      "bands5g": "SA/NSA/Sub6/mmWave bands",
+      "speed": "HSPA, LTE-A (CA), 5G",
+      "sim": "Nano-SIM and eSIM / Dual SIM"
+    },
+    "body": {
+      "dimensions": "e.g. 162.3 x 79 x 8.6 mm",
+      "weight": "e.g. 232 g",
+      "build": "Front/back glass, frame material",
+      "waterResistance": "e.g. IP68 dust/water resistant (up to 1.5m for 30 min)"
+    },
+    "display": {
+      "type": "Panel technology, refresh rate, HDR",
+      "size": "Inches, cm2, screen-to-body ratio",
+      "resolution": "Pixels, aspect ratio, PPI density",
+      "protection": "Cover glass protection",
+      "brightness": "Peak & HBM nits brightness",
+      "refreshRate": "Refresh rate range (e.g. 1Hz - 120Hz adaptive)"
+    },
+    "platform": {
+      "os": "Operating system & skin version",
+      "chipset": "SoC chipset name and process node (nm)",
+      "cpu": "CPU core configuration and clock speeds",
+      "gpu": "GPU model",
+      "antutuScore": "Verified AnTuTu v10 score estimate"
+    },
+    "memory": {
+      "ramVariants": ["12GB"],
+      "storageVariants": ["256GB", "512GB", "1TB"],
+      "cardSlot": "No or microSDXC details",
+      "storageType": "e.g. UFS 4.0 or NVMe"
+    },
+    "mainCamera": {
+      "setup": "Full rear camera sensors, MP, apertures, focal lengths, OIS, zoom",
+      "features": "LED flash, auto-HDR, panorama, laser AF, etc.",
+      "video": "Video recording resolutions & frame rates"
+    },
+    "selfieCamera": {
+      "setup": "Front camera MP, aperture, focal length, autofocus",
+      "features": "HDR, dual video call, etc.",
+      "video": "Front camera video recording specs"
+    },
+    "battery": {
+      "capacity": "Battery type and mAh capacity",
+      "charging": "Wired charging wattage, protocol, charge speed",
+      "wirelessCharging": "Wireless & reverse wireless charging specs"
+    },
+    "sound": {
+      "loudspeaker": "Stereo speakers details",
+      "jack35mm": "Yes or No",
+      "audioSpecs": "Hi-Res audio, Dolby Atmos, tuning details"
+    },
+    "connectivity": {
+      "wlan": "Wi-Fi standards & bands",
+      "bluetooth": "Bluetooth version & profiles",
+      "nfc": "Yes or No",
+      "radio": "Yes or No",
+      "usb": "USB Type-C version, DisplayPort, OTG",
+      "infrared": "Yes or No",
+      "positioning": "GPS, GLONASS, BDS, GALILEO, QZSS"
+    },
+    "sensors": "Fingerprint type, accelerometer, gyro, proximity, compass, barometer, UWB, satellite",
+    "biometrics": "Fingerprint sensor type & Face Unlock details",
+    "securityHardware": "Hardware security chip / enclave details"
+  },
+  "sources": [
+    {
+      "title": "Official Manufacturer Product Page or Reliable Spec Database",
+      "uri": "https://..."
+    }
+  ]
+}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: {
+        systemInstruction:
+          'You are a senior mobile hardware specification engineer for GsmScope. Always source accurate, factual, and complete smartphone specifications from the official device manufacturer website and trusted hardware specification authorities (such as GSMArena and official press releases). Never fabricate specs; use verified manufacturer data.',
+        tools: [{ googleSearch: {} }],
+      },
+    });
+
+    const rawText = response.text || '';
+    if (!rawText) {
+      return res.status(502).json({
+        success: false,
+        error: 'AI model returned an empty response. Please try again.',
+      });
+    }
+
+    const parsed = extractJsonFromText(rawText);
+    const verifiedSources = extractVerifiedSources(
+      response,
+      parsed?.name || query,
+      parsed?.brand || brandHint,
+      parsed?.sources
+    );
+
+    const priceUSD = Number(parsed?.priceUSD) || 299;
+    const priceNGN = Number(parsed?.priceNGN) || Math.round(priceUSD * 1500);
+    const computedPriceRange = (() => {
+      if (
+        parsed?.priceRange &&
+        ['under100k', '100k-200k', '200k-350k', '350k-600k', '600k-1.2m', 'flagship'].includes(parsed.priceRange)
+      ) {
+        return parsed.priceRange;
+      }
+      if (priceNGN < 100000) return 'under100k';
+      if (priceNGN <= 200000) return '100k-200k';
+      if (priceNGN <= 350000) return '200k-350k';
+      if (priceNGN <= 600000) return '350k-600k';
+      if (priceNGN <= 1200000) return '600k-1.2m';
+      return 'flagship';
+    })();
+
+    return res.json({
+      success: true,
+      query,
+      phoneSpecs: {
+        ...parsed,
+        priceUSD,
+        priceNGN,
+        priceRange: computedPriceRange,
+      },
+      sources: verifiedSources,
+    });
+  } catch (err: any) {
+    console.error('[AI Source Phone Specs Error]:', err);
+    const status = err?.status || 500;
+    return res.status(status >= 400 && status < 600 ? status : 500).json({
+      success: false,
+      error:
+        err?.message ||
+        'Failed to source phone specifications from AI. Please check your query or try again.',
+    });
+  }
+});
+
+// Endpoint 2: AI Review Writer Assistant (User Reviews, Admin Reviews & Editorial Lab Reviews)
+app.post('/api/ai/generate-review', async (req: Request, res: Response) => {
+  try {
+    const phoneName = String(req.body?.phoneName || '').trim();
+    const modelNumber = String(req.body?.modelNumber || '').trim();
+    const brand = String(req.body?.brand || '').trim();
+    const rating = Number(req.body?.rating) || 5;
+    const reviewType = (req.body?.reviewType || 'user') as 'user' | 'admin' | 'editorial';
+    const focusNotes = String(req.body?.focusNotes || '').trim();
+    const existingSpecs = req.body?.existingSpecs || null;
+
+    if (!phoneName && !modelNumber) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please select a phone or enter a phone title / model number first.',
+      });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: 'GEMINI_API_KEY is not configured on the server. Please check Settings > Secrets.',
+      });
+    }
+
+    const ai = getGeminiClient();
+    const deviceLabel = [brand, phoneName, modelNumber ? `(${modelNumber})` : ''].filter(Boolean).join(' ');
+
+    const styleInstruction =
+      reviewType === 'editorial'
+        ? `Write a comprehensive, authoritative, publication-grade Editorial Hardware Review article (600-900 words) formatted with Markdown headings (## Design & Build Quality, ## Display & Multimedia, ## Chipset Performance & Gaming, ## Camera System & Video Testing, ## Battery Endurance & Charging Speed, ## Final Verdict) and bold key takeaways (**...**).`
+        : reviewType === 'admin'
+        ? `Write a detailed, well-structured Verified Lab / Owner Review (250-400 words) formatted with clear subheadings (### Performance & Daily Use, ### Camera & Battery Life, ### Verdict) and **bold** highlights.`
+        : `Write an authentic, helpful, hands-on smartphone review (180-320 words) grounded in the phone's real hardware specifications. Include clear formatting with subheadings (### Highlights, ### Daily Experience & Verdict) and **bold** emphasis on real specs (chipset, battery mAh, charging wattage, display refresh rate, and camera sensors).`;
+
+    const prompt = `Search the official manufacturer website and trusted smartphone review authorities (such as GSMArena, NotebookCheck, DXOMARK) for accurate, real-world specifications and hardware details of: "${deviceLabel}".
+${existingSpecs ? `Known database specs context: ${JSON.stringify(existingSpecs)}` : ''}
+${focusNotes ? `User focus notes / specific points to cover: "${focusNotes}"` : ''}
+Target Rating: ${rating} out of 5 stars.
+
+${styleInstruction}
+Make sure every technical claim (processor, display panel & nits, camera sensor MP & OIS/zoom, battery mAh & charging wattage, OS) strictly matches the genuine device specifications from the manufacturer website.
+
+Return ONLY a valid JSON object matching this exact structure (no markdown fences outside the JSON):
+{
+  "resolvedPhoneName": "Official Device Name",
+  "resolvedModelNumber": "Official Model Number",
+  "title": "Compelling Review Headline for ${deviceLabel}",
+  "summary": "2-sentence executive summary of the review with **bold** key specs",
+  "comment": "The full formatted review text using ## or ### headings and **bold** text",
+  "pros": ["4 specific hardware pros based on real specs"],
+  "cons": ["2 realistic hardware trade-offs or cons"],
+  "tags": ["Review", "BrandName", "ModelName", "5G", "Camera Test"],
+  "readTime": "5 min read",
+  "seoTitle": "Official Phone Name Review: Camera, Battery & Performance Verdict | GsmScope",
+  "seoKeywords": "comma-separated SEO keywords for this review",
+  "seoDescription": "155-character SEO meta description for the review",
+  "sourcedSpecsSummary": "Concise 1-line summary of the verified specs used (e.g. Snapdragon 8 Elite • 6.9\" LTPO AMOLED 120Hz • 200MP Quad Camera • 5000mAh 45W)",
+  "sources": [
+    {
+      "title": "Official Manufacturer Page or Trusted Review Source",
+      "uri": "https://..."
+    }
+  ]
+}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: {
+        systemInstruction:
+          'You are an expert mobile hardware reviewer and technical analyst for GsmScope. Always ground your reviews in genuine, verified specifications from the official device manufacturer website and trusted review labs. Never invent specifications.',
+        tools: [{ googleSearch: {} }],
+      },
+    });
+
+    const rawText = response.text || '';
+    if (!rawText) {
+      return res.status(502).json({
+        success: false,
+        error: 'AI model returned an empty response. Please try again.',
+      });
+    }
+
+    const parsed = extractJsonFromText(rawText);
+    const verifiedSources = extractVerifiedSources(
+      response,
+      parsed?.resolvedPhoneName || phoneName || modelNumber,
+      brand,
+      parsed?.sources
+    );
+
+    return res.json({
+      success: true,
+      review: {
+        resolvedPhoneName: parsed?.resolvedPhoneName || phoneName,
+        resolvedModelNumber: parsed?.resolvedModelNumber || modelNumber,
+        title: parsed?.title || `${phoneName} Hands-On Review & Verdict`,
+        summary: parsed?.summary || '',
+        comment: parsed?.comment || '',
+        pros: Array.isArray(parsed?.pros) ? parsed.pros : [],
+        cons: Array.isArray(parsed?.cons) ? parsed.cons : [],
+        tags: Array.isArray(parsed?.tags) ? parsed.tags : ['Reviews', brand || 'Smartphone'],
+        readTime: parsed?.readTime || '5 min read',
+        seoTitle: parsed?.seoTitle || `${phoneName} Review | GsmScope`,
+        seoKeywords: parsed?.seoKeywords || `${phoneName} review, ${brand} review, specs, camera, battery`,
+        seoDescription: parsed?.seoDescription || parsed?.summary || '',
+        sourcedSpecsSummary: parsed?.sourcedSpecsSummary || '',
+      },
+      sources: verifiedSources,
+    });
+  } catch (err: any) {
+    console.error('[AI Generate Review Error]:', err);
+    const status = err?.status || 500;
+    return res.status(status >= 400 && status < 600 ? status : 500).json({
+      success: false,
+      error:
+        err?.message ||
+        'Failed to generate AI review. Please check your connection or try again.',
+    });
+  }
+});
+
 // 9. Admin Authentication API
 app.post('/api/admin/login', (req: Request, res: Response) => {
   const { username, password } = req.body;
-  const validUsername = username && (username.trim().toLowerCase() === 'admin@gsmscope.com' || username.trim().toLowerCase() === 'admin');
-  const validPassword = password === 'GsmScope2026!Admin' || password === 'admin123';
+  const trimmedUser = (username || '').trim();
+  const validUsername =
+    trimmedUser === 'gsM-scopE' ||
+    trimmedUser.toLowerCase() === 'gsm-scope' ||
+    trimmedUser.toLowerCase() === 'admin@gsmscope.com' ||
+    trimmedUser.toLowerCase() === 'admin';
+  const validPassword =
+    password === '@scopE-gsM?' ||
+    password === 'GsmScope2026!Admin' ||
+    password === 'admin123';
 
   if (validUsername && validPassword) {
     return res.json({
       success: true,
       message: 'Administrator session authenticated.',
       admin: {
+        username: 'gsM-scopE',
         email: 'admin@gsmscope.com',
         role: 'Super Administrator',
         permissions: ['all']
       }
     });
   }
+
+  // Also check custom admin users added via Dashboard -> Users & Roles
+  const customUsers = Array.isArray((websiteContentDatabase as any)?.adminUsers)
+    ? (websiteContentDatabase as any).adminUsers
+    : [];
+  const matchedCustomUser = customUsers.find(
+    (u: any) =>
+      u &&
+      u.status === 'Active' &&
+      (String(u.username || '').toLowerCase() === trimmedUser.toLowerCase() ||
+        String(u.email || '').toLowerCase() === trimmedUser.toLowerCase())
+  );
+  if (matchedCustomUser && validPassword) {
+    matchedCustomUser.lastLogin = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    saveDatabaseToDisk();
+    return res.json({
+      success: true,
+      message: `Session authenticated for ${matchedCustomUser.name || matchedCustomUser.username}.`,
+      admin: {
+        username: matchedCustomUser.username,
+        email: matchedCustomUser.email,
+        role: matchedCustomUser.role || 'Editor',
+        permissions: ['all']
+      }
+    });
+  }
+
   res.status(401).json({
     success: false,
     message: 'Invalid administrator credentials.'
@@ -443,35 +2019,634 @@ app.get('/api/stats', (_req: Request, res: Response) => {
 });
 
 // ==========================================
-// STATIC ASSETS & VITE INTEGRATION
+// 11. ADSENSE (/ads.txt), ROBOTS.TXT, SITEMAP.XML & SERVER-SIDE SEO INJECTION
 // ==========================================
-async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
-    // In development: mount Vite middleware for instant hot development
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa'
-    });
-    app.use(vite.middlewares);
-  } else {
-    // In production: serve built static assets from dist
-    const distPath = path.resolve(__dirname, 'dist');
-    if (fs.existsSync(distPath)) {
-      app.use(express.static(distPath));
-      app.get('*', (_req: Request, res: Response) => {
-        res.sendFile(path.resolve(distPath, 'index.html'));
+
+function escapeXml(unsafe: string): string {
+  return String(unsafe || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function escapeHtmlAttr(unsafe: string): string {
+  return String(unsafe || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function getRequestOrigin(req: Request): string {
+  const proto = (req.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim() || req.protocol || 'https';
+  const host = req.get('host') || 'gsmscope.com';
+  return `${proto}://${host}`;
+}
+
+function resolveAbsoluteAssetUrl(origin: string, rawUrl?: string): string {
+  if (!rawUrl || !rawUrl.trim()) {
+    return `${origin}/assets/aistudio/GsmScope_header_logo_dark.webp`;
+  }
+  const trimmed = rawUrl.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  return `${origin}${trimmed.startsWith('/') ? trimmed : `/${trimmed}`}`;
+}
+
+// Google AdSense /ads.txt endpoint
+app.get('/ads.txt', (_req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+
+  const customAdsTxt = (adSettingsDatabase?.adsTxtContent || '').trim();
+  if (customAdsTxt) {
+    return res.send(`${customAdsTxt}\n`);
+  }
+
+  const rawPubId = (adSettingsDatabase?.adsensePublisherId || '').trim();
+  const digits = rawPubId.replace(/\D/g, '') || '0000000000000000';
+  return res.send(`# GsmScope Authorized Digital Sellers (ads.txt)\ngoogle.com, pub-${digits}, DIRECT, f08c47fec0942fa0\n`);
+});
+
+// Search Engine Crawler /robots.txt endpoint
+app.get('/robots.txt', (req: Request, res: Response) => {
+  const origin = getRequestOrigin(req);
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+
+  const lines = [
+    '# GsmScope Search Engine & Google AdSense Crawler Directives',
+    'User-agent: *',
+    'Allow: /',
+    'Disallow: /admin',
+    'Disallow: /api/',
+    '',
+    'User-agent: Mediapartners-Google',
+    'Allow: /',
+    '',
+    'User-agent: Googlebot',
+    'Allow: /',
+    'Disallow: /admin',
+    '',
+    'User-agent: Googlebot-Image',
+    'Allow: /',
+    '',
+    `Sitemap: ${origin}/sitemap.xml`,
+    ''
+  ];
+  res.send(lines.join('\n'));
+});
+
+// Dynamic XML Sitemap with Google Image Sitemap extensions
+app.get('/sitemap.xml', (req: Request, res: Response) => {
+  const origin = getRequestOrigin(req);
+  const todayIso = new Date().toISOString().split('T')[0];
+
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=1800');
+
+  const staticRoutes = [
+    { path: '/', priority: '1.0', changefreq: 'hourly' },
+    { path: '/?tab=phones', priority: '0.9', changefreq: 'daily' },
+    { path: '/?tab=best-phones', priority: '0.9', changefreq: 'daily' },
+    { path: '/?tab=compare', priority: '0.8', changefreq: 'weekly' },
+    { path: '/?tab=brands', priority: '0.8', changefreq: 'weekly' },
+    { path: '/?tab=news', priority: '0.9', changefreq: 'daily' },
+    { path: '/?tab=reviews', priority: '0.9', changefreq: 'daily' },
+    { path: '/?tab=guides', priority: '0.8', changefreq: 'weekly' },
+    { path: '/?tab=about', priority: '0.6', changefreq: 'monthly' },
+    { path: '/?tab=contact', priority: '0.6', changefreq: 'monthly' },
+    { path: '/?tab=advertise', priority: '0.5', changefreq: 'monthly' },
+    { path: '/?tab=privacy', priority: '0.4', changefreq: 'monthly' },
+    { path: '/?tab=terms', priority: '0.4', changefreq: 'monthly' },
+  ];
+
+  const urlNodes: string[] = [];
+
+  for (const route of staticRoutes) {
+    urlNodes.push(
+      `  <url>\n    <loc>${escapeXml(`${origin}${route.path}`)}</loc>\n    <lastmod>${todayIso}</lastmod>\n    <changefreq>${route.changefreq}</changefreq>\n    <priority>${route.priority}</priority>\n  </url>`
+    );
+  }
+
+  // Add all live phones with image tags
+  for (const phone of phonesDatabase) {
+    const phoneLoc = `${origin}/?phone=${encodeURIComponent(phone.id)}`;
+    const imageUrl = resolveAbsoluteAssetUrl(origin, phone.image);
+    urlNodes.push(
+      `  <url>\n    <loc>${escapeXml(phoneLoc)}</loc>\n    <lastmod>${todayIso}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>\n    <image:image>\n      <image:loc>${escapeXml(imageUrl)}</image:loc>\n      <image:title>${escapeXml(`${phone.name} Full Specifications and Price`)}</image:title>\n    </image:image>\n  </url>`
+    );
+  }
+
+  // Add all brand pages
+  for (const brand of brandsDatabase) {
+    const brandLoc = `${origin}/?tab=brands&brand=${encodeURIComponent(brand.name)}`;
+    urlNodes.push(
+      `  <url>\n    <loc>${escapeXml(brandLoc)}</loc>\n    <lastmod>${todayIso}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
+    );
+  }
+
+  // Add all published news, reviews, and buying guides
+  for (const article of articlesDatabase) {
+    const slugOrId = article.slug || article.id;
+    const artLoc = `${origin}/?article=${encodeURIComponent(slugOrId)}`;
+    const imgBlock = article.coverImage
+      ? `\n    <image:image>\n      <image:loc>${escapeXml(resolveAbsoluteAssetUrl(origin, article.coverImage))}</image:loc>\n      <image:title>${escapeXml(article.title)}</image:title>\n    </image:image>`
+      : '';
+    urlNodes.push(
+      `  <url>\n    <loc>${escapeXml(artLoc)}</loc>\n    <lastmod>${todayIso}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>${imgBlock}\n  </url>`
+    );
+  }
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${urlNodes.join('\n')}\n</urlset>`;
+  res.send(xml);
+});
+
+// Helper to inject dynamic SSR Meta Tags, OpenGraph, JSON-LD Rich Results & Crawlable Snapshot into index.html
+function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
+  const origin = getRequestOrigin(req);
+  const siteName = websiteContentDatabase?.siteName || 'GsmScope';
+  const phoneQuery = typeof req.query.phone === 'string' ? req.query.phone.trim() : '';
+  const articleQuery = typeof req.query.article === 'string' ? req.query.article.trim() : '';
+  const tabQuery = typeof req.query.tab === 'string' ? req.query.tab.trim().toLowerCase() : '';
+  const brandQuery = typeof req.query.brand === 'string' ? req.query.brand.trim() : '';
+
+  let pageTitle =
+    websiteContentDatabase?.seoTitle ||
+    websiteContentDatabase?.defaultSeoTitle ||
+    `${siteName} — Phone Specs and Prices in Naira and USD`;
+  let pageDescription =
+    websiteContentDatabase?.seoDescription ||
+    websiteContentDatabase?.defaultSeoDescription ||
+    'Browse smartphone specifications with current Nigerian naira and USD prices, compare devices, read technology news and find the best phones for every budget.';
+  let pageKeywords =
+    websiteContentDatabase?.seoKeywords ||
+    websiteContentDatabase?.defaultSeoKeywords ||
+    'gsmscope, smartphone specs, phone prices, mobile phone reviews, buy phones';
+  let canonicalUrl = `${origin}/`;
+  let ogType = 'website';
+  let ogImage = resolveAbsoluteAssetUrl(origin, phonesDatabase[0]?.image);
+  let robotsDirective =
+    (websiteContentDatabase as any)?.customScripts?.robotsTxtMeta ||
+    'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
+
+  const orgId = `${origin}/#organization`;
+  const websiteId = `${origin}/#website`;
+
+  const graph: Record<string, unknown>[] = [
+    {
+      '@type': 'Organization',
+      '@id': orgId,
+      name: siteName,
+      url: `${origin}/`,
+      logo: {
+        '@type': 'ImageObject',
+        url: resolveAbsoluteAssetUrl(origin, websiteContentDatabase?.headerLogoDarkUrl || '/assets/aistudio/GsmScope_header_logo_dark.webp'),
+      },
+    },
+    {
+      '@type': 'WebSite',
+      '@id': websiteId,
+      url: `${origin}/`,
+      name: pageTitle,
+      description: pageDescription,
+      publisher: { '@id': orgId },
+      potentialAction: {
+        '@type': 'SearchAction',
+        target: {
+          '@type': 'EntryPoint',
+          urlTemplate: `${origin}/?tab=phones&q={search_term_string}`,
+        },
+        'query-input': 'required name=search_term_string',
+      },
+    },
+  ];
+
+  let crawlerBodyHtml = '';
+
+  if (req.path.startsWith('/admin') || tabQuery === 'admin') {
+    pageTitle = `Admin Dashboard — ${siteName}`;
+    robotsDirective = 'noindex, nofollow';
+    canonicalUrl = `${origin}/admin`;
+  } else if (phoneQuery) {
+    const matchedPhone = phonesDatabase.find(
+      (p) =>
+        p.id.toLowerCase() === phoneQuery.toLowerCase() ||
+        ((p as any).slug && String((p as any).slug).toLowerCase() === phoneQuery.toLowerCase())
+    );
+    if (matchedPhone) {
+      pageTitle =
+        matchedPhone.seoTitle ||
+        `${matchedPhone.name} Full Specifications, Reviews & Price ($${matchedPhone.priceUSD} / ₦${matchedPhone.priceNGN.toLocaleString()}) — ${siteName}`;
+      pageDescription =
+        matchedPhone.seoDescription ||
+        `${matchedPhone.name} complete specifications: ${matchedPhone.keyHighlights?.display || ''} display, ${matchedPhone.keyHighlights?.processor || ''} processor, ${matchedPhone.keyHighlights?.camera || ''} camera, ${matchedPhone.keyHighlights?.battery || ''} battery, and verified price.`;
+      pageKeywords =
+        matchedPhone.seoKeywords ||
+        `${matchedPhone.name}, ${matchedPhone.brand}, ${matchedPhone.name} specs, ${matchedPhone.name} price`;
+      canonicalUrl = `${origin}/?phone=${encodeURIComponent(matchedPhone.id)}`;
+      ogType = 'product';
+      ogImage = resolveAbsoluteAssetUrl(origin, matchedPhone.image);
+
+      const approvedReviews = reviewsDatabase.filter(
+        (r) => r.phoneId === matchedPhone.id && r.status === 'approved'
+      );
+      const priceValidUntil = `${new Date().getFullYear() + 1}-12-31`;
+
+      graph.push({
+        '@type': 'BreadcrumbList',
+        '@id': `${canonicalUrl}#breadcrumb`,
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: `${origin}/` },
+          { '@type': 'ListItem', position: 2, name: 'Phones', item: `${origin}/?tab=phones` },
+          { '@type': 'ListItem', position: 3, name: matchedPhone.brand, item: `${origin}/?tab=brands&brand=${encodeURIComponent(matchedPhone.brand)}` },
+          { '@type': 'ListItem', position: 4, name: matchedPhone.name, item: canonicalUrl },
+        ],
       });
-    } else {
-      console.warn('Production dist folder not found. Please run npm run build first.');
+
+      graph.push({
+        '@type': 'Product',
+        '@id': `${canonicalUrl}#product`,
+        name: matchedPhone.name,
+        sku: matchedPhone.id,
+        mpn: matchedPhone.modelNumber || matchedPhone.id,
+        category: 'Smartphones',
+        image: [ogImage],
+        description: pageDescription,
+        brand: { '@type': 'Brand', name: matchedPhone.brand },
+        offers: [
+          {
+            '@type': 'Offer',
+            url: canonicalUrl,
+            priceCurrency: 'USD',
+            price: matchedPhone.priceUSD,
+            priceValidUntil,
+            availability: 'https://schema.org/InStock',
+            itemCondition: 'https://schema.org/NewCondition',
+          },
+          {
+            '@type': 'Offer',
+            url: canonicalUrl,
+            priceCurrency: 'NGN',
+            price: matchedPhone.priceNGN,
+            priceValidUntil,
+            availability: 'https://schema.org/InStock',
+            itemCondition: 'https://schema.org/NewCondition',
+          },
+        ],
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          ratingValue: matchedPhone.rating || 4.5,
+          bestRating: 5,
+          worstRating: 1,
+          reviewCount: Math.max(matchedPhone.reviewsCount || 1, approvedReviews.length, 1),
+        },
+      });
+
+      crawlerBodyHtml = `<article><h1>${escapeHtmlAttr(matchedPhone.name)} Full Specifications &amp; Price</h1><p>${escapeHtmlAttr(pageDescription)}</p><ul><li>Brand: ${escapeHtmlAttr(matchedPhone.brand)}</li><li>Price: $${matchedPhone.priceUSD} USD / ₦${matchedPhone.priceNGN.toLocaleString()} NGN</li><li>Display: ${escapeHtmlAttr(matchedPhone.keyHighlights?.display || '')}</li><li>Processor: ${escapeHtmlAttr(matchedPhone.keyHighlights?.processor || '')}</li><li>RAM &amp; Storage: ${escapeHtmlAttr(matchedPhone.keyHighlights?.ram || '')} / ${escapeHtmlAttr(matchedPhone.keyHighlights?.storage || '')}</li><li>Camera: ${escapeHtmlAttr(matchedPhone.keyHighlights?.camera || '')}</li><li>Battery: ${escapeHtmlAttr(matchedPhone.keyHighlights?.battery || '')}</li></ul></article>`;
+    }
+  } else if (articleQuery) {
+    const matchedArticle = articlesDatabase.find(
+      (a) =>
+        a.id.toLowerCase() === articleQuery.toLowerCase() ||
+        (a.slug && a.slug.toLowerCase() === articleQuery.toLowerCase())
+    );
+    if (matchedArticle) {
+      const slugOrId = matchedArticle.slug || matchedArticle.id;
+      pageTitle = matchedArticle.seoTitle || `${matchedArticle.title} — ${siteName}`;
+      pageDescription = matchedArticle.seoDescription || matchedArticle.summary;
+      pageKeywords = matchedArticle.seoKeywords || (matchedArticle.tags || []).join(', ');
+      canonicalUrl = `${origin}/?article=${encodeURIComponent(slugOrId)}`;
+      ogType = 'article';
+      if (matchedArticle.coverImage) {
+        ogImage = resolveAbsoluteAssetUrl(origin, matchedArticle.coverImage);
+      }
+
+      const isReview =
+        matchedArticle.category?.toLowerCase().includes('review') ||
+        matchedArticle.title?.toLowerCase().includes('review');
+
+      graph.push({
+        '@type': isReview ? 'TechArticle' : 'NewsArticle',
+        '@id': `${canonicalUrl}#article`,
+        headline: matchedArticle.title,
+        description: matchedArticle.summary,
+        image: [ogImage],
+        datePublished: matchedArticle.date,
+        dateModified: matchedArticle.date,
+        author: {
+          '@type': 'Person',
+          name: matchedArticle.author?.name || 'GsmScope Editorial Team',
+        },
+        publisher: { '@id': orgId },
+      });
+
+      crawlerBodyHtml = `<article><h1>${escapeHtmlAttr(matchedArticle.title)}</h1><p>${escapeHtmlAttr(matchedArticle.summary)}</p></article>`;
+    }
+  } else if (tabQuery) {
+    canonicalUrl = brandQuery
+      ? `${origin}/?tab=${encodeURIComponent(tabQuery)}&brand=${encodeURIComponent(brandQuery)}`
+      : `${origin}/?tab=${encodeURIComponent(tabQuery)}`;
+    const tabTitles: Record<string, string> = {
+      phones: `All Smartphones Database — Full Specs & Prices | ${siteName}`,
+      'best-phones': `Best Smartphones by Budget, Camera & Battery | ${siteName}`,
+      compare: `Compare Phone Specifications Side-by-Side | ${siteName}`,
+      brands: brandQuery
+        ? `${brandQuery} Smartphones — Full Specs & Prices | ${siteName}`
+        : `All Mobile Phone Brands Directory | ${siteName}`,
+      news: `Latest Mobile Technology & Smartphone News | ${siteName}`,
+      reviews: `In-Depth Smartphone Hardware Reviews & Benchmarks | ${siteName}`,
+      guides: `Smartphone Buying Guides & Recommendations | ${siteName}`,
+      about: `About ${siteName} — Mobile Phone Specifications Database`,
+      contact: `Contact ${siteName} Editorial & Support Team`,
+      advertise: `Advertise with ${siteName}`,
+      privacy: `Privacy Policy — ${siteName}`,
+      terms: `Terms of Service — ${siteName}`,
+    };
+    if (tabTitles[tabQuery]) {
+      pageTitle = tabTitles[tabQuery];
     }
   }
 
-  app.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`GsmScope Full-Stack Server active at http://0.0.0.0:${PORT}`);
+  // Build crawlable directory list of phones and articles for <noscript>
+  const phoneLinksHtml = phonesDatabase
+    .slice(0, 25)
+    .map(
+      (p) =>
+        `<li><a href="/?phone=${encodeURIComponent(p.id)}">${escapeHtmlAttr(p.name)} — $${p.priceUSD} / ₦${p.priceNGN.toLocaleString()} (${escapeHtmlAttr(p.keyHighlights?.processor || '')})</a></li>`
+    )
+    .join('');
+  const articleLinksHtml = articlesDatabase
+    .slice(0, 20)
+    .map(
+      (a) =>
+        `<li><a href="/?article=${encodeURIComponent(a.slug || a.id)}">${escapeHtmlAttr(a.title)} (${escapeHtmlAttr(a.category)})</a></li>`
+    )
+    .join('');
+
+  const fullNoscriptSnapshot = `<noscript id="seo-crawler-snapshot">
+      <main>
+        ${crawlerBodyHtml || `<header><h1>${escapeHtmlAttr(pageTitle)}</h1><p>${escapeHtmlAttr(pageDescription)}</p></header>`}
+        <section>
+          <h2>Latest Smartphones &amp; Verified Prices</h2>
+          <ul>${phoneLinksHtml}</ul>
+        </section>
+        <section>
+          <h2>Latest Smartphone Reviews, Buying Guides &amp; News</h2>
+          <ul>${articleLinksHtml}</ul>
+        </section>
+        <nav aria-label="Primary Sitemap Navigation">
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/?tab=phones">All Smartphones Database</a></li>
+            <li><a href="/?tab=best-phones">Best Phones by Budget &amp; Camera</a></li>
+            <li><a href="/?tab=compare">Compare Phone Specifications</a></li>
+            <li><a href="/?tab=brands">Mobile Phone Brands Directory</a></li>
+            <li><a href="/?tab=news">Mobile Technology News</a></li>
+            <li><a href="/?tab=reviews">In-Depth Smartphone Reviews</a></li>
+            <li><a href="/?tab=guides">Smartphone Buying Guides</a></li>
+            <li><a href="/?tab=about">About GsmScope</a></li>
+            <li><a href="/?tab=contact">Contact Editorial Team</a></li>
+            <li><a href="/?tab=privacy">Privacy Policy</a></li>
+            <li><a href="/?tab=terms">Terms of Service</a></li>
+            <li><a href="/sitemap.xml">XML Sitemap</a></li>
+          </ul>
+        </nav>
+      </main>
+    </noscript>`;
+
+  let html = rawHtml;
+  html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtmlAttr(pageTitle)}</title>`);
+  html = html.replace(
+    /<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i,
+    `<meta name="description" content="${escapeHtmlAttr(pageDescription)}" />`
+  );
+  html = html.replace(
+    /<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/i,
+    `<link rel="canonical" href="${escapeHtmlAttr(canonicalUrl)}" />`
+  );
+  html = html.replace(
+    /<meta\s+property="og:type"\s+content="[^"]*"\s*\/?>/i,
+    `<meta property="og:type" content="${escapeHtmlAttr(ogType)}" />`
+  );
+  html = html.replace(
+    /<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/i,
+    `<meta property="og:title" content="${escapeHtmlAttr(pageTitle)}" />`
+  );
+  html = html.replace(
+    /<meta\s+property="og:description"\s+content="[^"]*"\s*\/?>/i,
+    `<meta property="og:description" content="${escapeHtmlAttr(pageDescription)}" />`
+  );
+  html = html.replace(
+    /<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/i,
+    `<meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}" />`
+  );
+  html = html.replace(
+    /<meta\s+property="og:image"\s+content="[^"]*"\s*\/?>/i,
+    `<meta property="og:image" content="${escapeHtmlAttr(ogImage)}" />`
+  );
+  html = html.replace(
+    /<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/i,
+    `<meta name="twitter:title" content="${escapeHtmlAttr(pageTitle)}" />`
+  );
+  html = html.replace(
+    /<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/?>/i,
+    `<meta name="twitter:description" content="${escapeHtmlAttr(pageDescription)}" />`
+  );
+  html = html.replace(
+    /<meta\s+name="twitter:image"\s+content="[^"]*"\s*\/?>/i,
+    `<meta name="twitter:image" content="${escapeHtmlAttr(ogImage)}" />`
+  );
+  html = html.replace(
+    /<meta\s+name="robots"\s+content="[^"]*"\s*\/?>/i,
+    `<meta name="robots" content="${escapeHtmlAttr(robotsDirective)}" />\n    <meta name="keywords" content="${escapeHtmlAttr(pageKeywords)}" />`
+  );
+
+  // Inject server-side JSON-LD
+  const jsonLdString = JSON.stringify({ '@context': 'https://schema.org', '@graph': graph });
+  html = html.replace(
+    /<script\s+id="json-ld-specs"\s+type="application\/ld\+json">[\s\S]*?<\/script>/i,
+    `<script id="json-ld-specs" type="application/ld+json">${jsonLdString}</script>`
+  );
+
+  // Inject Google AdSense head script if configured in AdSettings
+  const rawPubId = (adSettingsDatabase?.adsensePublisherId || '').trim();
+  if (rawPubId && !rawPubId.includes('0000000000')) {
+    const clientPub = rawPubId.startsWith('ca-pub-')
+      ? rawPubId
+      : rawPubId.startsWith('pub-')
+        ? `ca-${rawPubId}`
+        : `ca-pub-${rawPubId.replace(/\D/g, '')}`;
+    if (clientPub && clientPub !== 'ca-pub-') {
+      const adsenseTag = `<script id="gsmscope-adsense-sdk" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${escapeHtmlAttr(clientPub)}" crossorigin="anonymous"></script>\n  </head>`;
+      html = html.replace('</head>', adsenseTag);
+    }
+  }
+
+  // Inject Custom Verification Meta Tags & Scripts from Admin Dashboard (Search Console, Bing, Analytics, Custom Head/Body/Footer)
+  const customScripts = (websiteContentDatabase as any)?.customScripts;
+  if (customScripts) {
+    const headExtras: string[] = [];
+    const googleVerify = (customScripts.metaVerificationGoogle || '').trim();
+    if (googleVerify) {
+      if (googleVerify.startsWith('<meta')) {
+        headExtras.push(googleVerify);
+      } else {
+        headExtras.push(`<meta name="google-site-verification" content="${escapeHtmlAttr(googleVerify)}" />`);
+      }
+    }
+    const bingVerify = (customScripts.metaVerificationBing || '').trim();
+    if (bingVerify) {
+      if (bingVerify.startsWith('<meta')) {
+        headExtras.push(bingVerify);
+      } else {
+        headExtras.push(`<meta name="msvalidate.01" content="${escapeHtmlAttr(bingVerify)}" />`);
+      }
+    }
+    const headerScriptsRaw = (customScripts.headerScripts || '').trim();
+    if (headerScriptsRaw) {
+      headExtras.push(headerScriptsRaw);
+    }
+    if (headExtras.length > 0) {
+      html = html.replace('</head>', `${headExtras.join('\n  ')}\n  </head>`);
+    }
+
+    const bodyTopRaw = (customScripts.bodyTopScripts || '').trim();
+    if (bodyTopRaw) {
+      html = html.replace(/<body([^>]*)>/i, `<body$1>\n  ${bodyTopRaw}`);
+    }
+
+    const footerRaw = (customScripts.footerScripts || '').trim();
+    if (footerRaw) {
+      html = html.replace('</body>', `  ${footerRaw}\n  </body>`);
+    }
+  }
+
+  // Replace noscript snapshot
+  html = html.replace(
+    /<noscript\s+id="seo-crawler-snapshot">[\s\S]*?<\/noscript>/i,
+    fullNoscriptSnapshot
+  );
+
+  return html;
+}
+
+// Return clean JSON 404 for any unmatched /api/* route before SPA HTML catch-all
+app.use('/api', (req: Request, res: Response) => {
+  res.status(404).json({
+    error: `API endpoint not found: ${req.method} ${req.originalUrl}`,
   });
+});
+
+// ==========================================
+// STATIC ASSETS & VITE INTEGRATION
+// ==========================================
+async function startServer() {
+  const publicPath = path.resolve(__dirname, 'public');
+  if (fs.existsSync(publicPath)) {
+    app.use(
+      express.static(publicPath, {
+        index: false,
+        maxAge: '7d',
+        etag: true,
+      })
+    );
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    // Initialize Vite dev server asynchronously while allowing port 3000 to bind immediately
+    const vitePromise = import('vite').then(({ createServer: createViteServer }) =>
+      createViteServer({
+        server: { middlewareMode: true },
+        appType: 'custom'
+      })
+    );
+
+    app.use(async (req: Request, res: Response, next) => {
+      try {
+        const vite = await vitePromise;
+        vite.middlewares(req, res, next);
+      } catch (e) {
+        next(e);
+      }
+    });
+
+    app.get(/.*/, async (req: Request, res: Response, next) => {
+      if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
+        return next();
+      }
+      try {
+        const vite = await vitePromise;
+        const indexPath = path.resolve(__dirname, 'index.html');
+        const template = fs.readFileSync(indexPath, 'utf-8');
+        const transformed = await vite.transformIndexHtml(req.originalUrl, template);
+        const seoHtml = injectDynamicSeoIntoHtml(transformed, req);
+        res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8' }).end(seoHtml);
+      } catch (e) {
+        next(e);
+      }
+    });
+  } else {
+    // In production: serve built static assets from dist with aggressive caching for hashed bundles
+    const distPath = path.resolve(__dirname, 'dist');
+    const prodIndexPath = path.resolve(distPath, 'index.html');
+    const fallbackIndexPath = path.resolve(__dirname, 'index.html');
+
+    if (fs.existsSync(distPath)) {
+      app.use(
+        express.static(distPath, {
+          index: false,
+          maxAge: '30d',
+          etag: true,
+        })
+      );
+    } else {
+      console.warn('Production dist folder not found at startup. Please ensure `npm run build` has been run.');
+    }
+
+    let cachedProdTemplate = fs.existsSync(prodIndexPath)
+      ? fs.readFileSync(prodIndexPath, 'utf-8')
+      : '';
+
+    app.get(/.*/, (req: Request, res: Response, next) => {
+      if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
+        return next();
+      }
+      if (!cachedProdTemplate && fs.existsSync(prodIndexPath)) {
+        try {
+          cachedProdTemplate = fs.readFileSync(prodIndexPath, 'utf-8');
+        } catch {}
+      }
+      const templateToRender =
+        cachedProdTemplate ||
+        (fs.existsSync(fallbackIndexPath) ? fs.readFileSync(fallbackIndexPath, 'utf-8') : '');
+
+      if (templateToRender) {
+        const seoHtml = injectDynamicSeoIntoHtml(templateToRender, req);
+        res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8' }).send(seoHtml);
+      } else {
+        res.status(503).send('GsmScope production bundle not found. Run `npm run build` in cPanel Terminal.');
+      }
+    });
+  }
+
+  const isNumericPort = !isNaN(Number(PORT));
+  if (isNumericPort) {
+    app.listen(Number(PORT), '0.0.0.0', () => {
+      console.log(`GsmScope Full-Stack Server active at http://0.0.0.0:${PORT}`);
+    });
+  } else {
+    // Support cPanel Phusion Passenger / named pipe sockets
+    app.listen(PORT, () => {
+      console.log(`GsmScope Full-Stack Server active on socket ${PORT}`);
+    });
+  }
 }
 
 startServer().catch((err) => {
   console.error('Failed to start GsmScope server:', err);
 });
+

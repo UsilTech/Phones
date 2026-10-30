@@ -33,6 +33,9 @@ html[data-theme="dark"] {
 html {
   font-size: 17px;
   scroll-behavior: smooth;
+  overflow-x: clip;
+  width: 100%;
+  max-width: 100%;
 }
 
 @media (min-width: 1024px) {
@@ -48,6 +51,9 @@ html {
     color: var(--text-main);
     transition: background-color 0.2s ease, color 0.2s ease;
     line-height: 1.6;
+    overflow-x: clip;
+    width: 100%;
+    max-width: 100%;
   }
   
   h1, h2, h3, h4, h5, h6 {
@@ -78,18 +84,133 @@ html {
   }
 }
 
-/* Custom scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Remove window-level scrollbar vertical line on the right side of the screen */
+html, body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-::-webkit-scrollbar-track {
+html::-webkit-scrollbar, body::-webkit-scrollbar {
+  width: 0px;
+  height: 0px;
+  display: none;
   background: transparent;
 }
-::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.25);
-  border-radius: 3px;
+
+/* Optional custom scrollbars for inner boxes only */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.45);
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+/* Increase text size by 2px across all pages except Phone Detail Page */
+.page-text-scale {
+  --text-xs: calc(0.75rem + 2px);
+  --text-sm: calc(0.875rem + 2px);
+  --text-base: calc(1rem + 2px);
+  --text-lg: calc(1.125rem + 2px);
+  --text-xl: calc(1.25rem + 2px);
+  --text-2xl: calc(1.5rem + 2px);
+  --text-3xl: calc(1.875rem + 2px);
+  --text-4xl: calc(2.25rem + 2px);
+  --text-5xl: calc(3rem + 2px);
+  font-size: calc(1rem + 2px);
+}
+
+.page-text-scale .text-\[9px\] { font-size: 11px; }
+.page-text-scale .text-\[10px\] { font-size: 12px; }
+.page-text-scale .text-\[11px\] { font-size: 13px; }
+.page-text-scale .text-\[12px\] { font-size: 14px; }
+.page-text-scale .text-\[13px\] { font-size: 15px; }
+.page-text-scale .text-\[14px\] { font-size: 16px; }
+.page-text-scale .text-\[15px\] { font-size: 17px; }
+
+/* Reduce post titles by 2px */
+.page-text-scale .post-title,
+.phone-detail-text-scale .post-title {
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+}
+
+/* Reduced badge size and inner padding across the site */
+.site-badge,
+.page-text-scale .site-badge,
+.phone-detail-text-scale .site-badge {
+  font-size: 9.5px !important;
+  line-height: 1.2 !important;
+  padding: 1.5px 5px !important;
+}
+
+/* Hero section Featured phone badge increased by another 8% */
+.hero-featured-badge,
+.page-text-scale .hero-featured-badge {
+  font-size: 11.15px !important;
+  line-height: 1.3 !important;
+  padding: 2.5px 7px !important;
+}
+
+/* Homepage Compare smartphones badge reduced by 15% */
+.compare-smartphones-badge,
+.page-text-scale .compare-smartphones-badge {
+  font-size: calc((0.875rem + 2px) * 0.85) !important;
+  line-height: 1.35 !important;
+  padding: calc(0.375rem * 0.85) calc(1rem * 0.85) !important;
+}
+
+/* Increase text size by 1px on Phone Detail Page */
+.phone-detail-text-scale {
+  --text-xs: calc(0.75rem + 1px);
+  --text-sm: calc(0.875rem + 1px);
+  --text-base: calc(1rem + 1px);
+  --text-lg: calc(1.125rem + 1px);
+  --text-xl: calc(1.25rem + 1px);
+  --text-2xl: calc(1.5rem + 1px);
+  --text-3xl: calc(1.875rem + 1px);
+  --text-4xl: calc(2.25rem + 1px);
+  --text-5xl: calc(3rem + 1px);
+  font-size: calc(1rem + 1px);
+}
+
+.phone-detail-text-scale .text-\[9px\] { font-size: 10px; }
+.phone-detail-text-scale .text-\[10px\] { font-size: 11px; }
+.phone-detail-text-scale .text-\[11px\] { font-size: 12px; }
+.phone-detail-text-scale .text-\[12px\] { font-size: 13px; }
+.phone-detail-text-scale .text-\[13px\] { font-size: 14px; }
+.phone-detail-text-scale .text-\[14px\] { font-size: 15px; }
+.phone-detail-text-scale .text-\[15px\] { font-size: 16px; }
+.phone-detail-text-scale .text-\[17px\] { font-size: 18px; }
+.phone-detail-text-scale .text-\[19px\] { font-size: 20px; }
+
+@keyframes compare-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+}
+
+.animate-compare-pulse {
+  animation: compare-pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+
+

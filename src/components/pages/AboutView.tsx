@@ -14,9 +14,22 @@ import {
   ExternalLink 
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useSeoMeta } from '../seo/SeoMeta';
+import FormattedContent from '../common/FormattedContent';
 
 export default function AboutView() {
-  const { setActiveTab } = useApp();
+  const { setActiveTab, websiteContent } = useApp();
+  const contactEmail = websiteContent?.contactEmail?.trim() || 'info@gsmscope.com';
+  const contactPhone = websiteContent?.contactPhone?.trim() || '+2349127408003';
+  const officeLocation = websiteContent?.officeLocation?.trim() || 'Sokoto, Nigeria';
+
+  useSeoMeta({
+    title: 'About GsmScope — World Mobile Specs & Price Intelligence Authority',
+    description:
+      'Learn how GsmScope delivers accurate smartphone specifications, real-world hardware testing, and live global price tracking for buyers worldwide.',
+    type: 'website',
+    canonicalPath: '/?tab=about',
+  });
 
   return (
     <div className="max-w-5xl mx-auto space-y-12 py-4 animate-fadeIn pb-12">
@@ -26,27 +39,39 @@ export default function AboutView() {
           About GsmScope
         </span>
         <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk'] tracking-tight">
-          Nigeria&apos;s Independent Mobile Technology Authority
+          World Mobile Technology &amp; Device Intelligence Authority
         </h1>
-        <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-          GsmScope is built to provide Nigerian smartphone shoppers, retailers, and tech enthusiasts with reliable hardware specifications, authentic street market prices, and rigorous real-world reviews.
-        </p>
+        <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+          {websiteContent?.aboutSummary ? (
+            <FormattedContent content={websiteContent.aboutSummary} compact />
+          ) : (
+            <p>
+              GsmScope is built to provide smartphone shoppers, retailers, and tech enthusiasts worldwide with reliable hardware specifications, authentic global market prices, and rigorous real-world reviews.
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* 2. Core Mission & Nigerian Context */}
+      {websiteContent?.aboutPageContent && websiteContent.aboutPageContent.trim() && (
+        <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm text-sm text-slate-700 dark:text-slate-300">
+          <FormattedContent content={websiteContent.aboutPageContent} />
+        </div>
+      )}
+
+      {/* 2. Core Mission & Global Context */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
         <div className="lg:col-span-7 space-y-4 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-['Space_Grotesk']">
-            Solving the Nigerian Smartphone Buying Challenge
+            Solving the Global Smartphone Buying Challenge
           </h2>
           <p>
-            Purchasing a mobile phone in Nigeria involves navigating rapid exchange rate shifts between the Naira and US Dollar, varying street pricing between retail chains like <strong>Slot Systems</strong>, online platforms like <strong>Jumia</strong>, and open markets such as <strong>Ikeja Computer Village</strong>.
+            Purchasing a mobile phone worldwide involves navigating rapid currency shifts, regional hardware variations, and varying street pricing across major international carriers, online marketplaces, and authorized retail outlets.
           </p>
           <p>
-            Additionally, buyers must verify critical local factors: whether a device supports <strong>MTN and Airtel 5G network bands (Band n78 / Band n28)</strong>, whether its battery can endure local power outages, and whether official warranty repairs are supported by centers like <strong>Carlcare</strong> or <strong>Samsung Experience Centers</strong>.
+            Additionally, buyers must verify critical technical factors: whether a device supports <strong>global 5G and 4G LTE network bands (Sub-6GHz Band n78 / Band n28 and mmWave)</strong>, whether its battery can endure intensive daily workloads, and whether official warranty repairs are supported by <strong>authorized global service centers</strong>.
           </p>
           <p>
-            At <strong>GsmScope</strong>, we bridge this gap by conducting hands-on empirical testing, maintaining live price trackers in both Nigerian Naira (₦) and US Dollars ($), and publishing unbiased verdicts without corporate influence.
+            At <strong>GsmScope</strong>, we bridge this gap by conducting hands-on empirical testing, maintaining live global and local price trackers, and publishing unbiased verdicts without corporate influence.
           </p>
         </div>
 
@@ -60,19 +85,19 @@ export default function AboutView() {
           <ul className="space-y-3 text-xs text-slate-300">
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              <span>Real Nigerian street prices checked weekly at major phone hubs.</span>
+              <span>Real-time global MSRP ($ USD) and verified regional retail market pricing.</span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              <span>Tested battery endurance during actual screen-on time in Nigerian daily conditions.</span>
+              <span>Tested battery endurance during actual screen-on time in rigorous multi-tasking conditions.</span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              <span>Carrier-grade 4G/5G band verification for Nigerian telco networks.</span>
+              <span>Carrier-grade 4G/5G RF band verification across worldwide telecommunication networks.</span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              <span>Clear indication of Carlcare and authorized service center warranty coverage.</span>
+              <span>Clear indication of manufacturer warranty coverage and official global repair networks.</span>
             </li>
           </ul>
         </div>
@@ -100,7 +125,7 @@ export default function AboutView() {
             Side-by-Side Comparisons
           </h3>
           <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-            Direct spec comparisons allow users to weigh competing models from Tecno, Infinix, Samsung, Redmi, Apple, and OnePlus before committing their hard-earned money.
+            Direct spec comparisons allow users to weigh competing models from Apple, Samsung, Google, Xiaomi, OnePlus, Honor, Tecno, and Infinix before committing their hard-earned money.
           </p>
         </div>
 
@@ -138,8 +163,8 @@ export default function AboutView() {
 
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5">
             <Wifi className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span className="font-bold text-slate-900 dark:text-white block">Nigerian 5G Reception</span>
-            <p className="text-slate-500 dark:text-slate-400">Signal strength tested across key residential and commercial areas in Lagos and Abuja.</p>
+            <span className="font-bold text-slate-900 dark:text-white block">Global 5G &amp; RF Reception</span>
+            <p className="text-slate-500 dark:text-slate-400">Signal strength tested across key residential and commercial areas across cellular frequency bands.</p>
           </div>
 
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5">
@@ -160,26 +185,26 @@ export default function AboutView() {
             Collaborate with the GsmScope Editorial Team
           </h3>
           <p className="text-xs text-slate-300 leading-relaxed">
-            For device review requests, editorial corrections, or media inquiries, contact our Lagos headquarters.
+            For device review requests, editorial corrections, or media inquiries.
           </p>
-          <div className="flex flex-wrap items-center gap-4 text-xs pt-2">
+          <div className="flex flex-col items-start gap-2 text-xs pt-2">
             <a 
-              href="mailto:info@gsmscope.com" 
+              href={`mailto:${contactEmail}`} 
               className="flex items-center gap-1.5 text-emerald-400 hover:underline font-mono"
             >
               <Mail className="w-3.5 h-3.5" />
-              <span>info@gsmscope.com</span>
+              <span>{contactEmail}</span>
             </a>
             <a 
-              href="tel:+2349127408003" 
+              href={`tel:${contactPhone.replace(/\s+/g, '')}`} 
               className="flex items-center gap-1.5 text-emerald-400 hover:underline font-mono"
             >
               <Phone className="w-3.5 h-3.5" />
-              <span>+2349127408003</span>
+              <span>{contactPhone}</span>
             </a>
             <span className="flex items-center gap-1.5 text-slate-400">
               <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Ikeja Computer Village, Lagos</span>
+              <span>{officeLocation}</span>
             </span>
           </div>
         </div>

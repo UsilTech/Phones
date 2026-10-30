@@ -1,28 +1,65 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import Header from './components/common/Header';
+import Breadcrumbs from './components/common/Breadcrumbs';
 import Footer from './components/common/Footer';
 import AdBanner from './components/common/AdBanner';
+import AdPlacementSlot from './components/common/AdPlacementSlot';
+import PredictiveSearchDropdown from './components/common/PredictiveSearchDropdown';
 import HeroSection from './components/home/HeroSection';
+import BrandSliderSection from './components/home/BrandSliderSection';
 import BestCategoriesSection from './components/home/BestCategoriesSection';
 import PhoneFinderSection from './components/home/PhoneFinderSection';
 import QuickCompareBanner from './components/home/QuickCompareBanner';
 import PhoneCard from './components/phones/PhoneCard';
-import PhoneDetailPage from './components/phones/PhoneDetailPage';
-import ArticleDetailPage from './components/news/ArticleDetailPage';
 import PhoneFilterDrawer from './components/phones/PhoneFilterDrawer';
-import CompareView from './components/compare/CompareView';
+
+// Resilient lazy loader that retries dynamically imported chunks if network glitches or HMR occurs
+function safeLazy<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>
+) {
+  return lazy(async () => {
+    try {
+      return await factory();
+    } catch (err) {
+      console.warn('Dynamic chunk import error, retrying in 300ms...', err);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        return await factory();
+      } catch (retryErr) {
+        console.error('Failed to load module chunk after retry:', retryErr);
+        throw retryErr;
+      }
+    }
+  });
+}
+
+// Code-split heavy modals & detail views
+const PhoneDetailPage = safeLazy(() => import('./components/phones/PhoneDetailPage'));
+const ArticleDetailPage = safeLazy(() => import('./components/news/ArticleDetailPage'));
+const CompareView = safeLazy(() => import('./components/compare/CompareView'));
+const AdminDashboardModal = safeLazy(() => import('./components/admin/AdminDashboardModal'));
+const AdminLoginView = safeLazy(() => import('./components/admin/AdminLoginView'));
+
+// Direct imports for page views to prevent dynamic import fetch errors
 import BrandsView from './components/brands/BrandsView';
 import NewsView from './components/news/NewsView';
+import ReviewArticlesView from './components/pages/ReviewArticlesView';
 import ReviewsView from './components/pages/ReviewsView';
 import GuidesView from './components/pages/GuidesView';
 import AboutView from './components/pages/AboutView';
 import ContactView from './components/pages/ContactView';
 import AdvertiseView from './components/pages/AdvertiseView';
-import AdminDashboardModal from './components/admin/AdminDashboardModal';
-import AdminLoginView from './components/admin/AdminLoginView';
+import PrivacyPolicyView from './components/pages/PrivacyPolicyView';
+import TermsOfServiceView from './components/pages/TermsOfServiceView';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import JsonLdScript from './components/seo/JsonLdScript';
-import SocialShareBar from './components/common/SocialShareBar';
+import SeoMeta from './components/seo/SeoMeta';
+import BrandLogo from './components/common/BrandLogo';
+import GlobalProgressBar from './components/common/GlobalProgressBar';
+import PullToRefresh from './components/common/PullToRefresh';
+import GlobalToast from './components/common/GlobalToast';
+import PrivacyNotice from './components/common/PrivacyNotice';
 import { 
   SlidersHorizontal,
   Scale,
@@ -38,7 +75,8 @@ import {
   Sparkles,
   Search,
   ArrowUpDown,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
 
 function MainApp() {
@@ -64,10 +102,70 @@ function MainApp() {
     selectedPhone,
     setSelectedPhone,
     selectedArticle,
-    setSelectedArticle
+    setSelectedArticle,
+    setSelectedBrand,
+    clearCompare,
+    triggerNavigation,
+    startGlobalLoading,
+    stopGlobalLoading,
+    websiteContent,
+    adSettings,
+    goBack
   } = useApp();
 
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [isDbSearching, setIsDbSearching] = useState(false);
+  const [dbSearchPredictiveOpen, setDbSearchPredictiveOpen] = useState(false);
+  const [dbSearchPredictiveIndex, setDbSearchPredictiveIndex] = useState(-1);
+
+  // Inject Google AdSense Auto Ads script into <head> when enabled in Admin Dashboard
+  useEffect(() => {
+    if (!adSettings?.adsenseAutoAdsEnabled) return;
+    const rawPubId = (adSettings?.adsensePublisherId || '').trim();
+    if (!rawPubId) return;
+    const normalizedClient = rawPubId.startsWith('ca-pub-')
+      ? rawPubId
+      : rawPubId.startsWith('pub-')
+        ? `ca-${rawPubId}`
+        : `ca-pub-${rawPubId.replace(/\D/g, '')}`;
+    if (!normalizedClient || normalizedClient === 'ca-pub-' || normalizedClient.includes('0000000000')) {
+      return;
+    }
+
+    const existingScript = document.getElementById('gsmscope-adsense-sdk') as HTMLScriptElement | null;
+    const expectedSrc = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(normalizedClient)}`;
+    if (!existingScript) {
+      const script = document.createElement('script');
+      script.id = 'gsmscope-adsense-sdk';
+      script.async = true;
+      script.src = expectedSrc;
+      script.crossOrigin = 'anonymous';
+      document.head.appendChild(script);
+    }
+  }, [adSettings?.adsenseAutoAdsEnabled, adSettings?.adsensePublisherId]);
+
+  // Dynamically sync favicon when updated in Admin Dashboard -> Website Content & Branding
+  useEffect(() => {
+    const favUrl = websiteContent?.faviconUrl?.trim();
+    if (!favUrl) return;
+    const iconLinks = document.querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]');
+    iconLinks.forEach((link) => {
+      if (link.href !== favUrl) {
+        link.href = favUrl;
+      }
+    });
+  }, [websiteContent?.faviconUrl]);
+
+  const handleDbSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isDbSearching) return;
+    setIsDbSearching(true);
+    startGlobalLoading();
+    setTimeout(() => {
+      stopGlobalLoading();
+      setIsDbSearching(false);
+    }, 350);
+  };
 
   // Automatically scroll to the top whenever viewing a phone, article, or switching tabs
   useEffect(() => {
@@ -79,9 +177,9 @@ function MainApp() {
     // Search query
     if (filterState.searchQuery) {
       const q = filterState.searchQuery.toLowerCase();
-      const matchName = phone.name.toLowerCase().includes(q);
-      const matchBrand = phone.brand.toLowerCase().includes(q);
-      const matchChipset = phone.detailedSpecs.platform.chipset.toLowerCase().includes(q);
+      const matchName = (phone.name || '').toLowerCase().includes(q);
+      const matchBrand = (phone.brand || '').toLowerCase().includes(q);
+      const matchChipset = (phone.detailedSpecs?.platform?.chipset || phone.keyHighlights?.processor || '').toLowerCase().includes(q);
       if (!matchName && !matchBrand && !matchChipset) return false;
     }
 
@@ -90,27 +188,40 @@ function MainApp() {
       if (!filterState.selectedBrands.includes(phone.brand)) return false;
     }
 
-    // Price
-    if (phone.priceNGN < filterState.minPrice || phone.priceNGN > filterState.maxPrice) {
+    // Price (allow Admin 'best-budget' / 'under-200k' / 'under-300k' badges to appear in budget presets)
+    const cats = (phone.categories || []).map((c) => c.toLowerCase());
+    const hasBudgetCat =
+      (filterState.categoryPreset === 'Under ₦200,000' && (cats.includes('best-budget') || cats.includes('under-200k'))) ||
+      (filterState.categoryPreset === 'Under ₦300,000' && cats.includes('under-300k'));
+    if (!hasBudgetCat && (phone.priceNGN < filterState.minPrice || phone.priceNGN > filterState.maxPrice)) {
       return false;
     }
 
     // 5G
-    if (filterState.only5G && !phone.keyHighlights.network5g) {
+    if (filterState.only5G && !phone.keyHighlights?.network5g && !cats.includes('5g') && !cats.includes('best-5g')) {
       return false;
     }
 
     // Battery
     if (filterState.minBattery > 0) {
-      const capacityNum = parseInt(phone.detailedSpecs.battery.capacity.replace(/\D/g, ''), 10) || 0;
-      if (capacityNum < filterState.minBattery) return false;
+      const hasBatteryCat = filterState.categoryPreset === 'Best Battery Life' && cats.includes('best-battery');
+      if (!hasBatteryCat) {
+        const specCapacity = parseInt(phone.detailedSpecs?.battery?.capacity?.replace(/\D/g, '') || '', 10) || 0;
+        const highlightCapacity = parseInt(phone.keyHighlights?.battery?.replace(/\D/g, '') || '', 10) || 0;
+        const capacityNum = specCapacity || highlightCapacity;
+        if (capacityNum < filterState.minBattery) return false;
+      }
     }
 
     // Camera MP
     if (filterState.minCameraMP > 0) {
-      const mpMatch = phone.detailedSpecs.mainCamera.setup.match(/(\d+)\s*MP/i);
-      const mainMP = mpMatch ? parseInt(mpMatch[1], 10) : 0;
-      if (mainMP < filterState.minCameraMP) return false;
+      const hasCameraCat = filterState.categoryPreset === 'Best Camera Phones' && cats.includes('best-camera');
+      if (!hasCameraCat) {
+        const camStr = phone.detailedSpecs?.mainCamera?.setup || phone.keyHighlights?.camera || '';
+        const mpMatch = camStr.match(/(\d+)\s*MP/i);
+        const mainMP = mpMatch ? parseInt(mpMatch[1], 10) : 0;
+        if (mainMP < filterState.minCameraMP) return false;
+      }
     }
 
     // Screen size
@@ -125,31 +236,75 @@ function MainApp() {
 
     // RAM
     if (filterState.ram.length > 0) {
-      const hasRam = filterState.ram.some(r => phone.keyHighlights.ram.includes(r));
-      if (!hasRam) return false;
+      const hasGamingCat = filterState.categoryPreset === 'Best Gaming Phones' && cats.includes('best-gaming');
+      if (!hasGamingCat) {
+        const ramStr = phone.keyHighlights?.ram || (phone.detailedSpecs?.memory?.ramVariants || []).join(' ');
+        const hasRam = filterState.ram.some(r => ramStr.includes(r));
+        if (!hasRam) return false;
+      }
+    }
+
+    // Storage / Memory
+    if (filterState.storage && filterState.storage.length > 0) {
+      const storageStr = [
+        phone.keyHighlights?.storage || '',
+        (phone.detailedSpecs?.memory as any)?.internal || '',
+        ...(phone.detailedSpecs?.memory?.storageVariants || [])
+      ].join(' ');
+      const hasStorage = filterState.storage.some(s => storageStr.includes(s));
+      if (!hasStorage) return false;
     }
 
     return true;
   });
 
-  // Apply sorting
+  // Apply sorting (prioritizing admin-assigned category badges when a category preset is active)
   const sortedPhones = [...filteredPhones].sort((a, b) => {
+    if (filterState.categoryPreset) {
+      const catsA = (a.categories || []).map((c) => c.toLowerCase());
+      const catsB = (b.categories || []).map((c) => c.toLowerCase());
+      const matchesPresetBadge = (cats: string[], isFeat?: boolean) => {
+        if (filterState.categoryPreset === 'Top Rated Overall') {
+          return cats.includes('top-rated') || cats.includes('flagship') || Boolean(isFeat);
+        }
+        if (filterState.categoryPreset === 'Under ₦200,000') {
+          return cats.includes('best-budget') || cats.includes('under-200k');
+        }
+        if (filterState.categoryPreset === 'Best Camera Phones') {
+          return cats.includes('best-camera');
+        }
+        if (filterState.categoryPreset === 'Best Gaming Phones') {
+          return cats.includes('best-gaming');
+        }
+        if (filterState.categoryPreset === 'Best Battery Life') {
+          return cats.includes('best-battery');
+        }
+        if (filterState.categoryPreset === 'Best 5G Phones') {
+          return cats.includes('best-5g') || cats.includes('5g');
+        }
+        return false;
+      };
+      const badgeA = matchesPresetBadge(catsA, a.isFeatured) ? 1 : 0;
+      const badgeB = matchesPresetBadge(catsB, b.isFeatured) ? 1 : 0;
+      if (badgeB !== badgeA) return badgeB - badgeA;
+    }
+
     switch (filterState.sortBy) {
       case 'price-asc':
         return a.priceNGN - b.priceNGN;
       case 'price-desc':
         return b.priceNGN - a.priceNGN;
       case 'rating':
-        return b.rating - a.rating;
+        return (b.rating || 0) - (a.rating || 0);
       case 'newest': {
-        const dateB = Date.parse(b.releaseDate) || (b.releaseYear ? new Date(b.releaseYear, 0, 1).getTime() : 0);
-        const dateA = Date.parse(a.releaseDate) || (a.releaseYear ? new Date(a.releaseYear, 0, 1).getTime() : 0);
+        const dateB = Date.parse(b.releaseDate || '') || (b.releaseYear ? new Date(b.releaseYear, 0, 1).getTime() : 0);
+        const dateA = Date.parse(a.releaseDate || '') || (a.releaseYear ? new Date(a.releaseYear, 0, 1).getTime() : 0);
         if (dateB !== dateA) return dateB - dateA;
-        return b.releaseYear - a.releaseYear;
+        return (b.releaseYear || 0) - (a.releaseYear || 0);
       }
       case 'battery': {
-        const batA = parseInt(a.detailedSpecs.battery.capacity.replace(/\D/g, ''), 10) || 0;
-        const batB = parseInt(b.detailedSpecs.battery.capacity.replace(/\D/g, ''), 10) || 0;
+        const batA = parseInt((a.detailedSpecs?.battery?.capacity || a.keyHighlights?.battery || '').replace(/\D/g, ''), 10) || 0;
+        const batB = parseInt((b.detailedSpecs?.battery?.capacity || b.keyHighlights?.battery || '').replace(/\D/g, ''), 10) || 0;
         return batB - batA;
       }
       case 'popular':
@@ -158,38 +313,118 @@ function MainApp() {
     }
   });
 
+  const isBrandSliderExcluded = 
+    activeTab === 'about' || 
+    activeTab === 'contact' || 
+    activeTab === 'privacy' || 
+    activeTab === 'terms' || 
+    activeTab === 'advertise' ||
+    activeTab === 'admin';
+
+  if (activeTab === 'admin') {
+    if (!isAdminAuthenticated) {
+      return (
+        <div className="min-h-screen min-h-[100dvh] w-full bg-[#04110b] text-slate-100 flex items-center justify-center p-4 font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
+          <SeoMeta
+            title="Admin Login — GsmScope"
+            description="GsmScope Administrator Authentication"
+            canonicalPath="/admin"
+          />
+          <GlobalProgressBar />
+          <GlobalToast />
+          <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div>}>
+            <AdminLoginView />
+          </Suspense>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-[#f0f0f1] dark:bg-slate-950 text-[var(--text-main)] flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200 w-full max-w-full overflow-x-clip">
+        <SeoMeta
+          title="Admin Dashboard — GsmScope CMS"
+          description="Manage smartphones, full hardware specifications, brands, pricing, articles, user reviews, and site settings in the GsmScope Admin Dashboard."
+          canonicalPath="/admin"
+        />
+        <GlobalProgressBar />
+        <PullToRefresh />
+        <GlobalToast />
+        <JsonLdScript />
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center py-24"><Loader2 className="w-7 h-7 animate-spin text-emerald-600" /></div>}>
+          <AdminDashboardModal />
+        </Suspense>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[var(--bg-color)] text-[var(--text-main)] flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
+    <div className="min-h-screen bg-[var(--bg-color)] text-[var(--text-main)] flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200 w-full max-w-full overflow-x-clip">
+      {/* Global Animated Top Progress Bar & Pull-To-Refresh */}
+      <GlobalProgressBar />
+      <PullToRefresh />
+      <GlobalToast />
+
       <JsonLdScript />
+
+      {/* WordPress-style Top Admin Bar when Administrator is logged in */}
+      {isAdminAuthenticated && (
+        <Suspense fallback={null}>
+          <AdminDashboardModal />
+        </Suspense>
+      )}
       
       {/* Main Header (3-zone Top Bar with Currency Switcher) - Remains permanently dark */}
       <Header />
 
+      {/* World Notable Brands Slider - Shown across all pages except About Us, Contact Us, Privacy Policy, Terms of Service, Advertise with Us */}
+      {!isBrandSliderExcluded && (
+        <BrandSliderSection />
+      )}
+
+      {/* Dynamic SEO Breadcrumb Navigation */}
+      <Breadcrumbs />
+
       {/* Main Content Viewport */}
-      <main className="flex-1 w-full px-4 sm:px-8 lg:px-12 py-8 space-y-14">
-        {selectedPhone ? (
-          <PhoneDetailPage
-            phone={selectedPhone}
-            onBack={() => {
-              setSelectedPhone(null);
-              window.scrollTo({ top: 0, behavior: 'instant' });
-            }}
-          />
-        ) : selectedArticle ? (
-          <ArticleDetailPage
-            article={selectedArticle}
-            onBack={() => {
-              setSelectedArticle(null);
-              window.scrollTo({ top: 0, behavior: 'instant' });
-            }}
-          />
+      <main className={`flex-1 w-full max-w-full px-[calc(1rem-5px)] sm:px-[calc(2rem-5px)] lg:px-[calc(3rem-5px)] pt-5 pb-7 space-y-7 overflow-x-clip ${selectedPhone && !selectedArticle ? 'phone-detail-text-scale' : 'page-text-scale'}`}>
+        {selectedArticle ? (
+          <Suspense fallback={<div className="py-16 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div>}>
+            <ArticleDetailPage
+              article={selectedArticle}
+              onBack={() => {
+                goBack();
+                window.scrollTo({ top: 0, behavior: 'instant' });
+              }}
+            />
+          </Suspense>
+        ) : selectedPhone ? (
+          <Suspense fallback={<div className="py-16 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div>}>
+            <PhoneDetailPage
+              phone={phones.find((p) => p.id === selectedPhone.id) || selectedPhone}
+              onBack={() => {
+                goBack();
+                window.scrollTo({ top: 0, behavior: 'instant' });
+              }}
+            />
+          </Suspense>
         ) : (
           <>
             {/* VIEW: HOME */}
             {activeTab === 'home' && (
-          <div className="space-y-14">
+          <div className="space-y-7">
+            <SeoMeta
+              title={websiteContent?.seoTitle || websiteContent?.defaultSeoTitle || `${websiteContent?.siteName || 'GsmScope'} — ${websiteContent?.siteTagline || 'Global Phone Specs, Reviews and Prices'}`}
+              description={websiteContent?.seoDescription || websiteContent?.defaultSeoDescription || 'Browse smartphone specifications with global USD and local prices, compare devices, read technology news and find the best phones for every budget.'}
+              keywords={websiteContent?.seoKeywords || websiteContent?.defaultSeoKeywords || 'gsmscope, smartphone specs, phone prices, mobile phone reviews, buy phones'}
+              siteName={websiteContent?.siteName || 'GsmScope'}
+              image={phones[0]?.image}
+              imageAlt={`${websiteContent?.siteName || 'GsmScope'} — Smartphone Specifications, Comparisons, Reviews & Global Prices`}
+              canonicalPath="/"
+            />
             {/* 1. Hero Carousel + Most Read Articles - Remains permanently dark as requested */}
             <HeroSection />
+
+            {/* Ad Placement: Homepage — Above Trending phones section */}
+            <AdPlacementSlot placementId="home_above_trending" />
 
             {/* 2. Trending Phones Section (Columns layout, images fit column size without padding) */}
             <section className="space-y-4">
@@ -201,10 +436,15 @@ function MainApp() {
                 </div>
                 <button
                   onClick={() => {
-                    setActiveTab('phones');
-                    window.scrollTo({ top: 0, behavior: 'instant' });
+                    triggerNavigation(() => {
+                      resetFilters();
+                      setSelectedPhone(null);
+                      setSelectedArticle(null);
+                      setActiveTab('phones');
+                      window.scrollTo({ top: 0, behavior: 'instant' });
+                    });
                   }}
-                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
+                  className="text-xs font-normal text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
                 >
                   <span>View all</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -218,20 +458,21 @@ function MainApp() {
                     <div
                       key={phone.id}
                       onClick={() => {
-                        setSelectedPhone(phone);
-                        window.scrollTo({ top: 0, behavior: 'instant' });
+                        triggerNavigation(() => {
+                          setSelectedPhone(phone);
+                          window.scrollTo({ top: 0, behavior: 'instant' });
+                        });
                       }}
                       className="group p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/60 transition-all flex items-center gap-4 cursor-pointer shadow-sm hover:shadow-md"
                     >
-                      {/* Thumbnail with Rank Badge - Fits column size without padding */}
-                      <div className="relative w-28 sm:w-36 h-28 sm:h-36 rounded-xl overflow-hidden shrink-0 bg-slate-950 p-0 border border-slate-200 dark:border-slate-800 shadow-inner">
-                        <span className="absolute top-1.5 left-1.5 z-10 text-[11px] font-mono font-bold text-white bg-emerald-600/95 backdrop-blur-sm px-1.5 py-0.5 rounded shadow">
-                          #{idx + 1}
-                        </span>
+                      {/* Thumbnail - Adjusted height, without rank badge */}
+                      <div className="relative w-24 sm:w-[122px] h-[82px] sm:h-[95px] rounded-xl overflow-hidden shrink-0 bg-slate-950 p-0 border border-slate-200 dark:border-slate-800 shadow-inner">
                         {phone.image ? (
                           <img
                             src={phone.image}
                             alt={phone.name}
+                            loading="lazy"
+                            decoding="async"
                             referrerPolicy="no-referrer"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
@@ -242,55 +483,47 @@ function MainApp() {
 
                       {/* Details in column */}
                       <div className="flex-1 min-w-0 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
-                            {phone.brand}
-                          </span>
-                          <span className="text-xs text-slate-500 dark:text-slate-400">
-                            {phone.releaseYear}
-                          </span>
-                          <span className="text-xs text-amber-500 font-mono font-semibold ml-auto flex items-center gap-0.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-stretch gap-1.5">
+                            <span className="site-badge inline-flex items-center text-[9px] font-mono font-semibold uppercase px-1.5 py-px rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
+                              {phone.brand}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (inComp) {
+                                  removeFromCompare(phone.id);
+                                } else {
+                                  addToCompare(phone.id);
+                                }
+                              }}
+                              title={inComp ? 'Remove from comparison' : 'Add to compare'}
+                              aria-label={inComp ? 'Remove from comparison' : 'Add to compare'}
+                              className={`px-1 py-px rounded flex items-center justify-center transition-colors cursor-pointer border ${
+                                inComp
+                                  ? 'bg-emerald-600 text-white border-emerald-500'
+                                  : 'bg-slate-100 dark:bg-slate-800 hover:bg-emerald-600 text-emerald-600 dark:text-emerald-400 hover:text-white border-slate-200 dark:border-slate-700 hover:border-emerald-500'
+                              }`}
+                            >
+                              <Scale className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <span className="text-xs text-amber-500 font-mono font-semibold flex items-center gap-0.5">
                             ★ {phone.rating.toFixed(1)}
                           </span>
                         </div>
 
-                        <h3 className="font-bold text-slate-900 dark:text-white text-base sm:text-lg font-['Space_Grotesk'] truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                        <h3 className="post-title font-bold text-slate-900 dark:text-white text-base sm:text-lg font-['Space_Grotesk'] leading-snug group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                           {phone.name}
                         </h3>
 
-                        {/* Key specs summary */}
-                        <div className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 space-x-1.5">
-                          <span>{phone.keyHighlights.display}</span>
-                          <span>·</span>
-                          <span>{phone.keyHighlights.processor}</span>
-                          <span>·</span>
-                          <span>{phone.keyHighlights.battery}</span>
-                        </div>
-
                         {/* Action buttons */}
                         <div className="flex items-center justify-between pt-1 text-xs">
-                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
-                            <span>View specs</span>
+                          <span className="text-emerald-600 dark:text-emerald-400 font-normal group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                            <span>Full Specifications</span>
                             <ArrowRight className="w-3.5 h-3.5" />
                           </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (inComp) {
-                                removeFromCompare(phone.id);
-                              } else {
-                                addToCompare(phone.id);
-                              }
-                            }}
-                            className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer ${
-                              inComp
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-white hover:bg-slate-700'
-                            }`}
-                          >
-                            <Scale className="w-3.5 h-3.5" />
-                            <span>{inComp ? 'Comparing' : 'Compare'}</span>
-                          </button>
                         </div>
                       </div>
                     </div>
@@ -298,6 +531,9 @@ function MainApp() {
                 })}
               </div>
             </section>
+
+            {/* Ad Placement: Homepage — Above Latest Reviews section */}
+            <AdPlacementSlot placementId="home_above_reviews" />
 
             {/* 3. Latest Reviews Section - Phone Review Posts (Editorial Hardware Reviews) */}
             <section className="space-y-4">
@@ -309,10 +545,14 @@ function MainApp() {
                 </div>
                 <button
                   onClick={() => {
-                    setActiveTab('reviews');
-                    window.scrollTo({ top: 0, behavior: 'instant' });
+                    triggerNavigation(() => {
+                      setSelectedPhone(null);
+                      setSelectedArticle(null);
+                      setActiveTab('reviews');
+                      window.scrollTo({ top: 0, behavior: 'instant' });
+                    });
                   }}
-                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
+                  className="text-xs font-normal text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
                 >
                   <span>All reviews</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -321,148 +561,271 @@ function MainApp() {
 
               {/* Phone Review Posts */}
               {(() => {
+                const seedReviewIds = new Set([
+                  'art-1', 'art-2', 'art-3', 'art-4', 'art-5', 'art-6', 'art-7', 'art-8',
+                  'art-iphone-16-pro-review', 'art-galaxy-s24-ultra-review', 'art-pixel-9-pro-review',
+                  'art-xiaomi-14-ultra-review', 'art-oneplus-12-review'
+                ]);
                 const phoneReviewArticles = articles.filter(
-                  (a) => a.category.toLowerCase().includes('review') || a.title.toLowerCase().includes('review')
+                  (a) =>
+                    (a.category || '').toLowerCase().includes('review') ||
+                    (a.title || '').toLowerCase().includes('review') ||
+                    (a.tags || []).some((t) => t.toLowerCase().includes('review'))
                 );
-                const displayReviewPosts = phoneReviewArticles.length > 0 ? phoneReviewArticles : articles.slice(0, 3);
+                // Show newly published custom review articles first; among seed reviews, keep iPhone 16 Pro Max first
+                const sortedReviewArticles = [...phoneReviewArticles].sort((a, b) => {
+                  const isCustomA = !seedReviewIds.has(a.id);
+                  const isCustomB = !seedReviewIds.has(b.id);
+                  if (isCustomA && !isCustomB) return -1;
+                  if (!isCustomA && isCustomB) return 1;
+                  if (a.id === 'art-iphone-16-pro-review') return -1;
+                  if (b.id === 'art-iphone-16-pro-review') return 1;
+                  return 0;
+                });
+                const displayReviewPosts = sortedReviewArticles.length >= 5 
+                  ? sortedReviewArticles.slice(0, 5) 
+                  : [...sortedReviewArticles, ...articles.filter(a => !sortedReviewArticles.some(pra => pra.id === a.id))].slice(0, 5);
                 const leadReview = displayReviewPosts[0];
-                const restReviews = displayReviewPosts.slice(1, 3);
+                const verticalListArticles = displayReviewPosts.slice(1, 5);
 
                 if (!leadReview) return null;
                 const relatedPhone = phones.find(p => leadReview.relatedPhoneIds?.includes(p.id));
 
                 return (
-                  <div className="space-y-6">
-                    {/* One Big Grid Display (Featured Lead Phone Review Post) */}
+                  <div className="space-y-4 sm:space-y-5">
+                    {/* 1. Large Featured Review Article at the Top */}
                     <div 
                       onClick={() => {
-                        setSelectedArticle(leadReview);
-                        window.scrollTo({ top: 0, behavior: 'instant' });
+                        triggerNavigation(() => {
+                          setSelectedArticle(leadReview);
+                          window.scrollTo({ top: 0, behavior: 'instant' });
+                        });
                       }}
-                      className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border-2 border-emerald-500/40 hover:border-emerald-500 space-y-6 shadow-xl transition-all cursor-pointer group"
+                      className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/60 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col space-y-3.5"
                     >
-                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                        <div className="lg:col-span-8 space-y-3">
-                          <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <span className="text-[11px] font-mono uppercase tracking-wider font-bold text-white bg-emerald-600 px-2.5 py-1 rounded-md">
-                              Phone Review
-                            </span>
-                            <span className="text-emerald-600 dark:text-emerald-400 font-mono font-semibold text-xs bg-emerald-50 dark:bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/30">
-                              {leadReview.category}
-                            </span>
-                            <span className="text-slate-400 font-mono text-xs">
-                              {leadReview.date} · {leadReview.readTime}
-                            </span>
-                          </div>
-
-                          <h3 className="font-extrabold text-slate-900 dark:text-white text-lg sm:text-2xl font-['Space_Grotesk'] leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                            {leadReview.title}
-                          </h3>
-
-                          <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3">
-                            {leadReview.summary}
-                          </p>
-
-                          {/* Related Phone Highlights if available */}
-                          {relatedPhone && (
-                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs flex flex-wrap items-center gap-x-4 gap-y-1.5 text-slate-600 dark:text-slate-400">
-                              <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                                <Smartphone className="w-3.5 h-3.5 text-emerald-500" />
-                                {relatedPhone.brand} {relatedPhone.name}
-                              </span>
-                              <span>Display: {relatedPhone.keyHighlights.display.split(' ')[0]}</span>
-                              <span>Battery: {relatedPhone.keyHighlights.battery}</span>
-                              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                {currency === 'USD' ? formatUSD(relatedPhone.priceUSD) : formatNaira(relatedPhone.priceNGN)}
-                              </span>
-                            </div>
-                          )}
-
-                          <div className="pt-2 flex flex-wrap items-center justify-between gap-3">
-                            <span className="text-xs text-slate-500 dark:text-slate-400">
-                              By <strong>{leadReview.author.name}</strong> ({leadReview.author.role})
-                            </span>
-                            
-                            {/* Social Share Bar */}
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <SocialShareBar 
-                                title={`${leadReview.title} - GsmScope Phone Review`}
-                                summary={leadReview.summary}
-                                layout="compact"
-                                showLabel={true}
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Image Column */}
-                        <div className="lg:col-span-4 flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 h-52 sm:h-64 overflow-hidden">
-                          <img
-                            src={relatedPhone?.image || leadReview.coverImage}
-                            alt={leadReview.title}
-                            referrerPolicy="no-referrer"
-                            className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500 drop-shadow-md"
-                          />
-                        </div>
+                      {/* Top Landscape Cover Image */}
+                      <div className="w-full aspect-[16/10] sm:aspect-[16/9] md:aspect-[2/1] rounded-xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 relative">
+                        <img
+                          src={leadReview.coverImage || relatedPhone?.image}
+                          alt={leadReview.title}
+                          loading="lazy"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (!target.src.includes('IMG_20261026_152954_83c935f6.jpg')) {
+                              target.src = '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg';
+                            }
+                          }}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
                       </div>
+
+                      {/* Category Badge & Meta */}
+                      <div className="flex items-center gap-2.5 text-xs">
+                        <span className="site-badge text-[9px] font-mono font-semibold uppercase px-1.5 py-px rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
+                          {leadReview.category || 'REVIEWS'}
+                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                          {leadReview.date} · {leadReview.readTime}
+                        </span>
+                        {leadReview.author && (
+                          <span className="text-xs text-slate-400 dark:text-slate-500 hidden sm:inline">
+                            · by {leadReview.author.name}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Headline */}
+                      <h3 className="post-title font-bold text-slate-900 dark:text-white text-lg sm:text-xl md:text-2xl font-['Space_Grotesk'] leading-snug group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                        {leadReview.title}
+                      </h3>
                     </div>
 
-                    {/* Rest Phone Review Posts Beneath It */}
-                    {restReviews.length > 0 && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {restReviews.map((post) => {
+                    {/* 2. Vertical List of 4 Smaller Articles Underneath */}
+                    {verticalListArticles.length > 0 && (
+                      <div className="space-y-3 sm:space-y-3.5">
+                        {verticalListArticles.map((post) => {
                           const postPhone = phones.find(p => post.relatedPhoneIds?.includes(p.id));
                           return (
                             <div
                               key={post.id}
                               onClick={() => {
-                                setSelectedArticle(post);
-                                window.scrollTo({ top: 0, behavior: 'instant' });
+                                triggerNavigation(() => {
+                                  setSelectedArticle(post);
+                                  window.scrollTo({ top: 0, behavior: 'instant' });
+                                });
                               }}
-                              className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm hover:border-emerald-500/60 transition-all flex flex-col justify-between cursor-pointer group"
+                              className="group p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/60 transition-all flex items-center gap-4 cursor-pointer shadow-sm hover:shadow-md"
                             >
-                              <div className="space-y-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-16 h-16 rounded-xl bg-slate-50 dark:bg-slate-950 p-1.5 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-800">
-                                    <img
-                                      src={postPhone?.image || post.coverImage}
-                                      alt={post.title}
-                                      referrerPolicy="no-referrer"
-                                      className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform"
-                                    />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
-                                      <span className="text-[10px] font-mono uppercase font-semibold text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-500/20">
-                                        Review
-                                      </span>
-                                      <span className="font-mono text-[11px]">{post.date}</span>
-                                    </div>
-                                    <h4 className="font-bold text-slate-900 dark:text-white text-sm line-clamp-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors font-['Space_Grotesk']">
-                                      {post.title}
-                                    </h4>
-                                  </div>
-                                </div>
-
-                                <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
-                                  {post.summary}
-                                </p>
+                              {/* Square / Squircle Thumbnail Image (Height reduced 15%) */}
+                              <div className="relative w-24 sm:w-28 h-[82px] sm:h-[95px] rounded-xl overflow-hidden shrink-0 bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-inner">
+                                <img
+                                  src={post.coverImage || postPhone?.image}
+                                  alt={post.title}
+                                  loading="lazy"
+                                  decoding="async"
+                                  referrerPolicy="no-referrer"
+                                  onError={(e) => {
+                                    const target = e.currentTarget;
+                                    if (!target.src.includes('IMG_20261026_152954_83c935f6.jpg')) {
+                                      target.src = '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg';
+                                    }
+                                  }}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
                               </div>
 
-                              <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs gap-2">
-                                <span className="text-emerald-600 dark:text-emerald-400 font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
-                                  <span>Read review</span>
-                                  <ArrowRight className="w-3.5 h-3.5" />
-                                </span>
-
-                                <div onClick={(e) => e.stopPropagation()}>
-                                  <SocialShareBar 
-                                    title={`${post.title} - GsmScope Review`}
-                                    summary={post.summary}
-                                    layout="compact"
-                                    showLabel={false}
-                                  />
+                              {/* Details in Column */}
+                              <div className="flex-1 min-w-0 space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="site-badge text-[9px] font-mono font-semibold uppercase px-1.5 py-px rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
+                                    {post.category || 'REVIEWS'}
+                                  </span>
+                                  <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                                    {post.date}
+                                  </span>
                                 </div>
+
+                                <h4 className="post-title font-bold text-slate-900 dark:text-white text-base sm:text-lg font-['Space_Grotesk'] line-clamp-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors leading-snug">
+                                  {post.title}
+                                </h4>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </section>
+
+            {/* Latest News Section (Exact same design structure as Latest reviews) */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-['Space_Grotesk']">
+                    Latest News
+                  </h2>
+                </div>
+                <button
+                  onClick={() => {
+                    triggerNavigation(() => {
+                      setSelectedPhone(null);
+                      setSelectedArticle(null);
+                      setActiveTab('news');
+                      window.scrollTo({ top: 0, behavior: 'instant' });
+                    });
+                  }}
+                  className="text-xs font-normal text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
+                >
+                  <span>All news</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* News Posts (1 large featured card at top + 4 horizontal-card list underneath) */}
+              {(() => {
+                const newsArticles = articles.filter(
+                  (a) => !a.category.toLowerCase().includes('review') && !a.title.toLowerCase().includes('review')
+                );
+                const displayNewsPosts = newsArticles.length >= 5
+                  ? newsArticles.slice(0, 5)
+                  : articles.slice(0, 5);
+                const leadNews = displayNewsPosts[0];
+                const verticalListNews = displayNewsPosts.slice(1, 5);
+
+                if (!leadNews) return null;
+                const relatedPhone = phones.find(p => leadNews.relatedPhoneIds?.includes(p.id));
+
+                return (
+                  <div className="space-y-4 sm:space-y-5">
+                    {/* 1. Large Featured News Article at the Top */}
+                    <div 
+                      onClick={() => {
+                        triggerNavigation(() => {
+                          setSelectedArticle(leadNews);
+                          window.scrollTo({ top: 0, behavior: 'instant' });
+                        });
+                      }}
+                      className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/60 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col space-y-3.5"
+                    >
+                      {/* Top Landscape Cover Image */}
+                      <div className="w-full aspect-[16/10] sm:aspect-[16/9] md:aspect-[2/1] rounded-xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 relative">
+                        <img
+                          src={leadNews.coverImage || relatedPhone?.image}
+                          alt={leadNews.title}
+                          loading="lazy"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      </div>
+
+                      {/* Category Badge & Meta */}
+                      <div className="flex items-center gap-2.5 text-xs">
+                        <span className="site-badge text-[9px] font-mono font-semibold uppercase px-1.5 py-px rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
+                          {leadNews.category || 'NEWS'}
+                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                          {leadNews.date} · {leadNews.readTime}
+                        </span>
+                        {leadNews.author && (
+                          <span className="text-xs text-slate-400 dark:text-slate-500 hidden sm:inline">
+                            · by {leadNews.author.name}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Headline */}
+                      <h3 className="post-title font-bold text-slate-900 dark:text-white text-lg sm:text-xl md:text-2xl font-['Space_Grotesk'] leading-snug group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                        {leadNews.title}
+                      </h3>
+                    </div>
+
+                    {/* 2. Vertical List of 4 Smaller News Articles Underneath */}
+                    {verticalListNews.length > 0 && (
+                      <div className="space-y-3 sm:space-y-3.5">
+                        {verticalListNews.map((post) => {
+                          const postPhone = phones.find(p => post.relatedPhoneIds?.includes(p.id));
+                          return (
+                            <div
+                              key={post.id}
+                              onClick={() => {
+                                triggerNavigation(() => {
+                                  setSelectedArticle(post);
+                                  window.scrollTo({ top: 0, behavior: 'instant' });
+                                });
+                              }}
+                              className="group p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/60 transition-all flex items-center gap-4 cursor-pointer shadow-sm hover:shadow-md"
+                            >
+                              {/* Square / Squircle Thumbnail Image */}
+                              <div className="relative w-24 sm:w-28 h-[82px] sm:h-[95px] rounded-xl overflow-hidden shrink-0 bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-inner">
+                                <img
+                                  src={post.coverImage || postPhone?.image}
+                                  alt={post.title}
+                                  loading="lazy"
+                                  decoding="async"
+                                  referrerPolicy="no-referrer"
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                              </div>
+
+                              {/* Details in Column */}
+                              <div className="flex-1 min-w-0 space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="site-badge text-[9px] font-mono font-semibold uppercase px-1.5 py-px rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
+                                    {post.category || 'NEWS'}
+                                  </span>
+                                  <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                                    {post.date}
+                                  </span>
+                                </div>
+
+                                <h4 className="post-title font-bold text-slate-900 dark:text-white text-base sm:text-lg font-['Space_Grotesk'] line-clamp-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors leading-snug">
+                                  {post.title}
+                                </h4>
                               </div>
                             </div>
                           );
@@ -477,6 +840,9 @@ function MainApp() {
             {/* 4. Quick 2-Phone Comparison Banner ("Which phone is right for you?") */}
             <QuickCompareBanner />
 
+            {/* Ad Placement: Homepage — Above Buying Guides section */}
+            <AdPlacementSlot placementId="home_above_guides" />
+
             {/* 5. Buying Guides ("Find the best phone for you") */}
             <BestCategoriesSection />
 
@@ -484,41 +850,76 @@ function MainApp() {
             <PhoneFinderSection />
 
             {/* 7. Popular Brands Strip */}
-            <section className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+            <section className="space-y-2.5">
+              <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 dark:border-slate-800">
                 <div>
-                  <span className="text-[11px] font-mono font-semibold uppercase text-emerald-600 dark:text-emerald-400">
-                    Manufacturers
-                  </span>
                   <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-['Space_Grotesk']">
-                    Popular phone brands
+                    Explore brands
                   </h2>
                 </div>
                 <button
-                  onClick={() => setActiveTab('brands')}
-                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
+                  onClick={() => {
+                    triggerNavigation(() => {
+                      setSelectedPhone(null);
+                      setSelectedArticle(null);
+                      setSelectedBrand(null);
+                      setActiveTab('brands');
+                      window.scrollTo({ top: 0, behavior: 'instant' });
+                    });
+                  }}
+                  className="text-xs font-normal text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
                 >
                   <span>All brands</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-3">
-                {brands.map((b) => (
-                  <button
-                    key={b.id}
-                    onClick={() => setActiveTab('brands')}
-                    className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-[#061a11] transition-all text-center flex flex-col items-center justify-center gap-1 group cursor-pointer shadow-sm"
-                  >
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm ${b.accentBg} group-hover:scale-105 transition-transform`}>
-                      {b.logoLetter}
-                    </div>
-                    <span className="font-bold text-slate-800 dark:text-white text-xs group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                      {b.name}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              {(() => {
+                const defaultSeedBrandNames = new Set([
+                  'apple', 'google', 'xiaomi', 'oneplus', 'honor', 'oppo', 'tcl', 'huawei', 'samsung', 'motorola',
+                  'alcatel', 'asus', 'infinix', 'iqoo', 'itel', 'oscal', 'oukitel', 'realme', 'sony', 'tecno', 'umidigi', 'vivo', 'zte'
+                ]);
+                const priorityOrder = ['Apple', 'Google', 'Xiaomi', 'OnePlus', 'Honor', 'Oppo', 'TCL', 'Huawei', 'Samsung', 'Motorola'];
+                const sortedBrands = [...brands].sort((a, b) => {
+                  const isCustomA = !defaultSeedBrandNames.has(a.name.toLowerCase()) && !defaultSeedBrandNames.has((a.slug || '').toLowerCase());
+                  const isCustomB = !defaultSeedBrandNames.has(b.name.toLowerCase()) && !defaultSeedBrandNames.has((b.slug || '').toLowerCase());
+                  if (isCustomA && !isCustomB) return -1;
+                  if (!isCustomA && isCustomB) return 1;
+                  const idxA = priorityOrder.findIndex((p) => p.toLowerCase() === a.name.toLowerCase());
+                  const idxB = priorityOrder.findIndex((p) => p.toLowerCase() === b.name.toLowerCase());
+                  if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                  if (idxA !== -1) return -1;
+                  if (idxB !== -1) return 1;
+                  return a.name.localeCompare(b.name);
+                });
+
+                return (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 sm:gap-2.5">
+                    {sortedBrands.map((b) => (
+                      <button
+                        key={b.id}
+                        onClick={() => {
+                          triggerNavigation(() => {
+                            setSelectedPhone(null);
+                            setSelectedArticle(null);
+                            setSelectedBrand(b);
+                            setActiveTab('brands');
+                            window.scrollTo({ top: 0, behavior: 'instant' });
+                          });
+                        }}
+                        className="p-2 sm:p-2.5 pb-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 hover:bg-emerald-50/40 dark:hover:bg-[#061a11] transition-all flex flex-col items-center justify-center text-center gap-1.5 group cursor-pointer shadow-sm min-w-0"
+                      >
+                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/60 shrink-0 group-hover:scale-110 transition-transform shadow-xs">
+                          <BrandLogo name={b.name} logoUrl={b.logoUrl} className="w-5 h-5" />
+                        </div>
+                        <span className="font-bold text-slate-800 dark:text-white text-xs sm:text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate w-full text-center">
+                          {b.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
             </section>
           </div>
         )}
@@ -526,19 +927,35 @@ function MainApp() {
         {/* VIEW: PHONES DATABASE */}
         {activeTab === 'phones' && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+            <SeoMeta
+              title={
+                filterState.categoryPreset
+                  ? `${filterState.categoryPreset} — Smartphone Specs & Prices | GsmScope`
+                  : filterState.searchQuery
+                    ? `"${filterState.searchQuery}" Smartphone Specs & Prices | GsmScope`
+                    : 'World Mobile Phone Database | GsmScope'
+              }
+              description="Explore the complete GsmScope smartphone database with full technical specifications, 5G bands, battery ratings, and live global prices."
+              image={sortedPhones[0]?.image || phones[0]?.image}
+              imageAlt={sortedPhones[0]?.name || 'GsmScope Smartphone Database'}
+              canonicalPath="/?tab=phones"
+            />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-['Space_Grotesk'] tracking-tight">
-                  Phone database and Nigerian prices
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk'] tracking-tight">
+                  World mobile phone database
                 </h1>
-                <p className="text-xs text-slate-300 mt-1">
-                  Every phone we track, with full specifications and prices in naira and USD. Narrow the list by brand, budget, RAM, storage, camera, battery, display or 5G.
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1">
+                  Every phone we track, with complete specifications and global prices in USD and local currencies. Filter by brand, budget, RAM, storage, camera, battery, or 5G connectivity.
                 </p>
               </div>
 
               <button
+                type="button"
                 onClick={() => setMobileFilterOpen(true)}
-                className="lg:hidden px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs font-semibold text-white flex items-center gap-2"
+                aria-expanded={mobileFilterOpen}
+                aria-haspopup="dialog"
+                className="lg:hidden px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs font-semibold text-white flex items-center gap-2 cursor-pointer"
               >
                 <SlidersHorizontal className="w-4 h-4 text-emerald-400" />
                 <span>Show filters</span>
@@ -567,33 +984,91 @@ function MainApp() {
               <PhoneFilterDrawer 
                 isMobileOpen={mobileFilterOpen} 
                 onCloseMobile={() => setMobileFilterOpen(false)} 
+                resultCount={sortedPhones.length}
               />
 
               <div className="flex-1">
                 {/* Search Bar & Quick Sort Toolbar */}
                 <div className="mb-6 p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2.5">
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                    {/* Search Bar */}
+                    {/* Search Bar Form with Predictive Search */}
                     <div className="relative flex-1">
-                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
-                      <input
-                        type="text"
-                        value={filterState.searchQuery}
-                        onChange={(e) => setFilterState((prev) => ({ ...prev, searchQuery: e.target.value }))}
-                        placeholder="Search phones by model, brand, processor..."
-                        aria-label="Search phones in database"
-                        className="w-full pl-10 pr-9 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-xs sm:text-sm transition-colors"
-                      />
-                      {filterState.searchQuery && (
+                      <form onSubmit={handleDbSearchSubmit} className="relative flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={filterState.searchQuery}
+                            onFocus={() => setDbSearchPredictiveOpen(true)}
+                            onChange={(e) => {
+                              setFilterState((prev) => ({ ...prev, searchQuery: e.target.value }));
+                              setDbSearchPredictiveOpen(true);
+                              setDbSearchPredictiveIndex(-1);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'ArrowDown') {
+                                e.preventDefault();
+                                setDbSearchPredictiveOpen(true);
+                                setDbSearchPredictiveIndex((prev) => (prev < 5 ? prev + 1 : 0));
+                              } else if (e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                setDbSearchPredictiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
+                              } else if (e.key === 'Escape') {
+                                setDbSearchPredictiveOpen(false);
+                              }
+                            }}
+                            placeholder="Search phones by model, brand, processor..."
+                            aria-label="Search phones in database"
+                            className="w-full pl-10 pr-9 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-xs sm:text-sm transition-colors"
+                          />
+                          {filterState.searchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFilterState((prev) => ({ ...prev, searchQuery: '' }));
+                                setDbSearchPredictiveOpen(false);
+                              }}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer"
+                              title="Clear search"
+                              aria-label="Clear search"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                         <button
-                          onClick={() => setFilterState((prev) => ({ ...prev, searchQuery: '' }))}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer"
-                          title="Clear search"
-                          aria-label="Clear search"
+                          type="submit"
+                          disabled={isDbSearching}
+                          className="px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-sm"
                         >
-                          <X className="w-4 h-4" />
+                          {isDbSearching ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Search className="w-3.5 h-3.5" />
+                          )}
+                          <span className="hidden sm:inline">{isDbSearching ? 'Searching...' : 'Search'}</span>
                         </button>
-                      )}
+                      </form>
+
+                      {/* Predictive Search Suggestions Dropdown */}
+                      <PredictiveSearchDropdown
+                        searchTerm={filterState.searchQuery}
+                        isOpen={dbSearchPredictiveOpen}
+                        onClose={() => setDbSearchPredictiveOpen(false)}
+                        selectedIndex={dbSearchPredictiveIndex}
+                        setSelectedIndex={setDbSearchPredictiveIndex}
+                        onSelectPhone={(phone) => {
+                          setSelectedArticle(null);
+                          setSelectedBrand(null);
+                          setSelectedPhone(phone);
+                          setDbSearchPredictiveOpen(false);
+                          window.scrollTo({ top: 0, behavior: 'instant' });
+                        }}
+                        onSubmitSearch={(query) => {
+                          setFilterState((prev) => ({ ...prev, searchQuery: query }));
+                          setDbSearchPredictiveOpen(false);
+                        }}
+                      />
                     </div>
 
                     {/* Quick Sort Dropdown Menu */}
@@ -627,7 +1102,7 @@ function MainApp() {
                     <div className="flex items-center gap-2">
                       <span>Showing <strong className="text-slate-800 dark:text-white font-mono">{sortedPhones.length}</strong> matching phones</span>
                       {filterState.searchQuery && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 text-[10px] font-mono">
+                        <span className="site-badge inline-flex items-center gap-1 px-1.5 py-px rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 text-[9px] font-mono">
                           Query: &ldquo;{filterState.searchQuery}&rdquo;
                         </span>
                       )}
@@ -669,35 +1144,40 @@ function MainApp() {
                       return (
                         <div
                           onClick={() => {
-                            setSelectedPhone(leadPhone);
-                            window.scrollTo({ top: 0, behavior: 'instant' });
+                            triggerNavigation(() => {
+                              setSelectedPhone(leadPhone);
+                              window.scrollTo({ top: 0, behavior: 'instant' });
+                            });
                           }}
-                          className="group rounded-3xl bg-white dark:bg-slate-900 border-2 border-emerald-500/40 hover:border-emerald-500 p-6 sm:p-8 flex flex-col lg:flex-row items-center justify-between gap-8 shadow-xl relative overflow-hidden cursor-pointer transition-all"
+                          className="group rounded-3xl bg-white dark:bg-slate-900 border-2 border-emerald-500/40 hover:border-emerald-500 p-6 sm:p-8 flex flex-col gap-4 shadow-xl relative overflow-hidden cursor-pointer transition-all"
                         >
-                          <div className="flex-1 space-y-4">
+                          <div className="w-full space-y-4">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono uppercase tracking-wider font-bold text-white bg-emerald-600 px-2.5 py-1 rounded-md">
+                              <span className="site-badge text-[9px] font-mono uppercase tracking-wider font-bold text-white bg-emerald-600 px-1.5 py-px rounded">
                                 Top Result
                               </span>
-                              <span className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/90 border border-emerald-200 dark:border-emerald-500/30 px-2 py-0.5 rounded">
-                                {leadPhone.brand} · {leadPhone.releaseYear}
-                              </span>
-                              <span className="text-xs text-amber-500 font-mono font-bold ml-auto flex items-center gap-1">
-                                ★ {leadPhone.rating.toFixed(1)} ({leadPhone.reviewsCount} reviews)
+                              <span className="site-badge text-[9px] font-mono font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/90 border border-emerald-200 dark:border-emerald-500/30 px-1.5 py-px rounded">
+                                {leadPhone.brand}
                               </span>
                             </div>
 
-                            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk'] tracking-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                            <h2 className="post-title text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk'] tracking-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                               {leadPhone.name}
                             </h2>
 
-                            <div className="flex items-baseline gap-3">
-                              <span className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
-                                {currency === 'USD' ? formatUSD(leadPhone.priceUSD) : formatNaira(leadPhone.priceNGN)}
-                              </span>
-                              <span className="text-sm font-mono text-slate-500 dark:text-slate-400 tabular-nums">
-                                ({currency === 'USD' ? formatNaira(leadPhone.priceNGN) : formatUSD(leadPhone.priceUSD)})
-                              </span>
+                            {/* Featured Phone Image Showcase below phone name (decorated like HeroSection) */}
+                            <div className="w-full my-1.5 sm:my-2 flex items-center justify-center">
+                              <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-44 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
+                                <div className="absolute inset-0 bg-emerald-500/10 rounded-2xl blur-xl group-hover:bg-emerald-500/25 transition-all pointer-events-none" />
+                                <img
+                                  src={leadPhone.image}
+                                  alt={leadPhone.name}
+                                  loading="lazy"
+                                  decoding="async"
+                                  referrerPolicy="no-referrer"
+                                  className="w-full h-full object-cover rounded-2xl group-hover:scale-105 transition-transform duration-500"
+                                />
+                              </div>
                             </div>
 
                             {/* Key specs summary grid */}
@@ -725,17 +1205,17 @@ function MainApp() {
                             </div>
 
                             {/* Actions */}
-                            <div className="flex items-center gap-3 pt-2">
+                            <div className="flex items-center justify-center gap-3 pt-2">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedPhone(leadPhone);
                                   window.scrollTo({ top: 0, behavior: 'instant' });
                                 }}
-                                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-md cursor-pointer"
+                                className="px-4 sm:px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-normal flex items-center gap-1 shadow-md cursor-pointer whitespace-nowrap shrink-0"
                               >
-                                <Eye className="w-4 h-4" />
-                                <span>View full specs</span>
+                                <Eye className="w-3.5 h-3.5 shrink-0" />
+                                <span className="whitespace-nowrap">Full specs</span>
                               </button>
                               <button
                                 onClick={(e) => {
@@ -743,37 +1223,30 @@ function MainApp() {
                                   if (inComp) removeFromCompare(leadPhone.id);
                                   else addToCompare(leadPhone.id);
                                 }}
-                                className={`px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                                className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-normal flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                                   inComp 
                                     ? 'bg-emerald-600 text-white' 
                                     : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:border-emerald-500'
                                 }`}
                               >
-                                <Scale className="w-4 h-4 text-emerald-500" />
-                                <span>{inComp ? 'Comparing' : 'Compare'}</span>
+                                <Scale className="w-4 h-4 text-emerald-500 shrink-0" />
+                                <span className="whitespace-nowrap">{inComp ? 'Comparing' : 'Compare'}</span>
                               </button>
                             </div>
-                          </div>
-
-                          {/* Image */}
-                          <div className="w-48 sm:w-64 h-56 sm:h-72 flex items-center justify-center shrink-0">
-                            <img
-                              src={leadPhone.image}
-                              alt={leadPhone.name}
-                              referrerPolicy="no-referrer"
-                              className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500 drop-shadow-[0_15px_30px_rgba(0,0,0,0.4)]"
-                            />
                           </div>
                         </div>
                       );
                     })()}
+
+                    {/* Ad Placement: Phones Page — Below Top Result */}
+                    <AdPlacementSlot placementId="phones_below_top_result" />
 
                     {/* 2. Rest Posts Beneath It */}
                     {sortedPhones.length > 1 && (
                       <div className="space-y-4">
                         <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
                           <h3 className="font-bold text-slate-900 dark:text-white text-base font-['Space_Grotesk']">
-                            All Matching Smartphones ({sortedPhones.length - 1} more)
+                            All Matching Phones ({sortedPhones.length - 1} more)
                           </h3>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -787,33 +1260,52 @@ function MainApp() {
                 )}
               </div>
             </div>
+
+            {/* Phone Finder Tool ("Not sure what to buy?") */}
+            <PhoneFinderSection />
           </div>
         )}
 
         {/* VIEW: BEST PHONES */}
         {activeTab === 'best-phones' && (
           <div className="space-y-8">
-            <div className="pb-4 border-b border-slate-800">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-['Space_Grotesk'] tracking-tight">
-                Best phones in Nigeria
+            <SeoMeta
+              title="Best Phones & Buying Shortlists by Budget and Camera | GsmScope"
+              description="Discover the highest-rated smartphones in the GsmScope database ranked by camera quality, battery endurance, gaming performance, and budget."
+              image={phones.find((p) => p.rating >= 4.7)?.image || phones[0]?.image}
+              imageAlt="Best Smartphones & Buying Guides on GsmScope"
+              canonicalPath="/?tab=best-phones"
+            />
+            <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk'] tracking-tight">
+                Best Phones &amp; Buying Guides
               </h1>
-              <p className="text-xs text-slate-300 mt-1">
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1">
                 Shortlists built from the GsmScope database and updated as new models and prices come in. Jump to the category that matches what you care about most.
               </p>
             </div>
 
             <BestCategoriesSection />
 
+            {/* Ad Placement: Best Phones Page — Above Top Rated Phones */}
+            <AdPlacementSlot placementId="best_above_top_rated" />
+
             {/* Highest Rated - One Big Grid Display + Rest Beneath It */}
             {(() => {
-              const topRated = phones.filter(p => p.rating >= 4.7);
+              const topRated = phones.filter(
+                (p) =>
+                  p.rating >= 4.5 ||
+                  p.isFeatured ||
+                  (p.categories || []).includes('flagship') ||
+                  (p.categories || []).includes('top-rated')
+              );
               if (topRated.length === 0) return null;
               const leadTop = topRated[0];
               const restTop = topRated.slice(1);
               return (
                 <div className="space-y-6 pt-4">
-                  <h2 className="text-xl font-bold text-white font-['Space_Grotesk']">
-                    Highest Rated in our Database
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white font-['Space_Grotesk']">
+                    Top Rated Phones
                   </h2>
 
                   {/* One Big Grid Display */}
@@ -822,43 +1314,45 @@ function MainApp() {
                       setSelectedPhone(leadTop);
                       window.scrollTo({ top: 0, behavior: 'instant' });
                     }}
-                    className="p-6 sm:p-8 rounded-3xl bg-slate-900 border-2 border-emerald-500/40 hover:border-emerald-500 flex flex-col md:flex-row items-center justify-between gap-6 cursor-pointer group shadow-xl transition-all"
+                    className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border-2 border-emerald-500/40 hover:border-emerald-500 flex flex-col gap-4 cursor-pointer group shadow-xl transition-all"
                   >
-                    <div className="space-y-3 flex-1">
+                    <div className="space-y-4 w-full">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono uppercase tracking-wider font-bold text-white bg-emerald-600 px-2 py-0.5 rounded">
-                          #1 Highest Rated
+                        <span className="site-badge text-[9px] font-mono uppercase tracking-wider font-bold text-white bg-emerald-600 px-1.5 py-px rounded">
+                          Top Rated
                         </span>
-                        <span className="text-xs text-slate-400 font-mono">
-                          {leadTop.brand} · {leadTop.releaseYear}
-                        </span>
-                        <span className="text-xs text-amber-400 font-mono font-bold ml-auto flex items-center gap-1">
-                          ★ {leadTop.rating.toFixed(1)}
+                        <span className="text-xs text-amber-500 dark:text-amber-400 font-mono font-bold ml-auto flex items-center gap-1">
+                          {leadTop.rating > 0 ? `★ ${leadTop.rating.toFixed(1)}` : '★ Featured'}
                         </span>
                       </div>
-                      <h3 className="text-2xl sm:text-3xl font-extrabold text-white font-['Space_Grotesk'] group-hover:text-emerald-400 transition-colors">
+                      <h3 className="post-title text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk'] group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                         {leadTop.name}
                       </h3>
-                      <div className="text-xl font-bold font-mono text-emerald-400">
-                        {currency === 'USD' ? formatUSD(leadTop.priceUSD) : formatNaira(leadTop.priceNGN)}
+
+                      {/* Featured Phone Image Showcase below phone name (decorated like HeroSection) */}
+                      <div className="w-full my-1.5 sm:my-2 flex items-center justify-center">
+                        <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-44 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
+                          <div className="absolute inset-0 bg-emerald-500/10 rounded-2xl blur-xl group-hover:bg-emerald-500/25 transition-all pointer-events-none" />
+                          <img
+                            src={leadTop.image}
+                            alt={leadTop.name}
+                            loading="lazy"
+                            decoding="async"
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover rounded-2xl group-hover:scale-105 transition-transform duration-500"
+                          />
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-300">
+
+                      <p className="text-xs text-slate-600 dark:text-slate-300">
                         {leadTop.keyHighlights.display} · {leadTop.keyHighlights.processor} · {leadTop.keyHighlights.battery}
                       </p>
                       <div className="pt-2">
-                        <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                        <span className="text-xs font-normal text-emerald-600 dark:text-emerald-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
                           <span>View device specifications</span>
                           <ArrowRight className="w-3.5 h-3.5" />
                         </span>
                       </div>
-                    </div>
-                    <div className="w-48 h-56 flex items-center justify-center shrink-0">
-                      <img
-                        src={leadTop.image}
-                        alt={leadTop.name}
-                        referrerPolicy="no-referrer"
-                        className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
-                      />
                     </div>
                   </div>
 
@@ -876,64 +1370,40 @@ function MainApp() {
           </div>
         )}
 
-        {/* VIEW: COMPARE */}
-        {activeTab === 'compare' && <CompareView />}
+        <Suspense fallback={<div className="py-16 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div>}>
+          {/* VIEW: COMPARE */}
+          {activeTab === 'compare' && <CompareView />}
 
-        {/* VIEW: NEWS */}
-        {activeTab === 'news' && <NewsView />}
+          {/* VIEW: NEWS */}
+          {activeTab === 'news' && <NewsView />}
 
-        {/* VIEW: REVIEWS */}
-        {activeTab === 'reviews' && <ReviewsView />}
+          {/* VIEW: REVIEWS (Review Articles Archive) */}
+          {activeTab === 'reviews' && <ReviewArticlesView />}
 
-        {/* VIEW: GUIDES */}
-        {activeTab === 'guides' && <GuidesView />}
+          {/* VIEW: USER REVIEWS */}
+          {activeTab === 'user-reviews' && <ReviewsView />}
 
-        {/* VIEW: BRANDS */}
-        {activeTab === 'brands' && <BrandsView />}
+          {/* VIEW: GUIDES */}
+          {activeTab === 'guides' && <GuidesView />}
 
-        {/* VIEW: ABOUT */}
-        {activeTab === 'about' && <AboutView />}
+          {/* VIEW: BRANDS */}
+          {activeTab === 'brands' && <BrandsView />}
 
-        {/* VIEW: CONTACT */}
-        {activeTab === 'contact' && <ContactView />}
+          {/* VIEW: ABOUT */}
+          {activeTab === 'about' && <AboutView />}
 
-        {/* VIEW: ADVERTISE */}
-        {activeTab === 'advertise' && <AdvertiseView />}
+          {/* VIEW: CONTACT */}
+          {activeTab === 'contact' && <ContactView />}
 
-        {/* VIEW: ADMIN STUDIO (Access via /#admin) */}
-        {activeTab === 'admin' && (
-          !isAdminAuthenticated ? (
-            <AdminLoginView />
-          ) : (
-            <div className="py-12 flex justify-center">
-              <div className="p-8 rounded-2xl bg-slate-900 border border-slate-800 max-w-lg w-full text-center space-y-4 shadow-xl">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-950/80 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
-                  <ShieldCheck className="w-7 h-7" />
-                </div>
-                <h2 className="text-xl font-bold text-white font-['Space_Grotesk']">
-                  Administrator Session Active
-                </h2>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  You are signed in to the GsmScope Administration Studio. The full management modal is active. You can manage smartphones, adjust Nigerian prices, publish tech reviews and articles, or moderate comments.
-                </p>
-                <div className="flex items-center justify-center gap-3 pt-2">
-                  <button
-                    onClick={() => setActiveTab('home')}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors"
-                  >
-                    View Public Site
-                  </button>
-                  <button
-                    onClick={() => adminLogout()}
-                    className="px-4 py-2 bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800/60 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
-                  >
-                    Log Out
-                  </button>
-                </div>
-              </div>
-            </div>
-          )
-        )}
+          {/* VIEW: ADVERTISE */}
+          {activeTab === 'advertise' && <AdvertiseView />}
+
+          {/* VIEW: PRIVACY POLICY */}
+          {activeTab === 'privacy' && <PrivacyPolicyView />}
+
+          {/* VIEW: TERMS OF SERVICE */}
+          {activeTab === 'terms' && <TermsOfServiceView />}
+        </Suspense>
           </>
         )}
       </main>
@@ -941,30 +1411,49 @@ function MainApp() {
       {/* Floating Bottom Quick-Compare Bar */}
       {compareList.length > 0 && activeTab !== 'compare' && (
         <aside aria-label="Comparison quick dock" className="fixed bottom-4 right-4 z-30">
-          <button
-            onClick={() => setActiveTab('compare')}
-            className="flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-2xl border border-emerald-400/40 cursor-pointer transition-transform hover:scale-105"
-          >
-            <Scale className="w-4 h-4" />
-            <span>Compare Selected ({compareList.length})</span>
-            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-          </button>
+          <div className="flex items-center gap-2 pl-4 pr-2 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-2xl border border-emerald-400/40 transition-transform hover:scale-105">
+            <button
+              onClick={() => {
+                setSelectedPhone(null);
+                setSelectedArticle(null);
+                setActiveTab('compare');
+              }}
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <Scale className="w-4 h-4" />
+              <span>Compare Selected ({compareList.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                clearCompare(true);
+              }}
+              className="p-1.5 rounded-full hover:bg-black/25 text-white transition-colors cursor-pointer ml-1"
+              title="Clear selection"
+              aria-label="Clear compare selection"
+            >
+              <X className="w-4.5 h-4.5 stroke-[2.2]" />
+            </button>
+          </div>
         </aside>
       )}
 
-      {/* Admin Dashboard Workspace */}
-      <AdminDashboardModal />
-
       {/* Footer with GsmScope columns and newsletter */}
       <Footer />
+
+      {/* Bottom Privacy Notice */}
+      <PrivacyNotice />
     </div>
   );
 }
 
 export default function App() {
   return (
-    <AppProvider>
-      <MainApp />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <MainApp />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
