@@ -1,6 +1,5 @@
 {
   "name": "GsmScope — Phone Specs and Prices in Naira and USD",
   "description": "Browse smartphone specifications with current Nigerian naira and USD prices, compare devices, read technology news and find the best phones for every budget.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "requestFramePermissions": []
 }

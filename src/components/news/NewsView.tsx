@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { subscribeNewsletterApi } from '../../services/api';
 import { useSeoMeta } from '../seo/SeoMeta';
 import AdPlacementSlot from '../common/AdPlacementSlot';
 import { 
@@ -11,9 +10,7 @@ import {
   Eye, 
   TrendingUp, 
   Flame, 
-  Sparkles, 
-  Check,
-  Loader2
+  Sparkles
 } from 'lucide-react';
 
 export default function NewsView() {
@@ -31,26 +28,22 @@ export default function NewsView() {
   } = useApp();
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [newsletterEmail, setNewsletterEmail] = useState('');
-  const [newsletterDone, setNewsletterDone] = useState(false);
-  const [newsletterMessage, setNewsletterMessage] = useState('Confirmation email sent!');
-  const [isSubscribing, setIsSubscribing] = useState(false);
 
-  const categories = ['All', 'Phone News', 'Reviews', 'Buying Guides', 'Launch', 'Tech Updates'];
+  const categories = ['All', 'News', 'Reviews', 'Buying Guide', 'Launch'];
 
   const filteredArticles = selectedCategory === 'All'
     ? articles
     : articles.filter(a => {
-        if (selectedCategory === 'Phone News') {
-          return a.category === 'Phone News' || a.category === 'Smartphone News' || a.category === 'News';
+        if (selectedCategory === 'News') {
+          return a.category === 'News' || a.category === 'Phone News' || a.category === 'Smartphone News' || a.category === 'Tech Updates';
         }
         if (selectedCategory === 'Reviews') {
           return a.category === 'Reviews' || a.category === 'Review';
         }
-        if (selectedCategory === 'Buying Guides') {
+        if (selectedCategory === 'Buying Guide') {
           return (
-            a.category === 'Buying Guides' ||
             a.category === 'Buying Guide' ||
+            a.category === 'Buying Guides' ||
             a.category === 'FRP & Servicing Tools' ||
             a.category === 'Charging & Battery' ||
             a.category === 'Tips & Security'
@@ -80,46 +73,6 @@ export default function NewsView() {
   const popularPhones = [...phones]
     .sort((a, b) => (b.viewsCount || 0) - (a.viewsCount || 0))
     .slice(0, 6);
-
-  const handleSubscribe = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubscribing) return;
-    const email = newsletterEmail.trim();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-      showGlobalToast('Please enter a valid email address.', 'error');
-      return;
-    }
-
-    setIsSubscribing(true);
-    startGlobalLoading('Subscribing to alerts');
-
-    try {
-      const [result] = await Promise.all([
-        subscribeNewsletterApi(email),
-        new Promise((res) => setTimeout(res, 400))
-      ]);
-      if (!result.success) {
-        showGlobalToast(result.message || 'Please enter a valid email address.', 'error');
-        return;
-      }
-      setNewsletterMessage(result.message || `Confirmation email sent to ${email}!`);
-      setNewsletterDone(true);
-      setNewsletterEmail('');
-      showGlobalToast(
-        result.message || `Confirmation email sent to ${email}!`,
-        result.alreadySubscribed ? 'info' : 'success'
-      );
-      setTimeout(() => {
-        setNewsletterDone(false);
-      }, 5000);
-    } catch {
-      showGlobalToast('Failed to subscribe. Please try again.', 'error');
-    } finally {
-      stopGlobalLoading();
-      setIsSubscribing(false);
-    }
-  };
 
   return (
     <div className="space-y-8 animate-fadeIn pb-12">
@@ -375,63 +328,6 @@ export default function NewsView() {
             </div>
           </div>
 
-          {/* SIDEBAR WIDGET 3: Newsletter & Alert Signup */}
-          <div className="p-5 rounded-2xl bg-gradient-to-br from-[#061a11] to-[#0a2a1a] border border-emerald-950 text-white space-y-3 shadow-lg">
-            <span className="text-[10px] font-mono uppercase tracking-wider font-semibold text-emerald-400">
-              Weekly Digest
-            </span>
-            <h4 className="font-bold text-sm font-['Space_Grotesk']">
-              Get Global Tech &amp; Price Alerts
-            </h4>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Never miss a price drop on flagship or budget smartphones, tech breakthroughs, and benchmark comparisons.
-            </p>
-
-            <form onSubmit={handleSubscribe} noValidate className="space-y-2 pt-2">
-              {newsletterDone ? (
-                <div className="p-2.5 rounded-lg bg-emerald-950 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center justify-between gap-1.5">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Check className="w-4 h-4 shrink-0" />
-                    <span className="leading-snug">{newsletterMessage}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setNewsletterDone(false)}
-                    className="text-[10px] font-normal underline hover:text-white shrink-0 cursor-pointer"
-                  >
-                    Done
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <input
-                    type="email"
-                    required
-                    disabled={isSubscribing}
-                    value={newsletterEmail}
-                    onChange={(e) => setNewsletterEmail(e.target.value)}
-                    placeholder="Enter email address..."
-                    aria-label="Email address for price and tech alerts"
-                    className="w-full px-3 py-2 bg-slate-950/80 border border-emerald-900/80 rounded-lg text-xs text-white placeholder-slate-400 focus:outline-none focus:border-emerald-400 disabled:opacity-60"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isSubscribing}
-                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold rounded-lg text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    {isSubscribing ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Subscribing...</span>
-                      </>
-                    ) : (
-                      <span>Subscribe to Alerts</span>
-                    )}
-                  </button>
-                </>
-              )}
-            </form>
-          </div>
 
           {/* SIDEBAR WIDGET 4: Editorial Standards */}
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs space-y-2">

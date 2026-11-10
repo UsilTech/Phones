@@ -28,7 +28,7 @@ import {
 interface GuideItem {
   id: string;
   title: string;
-  category: 'Buying Guide' | 'FRP & Servicing Tools' | 'Charging & Battery' | 'Tips & Security';
+  category: 'Buying Guide';
   brandTag?: string;
   summary: string;
   content: string[];
@@ -48,26 +48,43 @@ export default function GuidesView() {
 
   const [commentName, setCommentName] = useState('');
   const [commentText, setCommentText] = useState('');
-  const [comments, setComments] = useState<Array<{ id: string; name: string; text: string; date: string }>>([
+  const defaultGuideComments = [
     {
-      id: 'gc1',
+      id: 'gc-1',
       name: 'Emeka Okafor',
-      text: 'Very helpful breakdown. Checking the sealed box and verifying the charger wattage saved me from buying a repackaged unit.',
-      date: '2 days ago'
+      text: 'Very clear and practical breakdown. Tested this workflow in our servicing shop and it worked smoothly.',
+      date: '3 hours ago'
     },
     {
-      id: 'gc2',
+      id: 'gc-2',
       name: 'Sadiq Bello',
-      text: 'Clear and practical guide. Works as described on current security patch levels.',
-      date: 'Yesterday'
+      text: 'Thanks for keeping these guides updated with current security patches and battery care advice.',
+      date: '1 day ago'
     }
-  ]);
+  ];
+  const [comments, setComments] = useState<Array<{ id: string; name: string; text: string; date: string }>>(defaultGuideComments);
   const [commentSubmitted, setCommentSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (!activeGuide?.id) {
+      setComments(defaultGuideComments);
+      return;
+    }
+    const isSeedGuide = /^guide-\d+$/.test(activeGuide.id);
+    const fallback = isSeedGuide ? defaultGuideComments : [];
+    try {
+      const raw = localStorage.getItem('gsmscope_guide_comments_v1');
+      const map = raw ? JSON.parse(raw) : {};
+      setComments(Array.isArray(map[activeGuide.id]) ? map[activeGuide.id] : fallback);
+    } catch {
+      setComments(fallback);
+    }
+  }, [activeGuide?.id]);
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (commentName.trim() && commentText.trim()) {
-      setComments([
+    if (commentName.trim() && commentText.trim() && activeGuide) {
+      const nextComments = [
         ...comments,
         {
           id: 'gc-' + Date.now(),
@@ -75,7 +92,14 @@ export default function GuidesView() {
           text: commentText.trim(),
           date: 'Just now'
         }
-      ]);
+      ];
+      setComments(nextComments);
+      try {
+        const raw = localStorage.getItem('gsmscope_guide_comments_v1');
+        const map = raw ? JSON.parse(raw) : {};
+        map[activeGuide.id] = nextComments;
+        localStorage.setItem('gsmscope_guide_comments_v1', JSON.stringify(map));
+      } catch {}
       setCommentSubmitted(true);
       setCommentName('');
       setCommentText('');
@@ -150,7 +174,7 @@ export default function GuidesView() {
     {
       id: 'guide-2',
       title: 'How to Enable ADB on Samsung Using Quick Share (FRP Bypass & Servicing)',
-      category: 'FRP & Servicing Tools',
+      category: 'Buying Guide',
       brandTag: 'Samsung',
       summary: 'A step-by-step technical guide to enabling Android Debug Bridge (ADB) on modern Samsung One UI devices using TalkBack, Quick Share, and official diagnostic tools.',
       content: [
@@ -166,7 +190,7 @@ export default function GuidesView() {
     {
       id: 'guide-3',
       title: 'BFT Tool: Free Android Tool for FRP Bypass & Factory Reset',
-      category: 'FRP & Servicing Tools',
+      category: 'Buying Guide',
       brandTag: 'Universal Android',
       summary: 'A comprehensive guide to BFT Tool, a Windows-based Android servicing utility supporting FRP removal, factory reset, and account servicing for Samsung, Xiaomi, and other Android devices.',
       content: [
@@ -182,7 +206,7 @@ export default function GuidesView() {
     {
       id: 'guide-4',
       title: 'SamFw Tool: Free Android Tool for FRP Bypass & Mi Account',
-      category: 'FRP & Servicing Tools',
+      category: 'Buying Guide',
       brandTag: 'Samsung & Xiaomi',
       summary: 'A comprehensive walkthrough of SamFw FRP Tool, a trusted servicing utility supporting Samsung test mode (*#0*#), Knox diagnostics, and Xiaomi sideload operations.',
       content: [
@@ -197,7 +221,7 @@ export default function GuidesView() {
     {
       id: 'guide-5',
       title: 'Fast charging explained: what 45W, 90W and 120W really mean',
-      category: 'Charging & Battery',
+      category: 'Buying Guide',
       brandTag: 'Battery & Power',
       summary: 'Bigger numbers charge faster, but only with the right charger, cable and temperature control. Here is how thermal conditions affect fast charging longevity.',
       content: [
@@ -212,7 +236,7 @@ export default function GuidesView() {
     {
       id: 'guide-6',
       title: 'Free Samsung, Redmi, Tecno & Infinix FRP Bypass Servicing Tools',
-      category: 'FRP & Servicing Tools',
+      category: 'Buying Guide',
       brandTag: 'Multi-Brand',
       summary: 'A curated list of verified free Android servicing tools including SAMFW Tool, BFT Tool, and MTK Client for diagnosing and restoring locked Android hardware.',
       content: [
@@ -227,7 +251,7 @@ export default function GuidesView() {
     {
       id: 'guide-7',
       title: 'How to Enable ADB on Samsung KG Locked Phones',
-      category: 'FRP & Servicing Tools',
+      category: 'Buying Guide',
       brandTag: 'Samsung Knox Guard',
       summary: 'A practical tutorial on how technicians analyze Knox Guard (KG) locked devices, verify carrier leasing status, and enable ADB for troubleshooting.',
       content: [
@@ -253,15 +277,7 @@ export default function GuidesView() {
       );
     })
     .map((a) => {
-      const rawCat = (a.category || '').trim();
-      const mappedCat: GuideItem['category'] =
-        rawCat === 'FRP & Servicing Tools'
-          ? 'FRP & Servicing Tools'
-          : rawCat === 'Charging & Battery'
-          ? 'Charging & Battery'
-          : rawCat === 'Tips & Security'
-          ? 'Tips & Security'
-          : 'Buying Guide';
+      const mappedCat: GuideItem['category'] = 'Buying Guide';
       const paragraphs = (a.content || a.summary || '')
         .split(/\n+/)
         .map((p) => p.trim())
@@ -298,7 +314,7 @@ export default function GuidesView() {
     ),
   ];
 
-  const categories = ['All', 'Buying Guide', 'FRP & Servicing Tools', 'Charging & Battery', 'Tips & Security'];
+  const categories = ['All', 'Buying Guide'];
 
   const filteredGuides = combinedGuides.filter(g => {
     if (selectedCategory !== 'All' && g.category !== selectedCategory) return false;

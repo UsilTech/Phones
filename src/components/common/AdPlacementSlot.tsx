@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AdPlacementId, ActiveTab } from '../../types';
 import { DEFAULT_AD_PLACEMENTS } from '../../data/seedData';
@@ -12,6 +12,7 @@ interface AdPlacementSlotProps {
 export default function AdPlacementSlot({ placementId, className = '' }: AdPlacementSlotProps) {
   const {
     adSettings,
+    mediaLibrary,
     setActiveTab,
     setSelectedPhone,
     setSelectedArticle,
@@ -21,12 +22,44 @@ export default function AdPlacementSlot({ placementId, className = '' }: AdPlace
   } = useApp();
 
   const scriptContainerRef = useRef<HTMLDivElement>(null);
+  const [imgFallbackActive, setImgFallbackActive] = useState(false);
+  const [imgFailedCompletely, setImgFailedCompletely] = useState(false);
 
   const defaultConfig = DEFAULT_AD_PLACEMENTS[placementId];
   const savedConfig = adSettings?.placements?.[placementId];
-  const placement = savedConfig ? { ...defaultConfig, ...savedConfig } : defaultConfig;
+  const placement = savedConfig
+    ? {
+        ...defaultConfig,
+        ...savedConfig,
+        name: defaultConfig.name,
+        pageLabel: defaultConfig.pageLabel,
+        positionLabel: defaultConfig.positionLabel,
+      }
+    : defaultConfig;
 
   const isEnabled = Boolean(placement?.enabled);
+  const rawImgUrl = (placement?.imageUrl || '').trim();
+  const matchedMediaDataUrl = rawImgUrl
+    ? mediaLibrary?.find((m) => m && m.url === rawImgUrl && m.dataUrl)?.dataUrl
+    : undefined;
+  const backupDataUrl = (placement?.imageDataUrl || matchedMediaDataUrl || '').trim();
+  const activeImageSrc = imgFallbackActive
+    ? backupDataUrl
+    : rawImgUrl || backupDataUrl;
+
+  useEffect(() => {
+    setImgFallbackActive(false);
+    setImgFailedCompletely(false);
+  }, [rawImgUrl, backupDataUrl]);
+
+  const handleImageError = () => {
+    if (!imgFallbackActive && backupDataUrl && activeImageSrc !== backupDataUrl) {
+      setImgFallbackActive(true);
+    } else {
+      setImgFailedCompletely(true);
+    }
+  };
+
   const showScript =
     isEnabled &&
     (placement.adType === 'script' || placement.adType === 'both') &&
@@ -103,10 +136,21 @@ export default function AdPlacementSlot({ placementId, className = '' }: AdPlace
     return null;
   }
 
-  const showBanner = placement.adType === 'banner' || placement.adType === 'both';
+  const showBanner =
+    placement.adType === 'banner' ||
+    placement.adType === 'both' ||
+    !placement.scriptCode?.trim();
   const hasLearnMore = Boolean(placement.showLearnMore);
   const learnMoreLabel = (placement.learnMoreText || 'Learn More').trim() || 'Learn More';
   const targetUrl = (placement.learnMoreUrl || '').trim();
+  const hasVisibleImage = Boolean(activeImageSrc && !imgFailedCompletely);
+
+  // Ensure an enabled banner slot never collapses to 0px if all text fields were cleared and no image is active
+  const displayBadgeText =
+    placement.badgeText || (!hasVisibleImage ? defaultConfig.badgeText || 'Featured' : '');
+  const displayTitle =
+    placement.title || (!hasVisibleImage && !placement.subtitle ? defaultConfig.title : '');
+  const displaySubtitle = placement.subtitle || '';
 
   const handleLearnMoreClick = (e: React.MouseEvent) => {
     if (!targetUrl) return;
@@ -185,55 +229,83 @@ export default function AdPlacementSlot({ placementId, className = '' }: AdPlace
 
   if (placementId === 'header_top') {
     return (
-      <aside
-        aria-label={placement.badgeText || 'Header Advertisement'}
-        data-ad-placement="header_top"
+      <div
+        role="region"
+        aria-label={displayBadgeText || 'Top Partner Highlight'}
+        data-slot-position="header_top"
         className={`w-full bg-gradient-to-r from-[#031d10] via-[#072417] to-[#031d10] border-b border-emerald-500/25 text-white transition-all shadow-inner ${className}`}
       >
         {/* Banner / Sponsored Content View */}
         {showBanner && (
-          <div className="w-full px-[calc(1rem-5px)] sm:px-[calc(2rem-5px)] lg:px-[calc(3rem-5px)] py-2 sm:py-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                {placement.imageUrl && (
-                  <img
-                    src={placement.imageUrl}
-                    alt={placement.title || 'Header Sponsor'}
-                    className="h-7 sm:h-8 w-auto rounded object-cover border border-emerald-500/30 shrink-0"
-                  />
-                )}
-                <span className="font-mono text-[10px] uppercase font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/40 px-2 py-0.5 rounded-full shrink-0">
-                  {placement.badgeText || 'GSMSCOPE LIVE'}
-                </span>
-                <span className="font-semibold text-white truncate">
-                  {placement.title}
-                </span>
-                {placement.subtitle && (
-                  <span className="text-slate-300 hidden md:inline truncate text-[11px]">
-                    — {placement.subtitle}
-                  </span>
-                )}
-              </div>
-
-              {hasLearnMore && (
-                <div className="shrink-0">
+          <div className="w-full px-[calc(1rem-5px)] sm:px-[calc(2rem-5px)] lg:px-[calc(3rem-5px)] py-2 sm:py-2.5 space-y-2">
+            {hasVisibleImage && (
+              <div className="flex items-center justify-center">
+                {targetUrl ? (
                   <a
-                    href={targetUrl || '#'}
+                    href={targetUrl}
                     target={placement.openInNewTab && /^https?:\/\//i.test(targetUrl) ? '_blank' : undefined}
                     rel={placement.openInNewTab && /^https?:\/\//i.test(targetUrl) ? 'noopener noreferrer' : undefined}
                     onClick={handleLearnMoreClick}
-                    className="px-3 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[11px] inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                    className="inline-block max-w-full cursor-pointer"
                   >
-                    <span>{learnMoreLabel}</span>
-                    {placement.openInNewTab && /^https?:\/\//i.test(targetUrl) ? (
-                      <ExternalLink className="w-3 h-3" />
-                    ) : (
-                      <ArrowRight className="w-3 h-3" />
-                    )}
+                    <img
+                      src={activeImageSrc}
+                      onError={handleImageError}
+                      alt={displayTitle || 'Header Partner'}
+                      className="w-auto h-auto max-w-full block rounded"
+                    />
                   </a>
+                ) : (
+                  <img
+                    src={activeImageSrc}
+                    onError={handleImageError}
+                    alt={displayTitle || 'Header Partner'}
+                    className="w-auto h-auto max-w-full block rounded"
+                  />
+                )}
+              </div>
+            )}
+
+            {(displayBadgeText || displayTitle || displaySubtitle || hasLearnMore) && (
+              <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  {displayBadgeText && (
+                    <span className="font-mono text-[10px] uppercase font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/40 px-2 py-0.5 rounded-full shrink-0">
+                      {displayBadgeText}
+                    </span>
+                  )}
+                  {displayTitle && (
+                    <span className="font-semibold text-white truncate">
+                      {displayTitle}
+                    </span>
+                  )}
+                  {displaySubtitle && (
+                    <span className="text-slate-300 hidden md:inline truncate text-[11px]">
+                      — {displaySubtitle}
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
+
+                {hasLearnMore && (
+                  <div className="shrink-0">
+                    <a
+                      href={targetUrl || '#'}
+                      target={placement.openInNewTab && /^https?:\/\//i.test(targetUrl) ? '_blank' : undefined}
+                      rel={placement.openInNewTab && /^https?:\/\//i.test(targetUrl) ? 'noopener noreferrer' : undefined}
+                      onClick={handleLearnMoreClick}
+                      className="px-3 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[11px] inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                    >
+                      <span>{learnMoreLabel}</span>
+                      {placement.openInNewTab && /^https?:\/\//i.test(targetUrl) ? (
+                        <ExternalLink className="w-3 h-3" />
+                      ) : (
+                        <ArrowRight className="w-3 h-3" />
+                      )}
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -242,7 +314,7 @@ export default function AdPlacementSlot({ placementId, className = '' }: AdPlace
           <div className={`w-full px-3 py-2 bg-[#02130a]/90 ${showBanner ? 'border-t border-emerald-950/80' : ''}`}>
             {!showBanner && (
               <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1.5 max-w-7xl mx-auto">
-                <span className="font-mono uppercase text-emerald-400 font-semibold">{placement.badgeText || 'Sponsored Leaderboard'}</span>
+                <span className="font-mono uppercase text-emerald-400 font-semibold">{displayBadgeText || 'Featured Highlight'}</span>
                 {hasLearnMore && targetUrl && (
                   <a
                     href={targetUrl}
@@ -263,71 +335,95 @@ export default function AdPlacementSlot({ placementId, className = '' }: AdPlace
             />
           </div>
         )}
-      </aside>
+      </div>
     );
   }
 
   return (
-    <aside
-      aria-label={placement.badgeText || 'Sponsored Advertisement'}
-      data-ad-placement={placementId}
+    <div
+      role="region"
+      aria-label={displayBadgeText || 'Featured Partner'}
+      data-slot-position={placementId}
       className={`w-full rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/30 dark:border-emerald-500/25 shadow-sm overflow-hidden transition-all ${className}`}
     >
       {/* Banner / Sponsored Content View */}
       {showBanner && (
-        <div className="p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40 dark:from-[#061a11]/90 dark:via-slate-900 dark:to-[#061a11]/70">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1 min-w-0">
-            {placement.imageUrl && (
-              <div className="w-full sm:w-28 h-24 sm:h-20 rounded-xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 shrink-0">
+        <div className="p-4 sm:p-5 space-y-4 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40 dark:from-[#061a11]/90 dark:via-slate-900 dark:to-[#061a11]/70">
+          {hasVisibleImage && (
+            <div className="flex items-center justify-center">
+              {targetUrl ? (
+                <a
+                  href={targetUrl}
+                  target={placement.openInNewTab && /^https?:\/\//i.test(targetUrl) ? '_blank' : undefined}
+                  rel={placement.openInNewTab && /^https?:\/\//i.test(targetUrl) ? 'noopener noreferrer' : undefined}
+                  onClick={handleLearnMoreClick}
+                  className="inline-block max-w-full cursor-pointer"
+                >
+                  <img
+                    src={activeImageSrc}
+                    onError={handleImageError}
+                    alt={displayTitle || 'Featured Partner'}
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    className="w-auto h-auto max-w-full block rounded-xl"
+                  />
+                </a>
+              ) : (
                 <img
-                  src={placement.imageUrl}
-                  alt={placement.title || 'Sponsored Ad'}
+                  src={activeImageSrc}
+                  onError={handleImageError}
+                  alt={displayTitle || 'Featured Partner'}
                   loading="lazy"
                   decoding="async"
                   referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover"
+                  className="w-auto h-auto max-w-full block rounded-xl"
                 />
-              </div>
-            )}
-
-            <div className="space-y-1.5 flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="site-badge inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-wider font-bold px-1.5 py-px rounded bg-emerald-600 text-white">
-                  <Megaphone className="w-2.5 h-2.5" />
-                  <span>{placement.badgeText || 'Sponsored'}</span>
-                </span>
-              </div>
-
-              {placement.title && (
-                <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base font-['Space_Grotesk'] leading-snug">
-                  {placement.title}
-                </h3>
-              )}
-
-              {placement.subtitle && (
-                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
-                  {placement.subtitle}
-                </p>
               )}
             </div>
-          </div>
+          )}
 
-          {hasLearnMore && (
-            <div className="shrink-0 w-full sm:w-auto">
-              <a
-                href={targetUrl || '#'}
-                target={placement.openInNewTab && /^https?:\/\//i.test(targetUrl) ? '_blank' : undefined}
-                rel={placement.openInNewTab && /^https?:\/\//i.test(targetUrl) ? 'noopener noreferrer' : undefined}
-                onClick={handleLearnMoreClick}
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-              >
-                <span>{learnMoreLabel}</span>
-                {placement.openInNewTab && /^https?:\/\//i.test(targetUrl) ? (
-                  <ExternalLink className="w-3.5 h-3.5" />
-                ) : (
-                  <ArrowRight className="w-3.5 h-3.5" />
+          {(displayBadgeText || displayTitle || displaySubtitle || hasLearnMore) && (
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="site-badge inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-wider font-bold px-1.5 py-px rounded bg-emerald-600 text-white">
+                    <Megaphone className="w-2.5 h-2.5" />
+                    <span>{displayBadgeText || 'Sponsored'}</span>
+                  </span>
+                </div>
+
+                {displayTitle && (
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base font-['Space_Grotesk'] leading-snug">
+                    {displayTitle}
+                  </h3>
                 )}
-              </a>
+
+                {displaySubtitle && (
+                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
+                    {displaySubtitle}
+                  </p>
+                )}
+              </div>
+
+              {hasLearnMore && (
+                <div className="shrink-0 w-full sm:w-auto">
+                  <a
+                    href={targetUrl || '#'}
+                    target={placement.openInNewTab && /^https?:\/\//i.test(targetUrl) ? '_blank' : undefined}
+                    rel={placement.openInNewTab && /^https?:\/\//i.test(targetUrl) ? 'noopener noreferrer' : undefined}
+                    onClick={handleLearnMoreClick}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                  >
+                    <span>{learnMoreLabel}</span>
+                    {placement.openInNewTab && /^https?:\/\//i.test(targetUrl) ? (
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    ) : (
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    )}
+                  </a>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -343,7 +439,7 @@ export default function AdPlacementSlot({ placementId, className = '' }: AdPlace
           {!showBanner && (
             <div className="flex items-center justify-between gap-2 mb-2">
               <span className="site-badge inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-wider font-semibold px-1.5 py-px rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                {placement.badgeText || 'Sponsored'}
+                {displayBadgeText || 'Sponsored'}
               </span>
 
               {hasLearnMore && targetUrl && (
@@ -373,6 +469,6 @@ export default function AdPlacementSlot({ placementId, className = '' }: AdPlace
           ) : null}
         </div>
       )}
-    </aside>
+    </div>
   );
 }

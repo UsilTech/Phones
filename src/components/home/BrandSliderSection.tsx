@@ -82,7 +82,7 @@ export default function BrandSliderSection() {
     };
   }).filter((b): b is NonNullable<typeof b> => Boolean(b));
 
-  const sliderBrands = [...customAddedBrands, ...activeNotableBrands];
+  const sliderBrands = [...activeNotableBrands, ...customAddedBrands];
 
   const handleBrandClick = (bName: string) => {
     triggerNavigation(() => {

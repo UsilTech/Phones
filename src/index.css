@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+@custom-variant dark ([data-theme=dark] &);
 
 :root {
   --primary-color: #16a34a;
@@ -33,15 +33,38 @@ html[data-theme="dark"] {
 html {
   font-size: 17px;
   scroll-behavior: smooth;
-  overflow-x: clip;
   width: 100%;
   max-width: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
+  background-color: #061a11;
 }
 
 @media (min-width: 1024px) {
   html {
     font-size: 17.5px;
   }
+}
+
+.sticky-top-header {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: #061a11;
+  box-shadow: 0 -6px 0 0 #061a11;
+  margin-top: 0;
+}
+
+.sticky-top-header::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  height: 5px;
+  background-color: #061a11;
+  pointer-events: none;
 }
 
 @layer base {
@@ -51,9 +74,13 @@ html {
     color: var(--text-main);
     transition: background-color 0.2s ease, color 0.2s ease;
     line-height: 1.6;
-    overflow-x: clip;
     width: 100%;
     max-width: 100%;
+    overflow-x: hidden;
+    overflow-x: clip;
+    min-height: 100vh;
+    min-height: 100dvh;
+    -webkit-overflow-scrolling: touch;
   }
   
   h1, h2, h3, h4, h5, h6 {

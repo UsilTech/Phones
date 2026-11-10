@@ -550,8 +550,8 @@ export default function JsonLdScript() {
       if (phones.length > 0) {
         graph.push({
           '@type': 'ItemList',
-          '@id': `${origin}/#trending-phones`,
-          name: 'Trending Smartphones on GsmScope',
+          '@id': `${origin}/#latest-phones`,
+          name: 'Latest Smartphones on GsmScope',
           itemListElement: phones.slice(0, 8).map((phone, index) => ({
             '@type': 'ListItem',
             position: index + 1,

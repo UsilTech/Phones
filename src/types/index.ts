@@ -137,7 +137,7 @@ export interface Article {
   id: string;
   title: string;
   slug: string;
-  category: 'News' | 'Review' | 'Reviews' | 'Buying Guide' | 'Buying Guides' | 'FRP & Servicing Tools' | 'Charging & Battery' | 'Tips & Security' | 'Launch' | 'Phone News' | 'Smartphone News' | 'Tech Updates' | string;
+  category: 'News' | 'Reviews' | 'Buying Guide' | 'Launch' | string;
   coverImage: string;
   summary: string;
   content: string;
@@ -149,6 +149,7 @@ export interface Article {
   readTime: string;
   tags: string[];
   featured?: boolean;
+  viewsCount?: number;
   relatedPhoneIds?: string[];
   // SEO fields
   seoTitle?: string;
@@ -179,6 +180,7 @@ export interface MediaItem {
   id: string;
   name: string;
   url: string;
+  dataUrl?: string;
   size?: number;
   mimeType?: string;
   uploadedAt: string;
@@ -258,11 +260,13 @@ export interface AdPlacementConfig {
   title: string;
   subtitle: string;
   imageUrl?: string;
+  imageDataUrl?: string;
   showLearnMore: boolean;
   learnMoreText: string;
   learnMoreUrl: string;
   openInNewTab?: boolean;
   scriptCode: string;
+  updatedAt?: string;
 }
 
 export interface AdSettings {
@@ -285,6 +289,7 @@ export interface AdSettings {
   adsensePublisherId?: string;
   adsenseAutoAdsEnabled?: boolean;
   adsTxtContent?: string;
+  updatedAt?: string;
 }
 
 export type ThemeMode = 'dark' | 'light';

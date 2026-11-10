@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Phone,
@@ -7,8 +7,6 @@ import {
   Review,
   PriceRangeCategory,
   ContactInquiry,
-  NewsletterSubscriber,
-  NewsletterBroadcast,
   MediaItem,
   WebsiteContent,
   AdPlacementId,
@@ -16,18 +14,7 @@ import {
 } from '../../types';
 import {
   fetchContactInquiriesApi,
-  replyToContactInquiryApi,
-  updateContactInquiryStatusApi,
   deleteContactInquiryApi,
-  fetchNewsletterSubscribersApi,
-  deleteNewsletterSubscriberApi,
-  subscribeNewsletterApi,
-  fetchNewsletterBroadcastsApi,
-  sendNewsletterBroadcastApi,
-  deleteNewsletterBroadcastApi,
-  sourcePhoneSpecsWithAiApi,
-  generateAiReviewApi,
-  AiVerifiedSource,
   checkServerHealthApi,
   ServerHealthStatus,
 } from '../../services/api';
@@ -74,16 +61,9 @@ import {
   Send,
   Radio,
   Bell,
-  Inbox,
-  Reply,
-  CheckCheck,
-  AlertCircle,
-  Filter,
   PhoneCall,
   Clock,
   Sparkles,
-  Loader2,
-  ShieldCheck,
 } from 'lucide-react';
 
 type AdminSection =
@@ -96,7 +76,6 @@ type AdminSection =
   | 'news'
   | 'reviews'
   | 'messages'
-  | 'broadcasts'
   | 'featured'
   | 'ads'
   | 'content'
@@ -343,9 +322,6 @@ const ALL_CATEGORY_BADGES = [
   'best-battery',
   '5g',
   'best-5g',
-  'best-budget',
-  'under-200k',
-  'under-300k',
   'flagship-killers',
 ];
 
@@ -364,14 +340,14 @@ function createEmptyPhoneForm(defaultBrand = 'Samsung'): Phone {
     releaseYear: year,
     releaseDate: `${year}, Q1`,
     modelNumber: 'SM-NEW2025',
-    image: '/assets/aistudio/IMG_20261024_202541_f0e9668e.jpg',
-    images: ['/assets/aistudio/IMG_20261024_202541_f0e9668e.jpg'],
+    image: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
+    images: ['/src/assets/images/hero_flagship_phones_1792578844852.jpg'],
     accentColor: '#10b981',
     rating: 0,
     reviewsCount: 0,
     viewsCount: 0,
     categories: ['5g', 'best-battery'],
-    isFeatured: true,
+    isFeatured: false,
     isPopular: false,
     screenSizeInches: 6.7,
     seoTitle: '',
@@ -506,7 +482,6 @@ export default function AdminDashboardModal() {
     setAdminSection,
     adminSubView,
     setAdminSubView,
-    goBack,
   } = useApp();
 
   const VALID_ADMIN_SECTIONS: AdminSection[] = [
@@ -519,7 +494,6 @@ export default function AdminDashboardModal() {
     'news',
     'reviews',
     'messages',
-    'broadcasts',
     'featured',
     'ads',
     'content',
@@ -544,7 +518,7 @@ export default function AdminDashboardModal() {
   const [reviewFilter, setReviewFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [articleCategoryFilter, setArticleCategoryFilter] = useState<'all' | 'news' | 'reviews' | 'guides'>('all');
   const [featuredCategoryFilter, setFeaturedCategoryFilter] = useState<
-    'all' | 'top-rated' | 'best-budget' | 'best-camera' | 'best-gaming' | 'best-battery' | 'best-5g'
+    'all' | 'top-rated' | 'best-camera' | 'best-gaming' | 'best-battery' | 'best-5g'
   >('all');
 
   // 1. Complete Phone Add/Edit Form state (includes ALL Phone fields & ALL DetailedSpecs fields)
@@ -632,16 +606,17 @@ export default function AdminDashboardModal() {
     file: File,
     category: NonNullable<MediaItem['category']>,
     customTitle: string,
-    onUploadedUrl: (url: string, item?: MediaItem) => void,
+    onUploadedUrl: (url: string, item?: MediaItem, dataUrl?: string) => void,
     assignedPhoneId?: string
   ) => {
     startGlobalLoading();
     const reader = new FileReader();
     reader.onload = async () => {
       if (typeof reader.result === 'string') {
+        const rawDataUrl = reader.result;
         const uploaded = await uploadMediaImage({
           filename: file.name,
-          data: reader.result,
+          data: rawDataUrl,
           name: customTitle.trim() || file.name.replace(/\.[^/.]+$/, ''),
           category,
           assignedPhoneId,
@@ -649,7 +624,7 @@ export default function AdminDashboardModal() {
         stopGlobalLoading();
         const finalUrl = uploaded.url || uploaded.media?.url;
         if (uploaded.success && finalUrl) {
-          onUploadedUrl(finalUrl, uploaded.media);
+          onUploadedUrl(finalUrl, uploaded.media, rawDataUrl);
           showGlobalToast(`Uploaded "${uploaded.media?.name || file.name}" to server (/uploads)`, 'success');
         } else {
           showGlobalToast(uploaded.error || 'Failed to upload image.', 'error');
@@ -672,7 +647,7 @@ export default function AdminDashboardModal() {
     category: 'News' as Article['category'],
     summary: '',
     content: '',
-    coverImage: '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg',
+    coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     readTime: '4 min read',
     tags: 'Smartphone, Launch, Specs',
     featured: false,
@@ -698,24 +673,8 @@ export default function AdminDashboardModal() {
     imageUrl: '',
     seoTitle: '',
     seoKeywords: '',
-    pushToSubscribers: false,
   });
 
-  // 7b. AI Assistant States (Phone Spec Sourcing & Review Writing)
-  const [aiPhoneQuery, setAiPhoneQuery] = useState('');
-  const [isAiSourcingPhone, setIsAiSourcingPhone] = useState(false);
-  const [aiPhoneSources, setAiPhoneSources] = useState<AiVerifiedSource[]>([]);
-
-  const [aiAdminReviewQuery, setAiAdminReviewQuery] = useState('');
-  const [aiAdminReviewNotes, setAiAdminReviewNotes] = useState('');
-  const [isAiGeneratingAdminReview, setIsAiGeneratingAdminReview] = useState(false);
-  const [aiAdminReviewSources, setAiAdminReviewSources] = useState<AiVerifiedSource[]>([]);
-  const [aiAdminReviewSpecsSummary, setAiAdminReviewSpecsSummary] = useState('');
-
-  const [aiArticleQuery, setAiArticleQuery] = useState('');
-  const [aiArticleNotes, setAiArticleNotes] = useState('');
-  const [isAiGeneratingArticle, setIsAiGeneratingArticle] = useState(false);
-  const [aiArticleSources, setAiArticleSources] = useState<AiVerifiedSource[]>([]);
 
   // Server & cPanel Connection Diagnostics state (inside Database Tools section)
   const [isTestingConnections, setIsTestingConnections] = useState(false);
@@ -784,6 +743,8 @@ export default function AdminDashboardModal() {
   const localAdSettingsRef = useRef(localAdSettings);
   localAdSettingsRef.current = localAdSettings;
 
+  const adPersistDebounceRef = useRef<any>(null);
+
   useEffect(() => {
     const synced = {
       ...adSettings,
@@ -801,6 +762,7 @@ export default function AdminDashboardModal() {
     patch: Partial<AdPlacementConfig>,
     immediatePersist = false
   ) => {
+    const nowIso = new Date().toISOString();
     const prev = localAdSettingsRef.current;
     const currentPlacements = prev.placements || DEFAULT_AD_PLACEMENTS;
     const basePlacement = currentPlacements[placementId] || DEFAULT_AD_PLACEMENTS[placementId];
@@ -808,10 +770,16 @@ export default function AdminDashboardModal() {
       ...DEFAULT_AD_PLACEMENTS[placementId],
       ...basePlacement,
       ...patch,
+      id: DEFAULT_AD_PLACEMENTS[placementId].id,
+      name: DEFAULT_AD_PLACEMENTS[placementId].name,
+      pageLabel: DEFAULT_AD_PLACEMENTS[placementId].pageLabel,
+      positionLabel: DEFAULT_AD_PLACEMENTS[placementId].positionLabel,
       enabled: patch.enabled !== undefined ? Boolean(patch.enabled) : Boolean(basePlacement.enabled),
+      updatedAt: nowIso,
     };
     const nextSettings = {
       ...prev,
+      updatedAt: nowIso,
       placements: {
         ...DEFAULT_AD_PLACEMENTS,
         ...currentPlacements,
@@ -832,8 +800,18 @@ export default function AdminDashboardModal() {
     };
     localAdSettingsRef.current = nextSettings;
     setLocalAdSettings(nextSettings);
+    try {
+      localStorage.setItem('gsmscope_ads_v3', JSON.stringify(nextSettings));
+      localStorage.setItem('gsmscope_ads_admin_saved_v1', 'true');
+    } catch {}
     if (immediatePersist) {
+      if (adPersistDebounceRef.current) clearTimeout(adPersistDebounceRef.current);
       updateAdSettings(nextSettings);
+    } else {
+      if (adPersistDebounceRef.current) clearTimeout(adPersistDebounceRef.current);
+      adPersistDebounceRef.current = setTimeout(() => {
+        updateAdSettings(localAdSettingsRef.current);
+      }, 250);
     }
   };
 
@@ -842,15 +820,38 @@ export default function AdminDashboardModal() {
     ...DEFAULT_WEBSITE_CONTENT,
     ...contextWebsiteContent,
   }));
+  const websiteContentRef = useRef<WebsiteContentSettings>(websiteContent);
+  websiteContentRef.current = websiteContent;
+
+  const applyAndPersistWebsiteContentPatch = (
+    patch: Partial<WebsiteContentSettings>,
+    toastMessage?: string
+  ) => {
+    const next: WebsiteContentSettings = {
+      ...websiteContentRef.current,
+      ...patch,
+    };
+    websiteContentRef.current = next;
+    setWebsiteContent(next);
+    updateWebsiteContent(next);
+    if (toastMessage) {
+      showGlobalToast(toastMessage, 'success');
+    }
+  };
+
   useEffect(() => {
     if (contextWebsiteContent) {
-      setWebsiteContent((prev) => ({
-        ...prev,
-        ...contextWebsiteContent,
-        seoTitle: contextWebsiteContent.seoTitle || contextWebsiteContent.defaultSeoTitle || prev.seoTitle,
-        seoKeywords: contextWebsiteContent.seoKeywords || contextWebsiteContent.defaultSeoKeywords || prev.seoKeywords,
-        seoDescription: contextWebsiteContent.seoDescription || contextWebsiteContent.defaultSeoDescription || prev.seoDescription,
-      }));
+      setWebsiteContent((prev) => {
+        const merged = {
+          ...prev,
+          ...contextWebsiteContent,
+          seoTitle: contextWebsiteContent.seoTitle || contextWebsiteContent.defaultSeoTitle || prev.seoTitle,
+          seoKeywords: contextWebsiteContent.seoKeywords || contextWebsiteContent.defaultSeoKeywords || prev.seoKeywords,
+          seoDescription: contextWebsiteContent.seoDescription || contextWebsiteContent.defaultSeoDescription || prev.seoDescription,
+        };
+        websiteContentRef.current = merged;
+        return merged;
+      });
       if (Array.isArray(contextWebsiteContent.specTablesSchema) && contextWebsiteContent.specTablesSchema.length > 0) {
         setSpecTablesSchema(contextWebsiteContent.specTablesSchema);
       }
@@ -912,7 +913,7 @@ export default function AdminDashboardModal() {
   // Backup JSON state
   const [jsonText, setJsonText] = useState('');
 
-  // 14. Contact Form Inquiries & Reply state
+  // 14. Messages state
   const [contactInquiries, setContactInquiries] = useState<ContactInquiry[]>(() => {
     try {
       const saved = localStorage.getItem('gsmscope_contact_inquiries_v1');
@@ -921,13 +922,8 @@ export default function AdminDashboardModal() {
     return [];
   });
   const [inquirySearch, setInquirySearch] = useState('');
-  const [inquiryFilter, setInquiryFilter] = useState<'all' | 'unread' | 'replied'>('all');
-  const [activeReplyInquiry, setActiveReplyInquiry] = useState<ContactInquiry | null>(null);
-  const [replySubject, setReplySubject] = useState('');
-  const [replyMessage, setReplyMessage] = useState('');
-  const [isSendingReply, setIsSendingReply] = useState(false);
 
-  // Synchronize open sub-forms (Add/Edit Phone, Edit Article, Add Review, Edit Brand, Reply Inquiry) with browser history
+  // Synchronize open sub-forms (Add/Edit Phone, Edit Article, Add Review, Edit Brand) with browser history
   const desiredSubView = showPhoneForm
     ? editingPhoneId
       ? `phone:${editingPhoneId}`
@@ -938,8 +934,6 @@ export default function AdminDashboardModal() {
     ? 'review:new'
     : editingBrandId
     ? `brand:${editingBrandId}`
-    : activeReplyInquiry
-    ? `inquiry:${activeReplyInquiry.id}`
     : null;
 
   const prevDesiredSubViewRef = useRef<string | null>(desiredSubView);
@@ -965,65 +959,63 @@ export default function AdminDashboardModal() {
         setEditingArticleId(null);
         setShowReviewForm(false);
         setEditingBrandId(null);
-        setActiveReplyInquiry(null);
       }
     }
   }, [adminSubView]);
 
-  // 15. Newsletter Subscribers & Push Broadcasts state
-  const [subscribers, setSubscribers] = useState<NewsletterSubscriber[]>([]);
-  const [broadcasts, setBroadcasts] = useState<NewsletterBroadcast[]>(() => {
-    try {
-      const saved = localStorage.getItem('gsmscope_broadcasts_v1');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return [];
-  });
-  const [broadcastType, setBroadcastType] = useState<NewsletterBroadcast['type']>('news');
-  const [broadcastTitle, setBroadcastTitle] = useState('');
-  const [broadcastMessage, setBroadcastMessage] = useState('');
-  const [broadcastActionUrl, setBroadcastActionUrl] = useState('/?tab=news');
-  const [broadcastActionLabel, setBroadcastActionLabel] = useState('Read Details');
-  const [isBroadcasting, setIsBroadcasting] = useState(false);
-  const [subscriberSearch, setSubscriberSearch] = useState('');
-  const [newSubscriberEmail, setNewSubscriberEmail] = useState('');
-
-  // Push to subscribers checkboxes on Add/Edit forms
-  const [pushPhoneToSubscribers, setPushPhoneToSubscribers] = useState(false);
-  const [pushArticleToSubscribers, setPushArticleToSubscribers] = useState(false);
-
-  // Sync Contact Inquiries, Subscribers, and Broadcasts with backend API
-  useEffect(() => {
-    let isMounted = true;
-    fetchContactInquiriesApi().then((data) => {
-      if (isMounted && data && Array.isArray(data)) {
-        setContactInquiries(data);
+  // Sync Contact Inquiries with backend API and real-time custom events
+  const syncLiveAdminCollections = useCallback(() => {
+    fetchContactInquiriesApi().then((serverData) => {
+      if (serverData && Array.isArray(serverData)) {
+        let merged = [...serverData];
         try {
-          localStorage.setItem('gsmscope_contact_inquiries_v1', JSON.stringify(data));
+          const localRaw = localStorage.getItem('gsmscope_contact_inquiries_v1');
+          const localList: ContactInquiry[] = localRaw ? JSON.parse(localRaw) : [];
+          if (Array.isArray(localList) && localList.length > 0) {
+            const serverIds = new Set(serverData.map((i) => i.id));
+            // Include any recent local inquiries (submitted within the last 10 minutes) that might still be in flight
+            const recentThreshold = Date.now() - 10 * 60 * 1000;
+            const localUnsynced = localList.filter((item) => {
+              if (!item || !item.id || serverIds.has(item.id)) return false;
+              const ts = new Date(item.createdAt || 0).getTime();
+              return !Number.isNaN(ts) && ts > recentThreshold;
+            });
+            if (localUnsynced.length > 0) {
+              merged = [...localUnsynced, ...merged];
+            }
+          }
+          localStorage.setItem('gsmscope_contact_inquiries_v1', JSON.stringify(merged));
         } catch {}
+        setContactInquiries(merged);
       }
     });
-    fetchNewsletterSubscribersApi().then((subs) => {
-      if (isMounted && subs && Array.isArray(subs)) {
-        setSubscribers(subs);
-      }
-    });
-    fetchNewsletterBroadcastsApi().then((bcs) => {
-      if (isMounted && bcs && Array.isArray(bcs)) {
-        setBroadcasts(bcs);
-        try {
-          localStorage.setItem('gsmscope_broadcasts_v1', JSON.stringify(bcs));
-        } catch {}
-      }
-    });
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
-  const unreadMessagesCount = contactInquiries.filter(
-    (i) => i.status !== 'read' && i.status !== 'replied' && !i.replied
-  ).length;
+  useEffect(() => {
+    syncLiveAdminCollections();
+  }, [syncLiveAdminCollections, isAdminAuthenticated, activeTab, section]);
+
+  useEffect(() => {
+    const handleContactUpdated = (e: Event) => {
+      const customEvt = e as CustomEvent<ContactInquiry | undefined>;
+      if (customEvt.detail && customEvt.detail.id) {
+        const newInq = customEvt.detail;
+        setContactInquiries((prev) => {
+          const next = [newInq, ...prev.filter((i) => i.id !== newInq.id)];
+          try {
+            localStorage.setItem('gsmscope_contact_inquiries_v1', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      } else {
+        syncLiveAdminCollections();
+      }
+    };
+    window.addEventListener('gsmscope:contact-updated', handleContactUpdated);
+    return () => {
+      window.removeEventListener('gsmscope:contact-updated', handleContactUpdated);
+    };
+  }, [syncLiveAdminCollections]);
 
   // Inject custom scripts/meta tags into document head/body/footer whenever saved
   useEffect(() => {
@@ -1190,298 +1182,6 @@ export default function AdminDashboardModal() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // AI Spec Sourcer Handler: Sources complete phone specifications from manufacturer website & trusted tech databases
-  const handleAiSourcePhoneSpecs = async (
-    targetMode: 'phoneDraft' | 'specPhoneDraft' = 'phoneDraft',
-    explicitQuery?: string
-  ) => {
-    if (isAiSourcingPhone) return;
-    const currentTarget = targetMode === 'specPhoneDraft' && specPhoneDraft ? specPhoneDraft : phoneDraft;
-    const queryToUse = (
-      explicitQuery ??
-      (aiPhoneQuery.trim() ||
-        currentTarget.name.trim() ||
-        (currentTarget.modelNumber && currentTarget.modelNumber !== 'SM-NEW2025' ? currentTarget.modelNumber.trim() : ''))
-    ).trim();
-
-    if (!queryToUse) {
-      showGlobalToast('Please type a phone title or model number first (e.g., "Galaxy S25 Ultra" or "SM-S938B").', 'error');
-      return;
-    }
-
-    setIsAiSourcingPhone(true);
-    startGlobalLoading();
-
-    try {
-      const res = await sourcePhoneSpecsWithAiApi({
-        query: queryToUse,
-        brandHint: currentTarget.brand,
-      });
-
-      if (!res.success || !res.phoneSpecs) {
-        showGlobalToast(res.error || 'Could not source phone specifications. Please try again.', 'error');
-        return;
-      }
-
-      const s = res.phoneSpecs;
-      const ramList = Array.isArray(s.detailedSpecs?.memory?.ramVariants) && s.detailedSpecs!.memory.ramVariants.length > 0
-        ? s.detailedSpecs!.memory.ramVariants
-        : (s.keyHighlights?.ram ? s.keyHighlights.ram.split('/').map((x) => x.trim()).filter(Boolean) : ['8GB', '12GB']);
-      const storageList = Array.isArray(s.detailedSpecs?.memory?.storageVariants) && s.detailedSpecs!.memory.storageVariants.length > 0
-        ? s.detailedSpecs!.memory.storageVariants
-        : (s.keyHighlights?.storage ? s.keyHighlights.storage.split('/').map((x) => x.trim()).filter(Boolean) : ['256GB', '512GB']);
-      const catsList = Array.isArray(s.categories) && s.categories.length > 0
-        ? s.categories
-        : ['5g', 'best-battery'];
-
-      const mergeIntoPhone = (prev: Phone): Phone => ({
-        ...prev,
-        name: s.name || prev.name || queryToUse,
-        brand: s.brand || prev.brand || 'Samsung',
-        modelNumber: s.modelNumber || prev.modelNumber || '',
-        marketStatus: s.marketStatus || prev.marketStatus || 'Available',
-        releaseDate: s.releaseDate || prev.releaseDate,
-        releaseYear: Number(s.releaseYear) || prev.releaseYear || new Date().getFullYear(),
-        priceUSD: Number(s.priceUSD) || prev.priceUSD,
-        priceNGN: Number(s.priceNGN) || prev.priceNGN,
-        priceRange: (s.priceRange as PriceRangeCategory) || prev.priceRange,
-        screenSizeInches: Number(s.screenSizeInches) || prev.screenSizeInches || 6.7,
-        nairaPriceNotes: s.nairaPriceNotes || prev.nairaPriceNotes,
-        categories: catsList,
-        seoTitle: s.seoTitle || prev.seoTitle,
-        seoKeywords: s.seoKeywords || prev.seoKeywords,
-        seoDescription: s.seoDescription || prev.seoDescription,
-        keyHighlights: {
-          display: s.keyHighlights?.display || prev.keyHighlights.display,
-          processor: s.keyHighlights?.processor || prev.keyHighlights.processor,
-          ram: s.keyHighlights?.ram || ramList.join(' / '),
-          storage: s.keyHighlights?.storage || storageList.join(' / '),
-          camera: s.keyHighlights?.camera || prev.keyHighlights.camera,
-          battery: s.keyHighlights?.battery || prev.keyHighlights.battery,
-          charging: s.keyHighlights?.charging || prev.keyHighlights.charging,
-          os: s.keyHighlights?.os || prev.keyHighlights.os,
-          network5g: s.keyHighlights?.network5g !== undefined ? Boolean(s.keyHighlights.network5g) : prev.keyHighlights.network5g,
-        },
-        detailedSpecs: {
-          network: {
-            technology: s.detailedSpecs?.network?.technology || prev.detailedSpecs.network.technology,
-            bands5g: s.detailedSpecs?.network?.bands5g || prev.detailedSpecs.network.bands5g,
-            speed: s.detailedSpecs?.network?.speed || prev.detailedSpecs.network.speed,
-            sim: s.detailedSpecs?.network?.sim || prev.detailedSpecs.network.sim,
-          },
-          body: {
-            dimensions: s.detailedSpecs?.body?.dimensions || prev.detailedSpecs.body.dimensions,
-            weight: s.detailedSpecs?.body?.weight || prev.detailedSpecs.body.weight,
-            build: s.detailedSpecs?.body?.build || prev.detailedSpecs.body.build,
-            waterResistance: s.detailedSpecs?.body?.waterResistance || prev.detailedSpecs.body.waterResistance,
-          },
-          display: {
-            type: s.detailedSpecs?.display?.type || prev.detailedSpecs.display.type,
-            size: s.detailedSpecs?.display?.size || prev.detailedSpecs.display.size,
-            resolution: s.detailedSpecs?.display?.resolution || prev.detailedSpecs.display.resolution,
-            protection: s.detailedSpecs?.display?.protection || prev.detailedSpecs.display.protection,
-            brightness: s.detailedSpecs?.display?.brightness || prev.detailedSpecs.display.brightness,
-            refreshRate: s.detailedSpecs?.display?.refreshRate || prev.detailedSpecs.display.refreshRate,
-          },
-          platform: {
-            os: s.detailedSpecs?.platform?.os || prev.detailedSpecs.platform.os,
-            chipset: s.detailedSpecs?.platform?.chipset || prev.detailedSpecs.platform.chipset,
-            cpu: s.detailedSpecs?.platform?.cpu || prev.detailedSpecs.platform.cpu,
-            gpu: s.detailedSpecs?.platform?.gpu || prev.detailedSpecs.platform.gpu,
-            antutuScore: s.detailedSpecs?.platform?.antutuScore || prev.detailedSpecs.platform.antutuScore,
-          },
-          memory: {
-            ramVariants: ramList,
-            storageVariants: storageList,
-            cardSlot: s.detailedSpecs?.memory?.cardSlot || prev.detailedSpecs.memory.cardSlot,
-            storageType: s.detailedSpecs?.memory?.storageType || prev.detailedSpecs.memory.storageType,
-          },
-          mainCamera: {
-            setup: s.detailedSpecs?.mainCamera?.setup || prev.detailedSpecs.mainCamera.setup,
-            features: s.detailedSpecs?.mainCamera?.features || prev.detailedSpecs.mainCamera.features,
-            video: s.detailedSpecs?.mainCamera?.video || prev.detailedSpecs.mainCamera.video,
-          },
-          selfieCamera: {
-            setup: s.detailedSpecs?.selfieCamera?.setup || prev.detailedSpecs.selfieCamera.setup,
-            features: s.detailedSpecs?.selfieCamera?.features || prev.detailedSpecs.selfieCamera.features,
-            video: s.detailedSpecs?.selfieCamera?.video || prev.detailedSpecs.selfieCamera.video,
-          },
-          battery: {
-            capacity: s.detailedSpecs?.battery?.capacity || prev.detailedSpecs.battery.capacity,
-            charging: s.detailedSpecs?.battery?.charging || prev.detailedSpecs.battery.charging,
-            wirelessCharging: s.detailedSpecs?.battery?.wirelessCharging || prev.detailedSpecs.battery.wirelessCharging,
-          },
-          sound: {
-            loudspeaker: s.detailedSpecs?.sound?.loudspeaker || prev.detailedSpecs.sound.loudspeaker,
-            jack35mm: s.detailedSpecs?.sound?.jack35mm || prev.detailedSpecs.sound.jack35mm,
-            audioSpecs: s.detailedSpecs?.sound?.audioSpecs || prev.detailedSpecs.sound.audioSpecs,
-          },
-          connectivity: {
-            wlan: s.detailedSpecs?.connectivity?.wlan || prev.detailedSpecs.connectivity.wlan,
-            bluetooth: s.detailedSpecs?.connectivity?.bluetooth || prev.detailedSpecs.connectivity.bluetooth,
-            nfc: s.detailedSpecs?.connectivity?.nfc || prev.detailedSpecs.connectivity.nfc,
-            radio: s.detailedSpecs?.connectivity?.radio || prev.detailedSpecs.connectivity.radio,
-            usb: s.detailedSpecs?.connectivity?.usb || prev.detailedSpecs.connectivity.usb,
-            infrared: s.detailedSpecs?.connectivity?.infrared || prev.detailedSpecs.connectivity.infrared,
-            positioning: s.detailedSpecs?.connectivity?.positioning || prev.detailedSpecs.connectivity.positioning,
-          },
-          sensors: s.detailedSpecs?.sensors || prev.detailedSpecs.sensors,
-          biometrics: s.detailedSpecs?.biometrics || prev.detailedSpecs.biometrics,
-          securityHardware: s.detailedSpecs?.securityHardware || prev.detailedSpecs.securityHardware,
-        },
-      });
-
-      if (targetMode === 'specPhoneDraft' && specPhoneDraft) {
-        setSpecPhoneDraft((prev) => (prev ? mergeIntoPhone(prev) : prev));
-        setSpecRamText(ramList.join(', '));
-        setSpecStorageText(storageList.join(', '));
-      } else {
-        setPhoneDraft((prev) => mergeIntoPhone(prev));
-        setRamVariantsText(ramList.join(', '));
-        setStorageVariantsText(storageList.join(', '));
-        setCustomCategoriesText(catsList.join(', '));
-      }
-
-      setAiPhoneSources(res.sources || []);
-      showGlobalToast(
-        `Sourced & auto-filled all specifications for "${s.name || queryToUse}" from official manufacturer & trusted sources!`,
-        'success'
-      );
-    } catch {
-      showGlobalToast('Failed to reach AI spec sourcer. Please try again.', 'error');
-    } finally {
-      stopGlobalLoading();
-      setIsAiSourcingPhone(false);
-    }
-  };
-
-  // AI Admin Review Generator Handler (Section 7: Manage & Publish Reviews)
-  const handleAiGenerateAdminReview = async () => {
-    if (isAiGeneratingAdminReview) return;
-    const selectedPhoneObj = phones.find((p) => p.id === reviewForm.phoneId);
-    const targetQuery = aiAdminReviewQuery.trim() || selectedPhoneObj?.name || '';
-
-    if (!targetQuery) {
-      showGlobalToast('Please select a target phone or enter a phone title / model number.', 'error');
-      return;
-    }
-
-    setIsAiGeneratingAdminReview(true);
-    startGlobalLoading();
-
-    try {
-      const res = await generateAiReviewApi({
-        phoneName: targetQuery,
-        modelNumber: selectedPhoneObj?.modelNumber || '',
-        brand: aiAdminReviewQuery.trim() ? '' : selectedPhoneObj?.brand || '',
-        rating: reviewForm.rating,
-        reviewType: 'admin',
-        focusNotes: aiAdminReviewNotes.trim(),
-        existingSpecs: !aiAdminReviewQuery.trim() && selectedPhoneObj
-          ? {
-              name: selectedPhoneObj.name,
-              brand: selectedPhoneObj.brand,
-              modelNumber: selectedPhoneObj.modelNumber,
-              keyHighlights: selectedPhoneObj.keyHighlights,
-              detailedSpecs: selectedPhoneObj.detailedSpecs,
-            }
-          : undefined,
-      });
-
-      if (!res.success || !res.review) {
-        showGlobalToast(res.error || 'Could not generate AI review.', 'error');
-        return;
-      }
-
-      setReviewForm((prev) => ({
-        ...prev,
-        title: res.review!.title || prev.title,
-        comment: res.review!.comment || prev.comment,
-        pros: (res.review!.pros || []).join(', ') || prev.pros,
-        cons: (res.review!.cons || []).join(', ') || prev.cons,
-        seoTitle: res.review!.seoTitle || prev.seoTitle,
-        seoKeywords: res.review!.seoKeywords || prev.seoKeywords,
-      }));
-      setAiAdminReviewSpecsSummary(res.review.sourcedSpecsSummary || '');
-      setAiAdminReviewSources(res.sources || []);
-      showGlobalToast(`AI sourced official specs and wrote review for ${res.review.resolvedPhoneName || targetQuery}!`, 'success');
-    } catch {
-      showGlobalToast('Failed to reach AI review assistant.', 'error');
-    } finally {
-      stopGlobalLoading();
-      setIsAiGeneratingAdminReview(false);
-    }
-  };
-
-  // AI Editorial Review / Article Generator Handler (Section 6: News, Guides, Reviews & Articles)
-  const handleAiGenerateEditorialArticle = async () => {
-    if (isAiGeneratingArticle) return;
-    const targetQuery = aiArticleQuery.trim() || articleForm.title.trim();
-
-    if (!targetQuery) {
-      showGlobalToast('Please enter a phone title / model number or headline to source & write.', 'error');
-      return;
-    }
-
-    setIsAiGeneratingArticle(true);
-    startGlobalLoading();
-
-    try {
-      const matchedPhone = phones.find(
-        (p) =>
-          targetQuery.toLowerCase().includes(p.name.toLowerCase()) ||
-          p.name.toLowerCase().includes(targetQuery.toLowerCase()) ||
-          (p.modelNumber && p.modelNumber.toLowerCase() === targetQuery.toLowerCase())
-      );
-
-      const res = await generateAiReviewApi({
-        phoneName: targetQuery,
-        modelNumber: matchedPhone?.modelNumber || '',
-        brand: matchedPhone?.brand || '',
-        rating: 5,
-        reviewType: 'editorial',
-        focusNotes: aiArticleNotes.trim(),
-        existingSpecs: matchedPhone
-          ? {
-              name: matchedPhone.name,
-              brand: matchedPhone.brand,
-              modelNumber: matchedPhone.modelNumber,
-              keyHighlights: matchedPhone.keyHighlights,
-              detailedSpecs: matchedPhone.detailedSpecs,
-            }
-          : undefined,
-      });
-
-      if (!res.success || !res.review) {
-        showGlobalToast(res.error || 'Could not generate editorial review with AI.', 'error');
-        return;
-      }
-
-      setArticleForm((prev) => ({
-        ...prev,
-        title: res.review!.title || prev.title,
-        category:
-          prev.category === 'Reviews' || prev.category === 'Review'
-            ? prev.category
-            : 'Reviews',
-        summary: res.review!.summary || prev.summary,
-        content: res.review!.comment || prev.content,
-        readTime: res.review!.readTime || '5 min read',
-        tags: (res.review!.tags || []).join(', ') || prev.tags,
-        seoTitle: res.review!.seoTitle || prev.seoTitle,
-        seoKeywords: res.review!.seoKeywords || prev.seoKeywords,
-        seoDescription: res.review!.seoDescription || prev.seoDescription,
-      }));
-      setAiArticleSources(res.sources || []);
-      showGlobalToast(`AI drafted full editorial review for "${res.review.resolvedPhoneName || targetQuery}"!`, 'success');
-    } catch {
-      showGlobalToast('Failed to reach AI editorial assistant.', 'error');
-    } finally {
-      stopGlobalLoading();
-      setIsAiGeneratingArticle(false);
-    }
-  };
-
   const handleSavePhone = (e: React.FormEvent) => {
     e.preventDefault();
     if (!phoneDraft.name.trim()) {
@@ -1510,8 +1210,7 @@ export default function AdminDashboardModal() {
     const priceNGN = Number(phoneDraft.priceNGN) || 350000;
     const priceUSD = Number(phoneDraft.priceUSD) || Math.round(priceNGN / 1500);
     const computedPriceRange: PriceRangeCategory =
-      phoneDraft.priceRange ||
-      (priceNGN < 100000
+      priceNGN < 100000
         ? 'under100k'
         : priceNGN <= 200000
         ? '100k-200k'
@@ -1521,11 +1220,16 @@ export default function AdminDashboardModal() {
         ? '350k-600k'
         : priceNGN <= 1200000
         ? '600k-1.2m'
-        : 'flagship');
+        : 'flagship';
+
+    const yearMatch = (phoneDraft.releaseDate || '').match(/\b(19\d{2}|20\d{2})\b/);
+    const derivedReleaseYear = yearMatch
+      ? Number(yearMatch[1])
+      : Number(phoneDraft.releaseYear) || new Date().getFullYear();
 
     const defaultSeoTitle = `${phoneDraft.name.trim()} Full Specifications & Price in USD / NGN | ${websiteContent.siteName || 'GsmScope'}`;
     const defaultSeoKeywords = `${phoneDraft.name.trim()}, ${phoneDraft.brand.trim()}, ${phoneDraft.name.trim()} specs, ${phoneDraft.name.trim()} price in Nigeria, ${phoneDraft.name.trim()} USD price, ${phoneDraft.keyHighlights.processor}, ${phoneDraft.keyHighlights.camera}`;
-    const defaultSeoDescription = `Explore full hardware specifications for ${phoneDraft.name.trim()} (${phoneDraft.releaseYear}): ${phoneDraft.keyHighlights.display}, ${phoneDraft.keyHighlights.processor}, ${phoneDraft.keyHighlights.camera}, ${phoneDraft.keyHighlights.battery} battery, and verified price.`;
+    const defaultSeoDescription = `Explore full hardware specifications for ${phoneDraft.name.trim()} (${derivedReleaseYear}): ${phoneDraft.keyHighlights.display}, ${phoneDraft.keyHighlights.processor}, ${phoneDraft.keyHighlights.camera}, ${phoneDraft.keyHighlights.battery} battery, and verified price.`;
 
     const finalPhone: Phone = {
       ...phoneDraft,
@@ -1538,8 +1242,8 @@ export default function AdminDashboardModal() {
       priceRange: computedPriceRange,
       marketStatus: phoneDraft.marketStatus || 'Available',
       nairaPriceNotes: phoneDraft.nairaPriceNotes || 'Available at authorized stores.',
-      releaseYear: Number(phoneDraft.releaseYear) || new Date().getFullYear(),
-      releaseDate: phoneDraft.releaseDate || `${phoneDraft.releaseYear}`,
+      releaseYear: derivedReleaseYear,
+      releaseDate: phoneDraft.releaseDate || `${derivedReleaseYear}`,
       modelNumber: phoneDraft.modelNumber || '',
       image: phoneDraft.image.trim(),
       images: [
@@ -1552,7 +1256,10 @@ export default function AdminDashboardModal() {
       viewsCount: editingPhoneId ? (phoneDraft.viewsCount || 0) : 0,
       screenSizeInches: Number(phoneDraft.screenSizeInches) || 6.7,
       categories: categoriesArr.length > 0 ? categoriesArr : ['5g'],
-      isFeatured: Boolean(phoneDraft.isFeatured),
+      isFeatured: Boolean(
+        phoneDraft.isFeatured ||
+        categoriesArr.some((c) => c.toLowerCase() === 'featured')
+      ),
       isPopular: Boolean(phoneDraft.isPopular),
       seoTitle: (phoneDraft.seoTitle || '').trim() || defaultSeoTitle,
       seoKeywords: (phoneDraft.seoKeywords || '').trim() || defaultSeoKeywords,
@@ -1571,21 +1278,6 @@ export default function AdminDashboardModal() {
         },
       },
     };
-
-    if (pushPhoneToSubscribers) {
-      sendNewsletterBroadcastApi({
-        type: 'phone',
-        title: `New Phone Launch: ${finalPhone.brand} ${finalPhone.name}`,
-        message: `${finalPhone.name} is now published on GsmScope. Chipset: ${finalPhone.keyHighlights.processor}, Camera: ${finalPhone.keyHighlights.camera}, Battery: ${finalPhone.keyHighlights.battery}. Verified prices: ₦${finalPhone.priceNGN.toLocaleString()} / $${finalPhone.priceUSD}.`,
-        actionUrl: `/?phone=${encodeURIComponent(finalPhone.id)}`,
-        actionLabel: 'View Device Specs',
-      }).then((res) => {
-        if (res.broadcast) {
-          setBroadcasts((prev) => [res.broadcast!, ...prev]);
-        }
-      });
-      setPushPhoneToSubscribers(false);
-    }
 
     if (editingPhoneId) {
       runWithProgress(() => {
@@ -1870,7 +1562,7 @@ export default function AdminDashboardModal() {
           category: 'News',
           summary: '',
           content: '',
-          coverImage: '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg',
+          coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
           readTime: '4 min read',
           tags: 'Smartphone, Launch, Specs',
           featured: false,
@@ -1895,29 +1587,15 @@ export default function AdminDashboardModal() {
         },
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         readTime: articleForm.readTime || '4 min read',
-        coverImage: articleForm.coverImage || '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg',
+        coverImage: articleForm.coverImage || '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
         tags: tagsArr.length > 0 ? tagsArr : ['News', 'Smartphones'],
         featured: articleForm.featured,
+        viewsCount: 0,
         relatedPhoneIds: [],
         seoTitle: computedSeoTitle,
         seoKeywords: computedSeoKeywords,
         seoDescription: computedSeoDesc,
       };
-
-      if (pushArticleToSubscribers) {
-        sendNewsletterBroadcastApi({
-          type: created.category === 'Buying Guides' || created.category === 'Buying Guide' ? 'guide' : 'news',
-          title: `New Post: ${created.title}`,
-          message: `${created.summary} Read the full article and insights on GsmScope.`,
-          actionUrl: `/?tab=news`,
-          actionLabel: 'Read Article',
-        }).then((res) => {
-          if (res.broadcast) {
-            setBroadcasts((prev) => [res.broadcast!, ...prev]);
-          }
-        });
-        setPushArticleToSubscribers(false);
-      }
 
       runWithProgress(() => {
         addArticle(created);
@@ -1926,7 +1604,7 @@ export default function AdminDashboardModal() {
           category: 'News',
           summary: '',
           content: '',
-          coverImage: '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg',
+          coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
           readTime: '4 min read',
           tags: 'Smartphone, Launch, Specs',
           featured: false,
@@ -1975,18 +1653,6 @@ export default function AdminDashboardModal() {
         `${phoneObj?.name || 'Smartphone'} review, ${phoneObj?.brand || ''} user review, camera test, battery life`,
     };
 
-    if (reviewForm.pushToSubscribers) {
-      sendNewsletterBroadcastApi({
-        type: 'review',
-        title: `New Device Review: ${phoneObj?.name || 'Smartphone'} (★ ${newRev.rating}/5)`,
-        message: `"${newRev.comment.slice(0, 150)}..." — Reviewed by ${newRev.userName}.`,
-        actionUrl: `/?phone=${encodeURIComponent(newRev.phoneId)}`,
-        actionLabel: 'Read Review',
-      }).then((res) => {
-        if (res.broadcast) setBroadcasts((prev) => [res.broadcast!, ...prev]);
-      });
-    }
-
     runWithProgress(
       () => {
         if (existingRev) {
@@ -2008,7 +1674,6 @@ export default function AdminDashboardModal() {
           imageUrl: '',
           seoTitle: '',
           seoKeywords: '',
-          pushToSubscribers: false,
         });
       },
       existingRev
@@ -2097,14 +1762,6 @@ export default function AdminDashboardModal() {
           active: section === 'featured' && featuredCategoryFilter === 'top-rated',
         },
         {
-          label: 'Best Budget Phones',
-          onClick: () => {
-            setSection('featured');
-            setFeaturedCategoryFilter('best-budget');
-          },
-          active: section === 'featured' && featuredCategoryFilter === 'best-budget',
-        },
-        {
           label: 'Best Camera Phones',
           onClick: () => {
             setSection('featured');
@@ -2164,7 +1821,7 @@ export default function AdminDashboardModal() {
           active: section === 'news' && articleCategoryFilter === 'news',
         },
         {
-          label: 'Buying Guides',
+          label: 'Buying Guide',
           onClick: () => {
             setSection('news');
             setArticleCategoryFilter('guides');
@@ -2217,56 +1874,12 @@ export default function AdminDashboardModal() {
     },
     {
       id: 'messages',
-      label: 'Contact Messages',
+      label: 'Messages',
       icon: Mail,
-      badge: unreadMessagesCount > 0 ? `${unreadMessagesCount} new` : (contactInquiries.length > 0 ? contactInquiries.length : undefined),
+      badge: contactInquiries.length > 0 ? contactInquiries.length : undefined,
       group: 'COMMUNICATIONS & AUDIENCE',
-      subItems: [
-        {
-          label: `All Inquiries (${contactInquiries.length})`,
-          onClick: () => {
-            setSection('messages');
-            setInquiryFilter('all');
-          },
-          active: section === 'messages' && inquiryFilter === 'all',
-        },
-        {
-          label: `Unread (${unreadMessagesCount})`,
-          onClick: () => {
-            setSection('messages');
-            setInquiryFilter('unread');
-          },
-          active: section === 'messages' && inquiryFilter === 'unread',
-        },
-        {
-          label: 'Replied',
-          onClick: () => {
-            setSection('messages');
-            setInquiryFilter('replied');
-          },
-          active: section === 'messages' && inquiryFilter === 'replied',
-        },
-      ],
     },
-    {
-      id: 'broadcasts',
-      label: 'Push to Subscribers',
-      icon: Radio,
-      badge: subscribers.length > 0 ? `${subscribers.length} subs` : undefined,
-      group: 'COMMUNICATIONS & AUDIENCE',
-      subItems: [
-        {
-          label: 'Compose Broadcast',
-          onClick: () => setSection('broadcasts'),
-          active: section === 'broadcasts',
-        },
-        {
-          label: `Subscribers List (${subscribers.length})`,
-          onClick: () => setSection('broadcasts'),
-          active: section === 'broadcasts',
-        },
-      ],
-    },
+
     {
       id: 'specs',
       label: 'Full Phone Specs',
@@ -2289,26 +1902,9 @@ export default function AdminDashboardModal() {
     { id: 'users', label: 'Users & Roles', icon: Users, badge: usersList.length, group: 'USERS & ACCESS' },
     {
       id: 'content',
-      label: 'Company & Site Pages',
+      label: 'Site Branding & SEO',
       icon: Globe,
       group: 'SETTINGS & SYSTEM',
-      subItems: [
-        {
-          label: 'About Us & Contact Us',
-          onClick: () => setSection('content'),
-          active: section === 'content',
-        },
-        {
-          label: 'Advertise with Us',
-          onClick: () => setSection('content'),
-          active: section === 'content',
-        },
-        {
-          label: 'Privacy Policy & Terms',
-          onClick: () => setSection('content'),
-          active: section === 'content',
-        },
-      ],
     },
     { id: 'ads', label: 'Advertisements', icon: Megaphone, group: 'SETTINGS & SYSTEM' },
     { id: 'scripts', label: 'Header / Footer Scripts', icon: Code2, group: 'SETTINGS & SYSTEM' },
@@ -3012,24 +2608,6 @@ export default function AdminDashboardModal() {
               <Globe className="w-3.5 h-3.5" />
               <span>11. SEO TITLE, FOCUS KEYWORDS &amp; SEARCH META DESCRIPTION</span>
             </h3>
-            <button
-              type="button"
-              onClick={() => {
-                const name = draft.name.trim() || 'Smartphone';
-                const brand = draft.brand.trim() || 'Brand';
-                setDraft((prev: Phone) => ({
-                  ...prev,
-                  seoTitle: `${name} Full Specifications, Review & Price in USD / NGN | ${websiteContent.siteName || 'GsmScope'}`,
-                  seoKeywords: `${name}, ${brand} ${name}, ${name} specs, ${name} price in Nigeria, ${name} USD price, ${prev.keyHighlights.processor}, ${prev.keyHighlights.camera}, ${prev.keyHighlights.battery}`,
-                  seoDescription: `Compare full technical specifications and live street prices for ${name} (${prev.releaseYear}): ${prev.keyHighlights.display} display, ${prev.keyHighlights.processor}, ${prev.keyHighlights.camera}, and ${prev.keyHighlights.battery} battery.`,
-                }));
-                showGlobalToast('Auto-generated optimized SEO Title, Keywords & Description!', 'info');
-              }}
-              className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
-            >
-              <Sparkles className="w-3 h-3" />
-              <span>Auto-Generate SEO</span>
-            </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -3112,15 +2690,6 @@ export default function AdminDashboardModal() {
             />
           </div>
 
-          {(section !== 'dashboard' || adminSubView !== null) && (
-            <button
-              onClick={() => goBack()}
-              className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-semibold transition-colors cursor-pointer"
-              title="Step Back to Previous Admin View"
-            >
-              <span>← Back</span>
-            </button>
-          )}
 
           <button
             onClick={() => {
@@ -3207,25 +2776,18 @@ export default function AdminDashboardModal() {
           <button
             onClick={() => setSection('messages')}
             className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-slate-800 text-xs text-slate-300 cursor-pointer"
-            title="Contact Form Messages"
+            title="Messages"
           >
             <Mail className="w-3.5 h-3.5 text-cyan-400" />
             <span>Messages</span>
-            {unreadMessagesCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-bold">
-                {unreadMessagesCount}
+            {contactInquiries.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-slate-700 text-white text-[10px] font-bold">
+                {contactInquiries.length}
               </span>
             )}
           </button>
 
-          <button
-            onClick={() => setSection('broadcasts')}
-            className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-slate-800 text-xs text-slate-300 cursor-pointer"
-            title="Push Updates to Subscribers"
-          >
-            <Radio className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Broadcast</span>
-          </button>
+
 
           <button
             onClick={() => setSection('reviews')}
@@ -3480,32 +3042,18 @@ export default function AdminDashboardModal() {
                   className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-cyan-500 shadow-sm cursor-pointer transition-all"
                 >
                   <div className="flex items-center justify-between text-slate-400 text-xs">
-                    <span>Inquiries</span>
+                    <span>Messages</span>
                     <Mail className="w-4 h-4 text-cyan-500" />
                   </div>
                   <div className="text-xl font-bold text-slate-900 dark:text-white mt-1.5 font-mono">
                     {contactInquiries.length}
                   </div>
                   <div className="text-[10px] text-cyan-600 dark:text-cyan-400 mt-1 truncate">
-                    {unreadMessagesCount} unread · reply inbox
+                    Received messages
                   </div>
                 </div>
 
-                <div
-                  onClick={() => setSection('broadcasts')}
-                  className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500 shadow-sm cursor-pointer transition-all"
-                >
-                  <div className="flex items-center justify-between text-slate-400 text-xs">
-                    <span>Audience Push</span>
-                    <Radio className="w-4 h-4 text-emerald-500" />
-                  </div>
-                  <div className="text-xl font-bold text-slate-900 dark:text-white mt-1.5 font-mono">
-                    {subscribers.length}
-                  </div>
-                  <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 truncate">
-                    {broadcasts.length} broadcasts sent
-                  </div>
-                </div>
+
               </div>
 
               {/* Recent Published Phones Quick Table */}
@@ -3548,225 +3096,6 @@ export default function AdminDashboardModal() {
                 </div>
               </div>
 
-              {/* Explore, Guides & Company Pages Management Directory */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
-                  <div>
-                    <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-mono">
-                      Site Navigation &amp; Footer Pages Management (Explore · Guides · Company)
-                    </h2>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      Every public page, phone category, buying guide, and company policy has live management here.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Column 1: Explore */}
-                  <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-2.5">
-                    <div className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white font-mono flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
-                      <span>Explore</span>
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400">5 Sections</span>
-                    </div>
-                    <div className="space-y-1.5">
-                      {[
-                        {
-                          label: 'All Phones',
-                          meta: `${phones.length} devices`,
-                          action: () => {
-                            setSection('phones');
-                            setShowPhoneForm(false);
-                          },
-                        },
-                        {
-                          label: 'Best Phones',
-                          meta: `${phones.filter((p) => p.rating >= 4.7 || p.isFeatured || (p.categories || []).includes('top-rated')).length} picks`,
-                          action: () => {
-                            setSection('featured');
-                            setFeaturedCategoryFilter('all');
-                          },
-                        },
-                        {
-                          label: 'Compare Phones',
-                          meta: 'VS Pair & Headline',
-                          action: () => {
-                            setSection('featured');
-                            setFeaturedCategoryFilter('all');
-                          },
-                        },
-                        {
-                          label: 'News & Articles',
-                          meta: `${articles.filter((a) => !String(a.category || '').toLowerCase().includes('guide')).length} posts`,
-                          action: () => {
-                            setSection('news');
-                            setArticleCategoryFilter('news');
-                          },
-                        },
-                        {
-                          label: 'User Reviews',
-                          meta: `${reviews.length} reviews`,
-                          action: () => {
-                            setSection('reviews');
-                            setReviewFilter('all');
-                          },
-                        },
-                      ].map((item, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={item.action}
-                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-emerald-500 text-left transition-all cursor-pointer group"
-                        >
-                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
-                            {item.label}
-                          </span>
-                          <span className="text-[10px] font-mono text-slate-400 group-hover:text-emerald-500">
-                            {item.meta} →
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Column 2: Guides */}
-                  <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-2.5">
-                    <div className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white font-mono flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
-                      <span>Guides &amp; Best Lists</span>
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400">8 Sections</span>
-                    </div>
-                    <div className="space-y-1.5">
-                      {[
-                        {
-                          label: 'Brand Directory',
-                          meta: `${brands.length} brands`,
-                          action: () => setSection('brands'),
-                        },
-                        {
-                          label: 'Buying Guides',
-                          meta: `${articles.filter((a) => String(a.category || '').toLowerCase().includes('guide') || ['FRP & Servicing Tools', 'Charging & Battery', 'Tips & Security'].includes(a.category)).length} guides`,
-                          action: () => {
-                            setSection('news');
-                            setArticleCategoryFilter('guides');
-                          },
-                        },
-                        {
-                          label: 'Best phones overall',
-                          meta: `${phones.filter((p) => (p.categories || []).includes('top-rated') || (p.categories || []).includes('flagship') || p.isFeatured).length} tagged`,
-                          action: () => {
-                            setSection('featured');
-                            setFeaturedCategoryFilter('top-rated');
-                          },
-                        },
-                        {
-                          label: 'Best budget phones',
-                          meta: `${phones.filter((p) => (p.categories || []).includes('best-budget') || (p.categories || []).includes('under-200k') || p.priceNGN <= 200000).length} tagged`,
-                          action: () => {
-                            setSection('featured');
-                            setFeaturedCategoryFilter('best-budget');
-                          },
-                        },
-                        {
-                          label: 'Best camera phones',
-                          meta: `${phones.filter((p) => (p.categories || []).includes('best-camera')).length} tagged`,
-                          action: () => {
-                            setSection('featured');
-                            setFeaturedCategoryFilter('best-camera');
-                          },
-                        },
-                        {
-                          label: 'Best gaming phones',
-                          meta: `${phones.filter((p) => (p.categories || []).includes('best-gaming')).length} tagged`,
-                          action: () => {
-                            setSection('featured');
-                            setFeaturedCategoryFilter('best-gaming');
-                          },
-                        },
-                        {
-                          label: 'Best battery phones',
-                          meta: `${phones.filter((p) => (p.categories || []).includes('best-battery')).length} tagged`,
-                          action: () => {
-                            setSection('featured');
-                            setFeaturedCategoryFilter('best-battery');
-                          },
-                        },
-                        {
-                          label: 'Best 5G phones',
-                          meta: `${phones.filter((p) => (p.categories || []).includes('best-5g') || (p.categories || []).includes('5g') || p.keyHighlights.network5g).length} tagged`,
-                          action: () => {
-                            setSection('featured');
-                            setFeaturedCategoryFilter('best-5g');
-                          },
-                        },
-                      ].map((item, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={item.action}
-                          className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-emerald-500 text-left transition-all cursor-pointer group"
-                        >
-                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
-                            {item.label}
-                          </span>
-                          <span className="text-[10px] font-mono text-slate-400 group-hover:text-emerald-500">
-                            {item.meta} →
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Column 3: Company */}
-                  <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-2.5">
-                    <div className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white font-mono flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
-                      <span>Company Pages</span>
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400">5 Pages</span>
-                    </div>
-                    <div className="space-y-1.5">
-                      {[
-                        {
-                          label: 'About Us',
-                          meta: 'Summary & Custom Copy',
-                          action: () => setSection('content'),
-                        },
-                        {
-                          label: 'Contact Us',
-                          meta: `${websiteContent.officeLocation || 'Sokoto, Nigeria'}`,
-                          action: () => setSection('content'),
-                        },
-                        {
-                          label: 'Advertise with Us',
-                          meta: 'Tiers, Rates & Ad Slots',
-                          action: () => setSection('content'),
-                        },
-                        {
-                          label: 'Privacy Policy',
-                          meta: 'Legal Clauses & Rich Text',
-                          action: () => setSection('content'),
-                        },
-                        {
-                          label: 'Terms of Service',
-                          meta: 'Terms & Conditions',
-                          action: () => setSection('content'),
-                        },
-                      ].map((item, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={item.action}
-                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-emerald-500 text-left transition-all cursor-pointer group"
-                        >
-                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
-                            {item.label}
-                          </span>
-                          <span className="text-[10px] font-mono text-slate-400 group-hover:text-emerald-500">
-                            {item.meta} →
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
 
               {/* Management Modules Quick Access Grid */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
@@ -3783,13 +3112,12 @@ export default function AdminDashboardModal() {
                     { id: 'news', title: 'Publish & Manage News/Articles', desc: 'Write reviews, news stories, and buyer guides', icon: FileText },
                     { id: 'reviews', title: 'Manage Reviews / Comments', desc: 'Approve, reject, or delete community device reviews', icon: MessageSquare },
                     { id: 'featured', title: 'Manage Featured Phones', desc: 'Control homepage hero carousel & category badges', icon: Star },
-                    { id: 'ads', title: 'Manage Advertisements & Placements', desc: 'Control 7 page ad placements, Learn More buttons & script ad codes', icon: Megaphone },
-                    { id: 'content', title: 'Manage Website Content', desc: 'Edit site title, hero copy, contact details & footer text', icon: Globe },
+                    { id: 'ads', title: 'Manage Advertisements & Placements', desc: 'Control 8 page ad placements, Learn More buttons & script ad codes', icon: Megaphone },
+                    { id: 'content', title: 'Site Branding & Global SEO', desc: 'Edit logos, favicon, global SEO title/keywords, contact details & footer text', icon: Globe },
                     { id: 'spec-tables', title: 'Manage Spec Tables & Subtables', desc: 'Customize specification table headings, order & subfields', icon: Table2 },
                     { id: 'users', title: 'Manage Users & Roles', desc: 'Add/remove administrators, editors, authors & moderators', icon: Users },
                     { id: 'scripts', title: 'Header / Body / Footer Scripts', desc: 'Manage meta verification tags, analytics & custom code', icon: Code2 },
-                    { id: 'messages', title: 'Contact Form Inquiries & Reply', desc: 'View messages from contact form and send direct email replies', icon: Mail },
-                    { id: 'broadcasts', title: 'Push to Newsletter Subscribers', desc: 'Dispatch news alerts, launches & price drop notices to audience', icon: Radio },
+                    { id: 'messages', title: 'Messages', desc: 'Receive, read, and delete incoming messages', icon: Mail },
                   ].map((cap) => {
                     const Icon = cap.icon;
                     return (
@@ -3832,18 +3160,6 @@ export default function AdminDashboardModal() {
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 self-start">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!showPhoneForm) {
-                        openCreatePhoneForm();
-                      }
-                    }}
-                    className="px-3.5 py-2 rounded-lg bg-emerald-950/90 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>AI Source &amp; Add Phone</span>
-                  </button>
                   <button
                     onClick={() => {
                       if (showPhoneForm) {
@@ -3893,93 +3209,6 @@ export default function AdminDashboardModal() {
                     </div>
                   </div>
 
-                  {/* AI SMARTPHONE SPEC SOURCER BANNER (OFFICIAL MANUFACTURER & RELIABLE SOURCES) */}
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-50/90 via-teal-50/60 to-slate-50 dark:from-[#062116] dark:via-[#071a12] dark:to-slate-950 border-2 border-emerald-500/40 space-y-3 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <span className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs">
-                          <Sparkles className="w-4 h-4" />
-                        </span>
-                        <div>
-                          <h3 className="text-sm font-bold text-slate-900 dark:text-white font-['Space_Grotesk'] flex items-center gap-2">
-                            <span>AI Smartphone Spec Sourcer — Auto-Fill All 12 Specification Tables</span>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-600/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                              <ShieldCheck className="w-3 h-3" />
-                              Official Manufacturer &amp; Trusted Sources
-                            </span>
-                          </h3>
-                          <p className="text-xs text-slate-600 dark:text-slate-400">
-                            Enter a phone title (e.g. <strong>Samsung Galaxy S25 Ultra</strong>, <strong>iPhone 16 Pro Max</strong>) or model number (e.g. <strong>SM-S938B</strong>, <strong>A3296</strong>) and click <strong>Source to Fill</strong>.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-2.5">
-                      <div className="relative flex-1">
-                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        <input
-                          type="text"
-                          value={aiPhoneQuery}
-                          onChange={(e) => setAiPhoneQuery(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAiSourcePhoneSpecs('phoneDraft');
-                            }
-                          }}
-                          placeholder="Type phone title or model number (e.g. Samsung Galaxy S25 Ultra, SM-S938B, Redmi Note 14 Pro+, iPhone 16 Pro)..."
-                          className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-500/40 text-xs font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        disabled={isAiSourcingPhone}
-                        onClick={() => handleAiSourcePhoneSpecs('phoneDraft')}
-                        className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-md shrink-0 transition-colors"
-                      >
-                        {isAiSourcingPhone ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Sourcing from Manufacturer &amp; Filling Specs...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="w-4 h-4" />
-                            <span>Source to Fill All Specs</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Display Verified Genuine Sources */}
-                    {aiPhoneSources.length > 0 && (
-                      <div className="pt-2 border-t border-emerald-500/20 space-y-1.5">
-                        <span className="text-[10px] font-mono uppercase font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                          <Globe className="w-3.5 h-3.5" />
-                          <span>Verified Sources Used (Official Manufacturer Website &amp; Hardware Authorities):</span>
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {aiPhoneSources.map((src, idx) => (
-                            <a
-                              key={idx}
-                              href={src.uri}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] border transition-colors ${
-                                src.isManufacturer
-                                  ? 'bg-emerald-600/15 border-emerald-500/50 text-emerald-800 dark:text-emerald-300 font-bold'
-                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-emerald-500'
-                              }`}
-                            >
-                              <span className="truncate max-w-[260px]">{src.title}</span>
-                              <ExternalLink className="w-3 h-3 shrink-0" />
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
 
                   {/* GENERAL & PRICING & MEDIA META BOX */}
                   <div className="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-4">
@@ -3987,33 +3216,6 @@ export default function AdminDashboardModal() {
                       <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400">
                         0. GENERAL TABLE, IDENTITY, PRICING & MEDIA
                       </h3>
-                      <button
-                        type="button"
-                        disabled={isAiSourcingPhone}
-                        onClick={() =>
-                          handleAiSourcePhoneSpecs(
-                            'phoneDraft',
-                            phoneDraft.name.trim() ||
-                              (phoneDraft.modelNumber && phoneDraft.modelNumber !== 'SM-NEW2025'
-                                ? phoneDraft.modelNumber.trim()
-                                : aiPhoneQuery.trim())
-                          )
-                        }
-                        className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-[11px] font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
-                        title="Source all specifications using the Phone Model Name or Model Number entered below"
-                      >
-                        {isAiSourcingPhone ? (
-                          <>
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            <span>Sourcing Specs...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="w-3 h-3" />
-                            <span>Source to Fill from Title / Model #</span>
-                          </>
-                        )}
-                      </button>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       <div>
@@ -4080,15 +3282,6 @@ export default function AdminDashboardModal() {
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Release Year</label>
-                        <input
-                          type="number"
-                          value={phoneDraft.releaseYear}
-                          onChange={(e) => setPhoneDraft({ ...phoneDraft, releaseYear: Number(e.target.value) })}
-                          className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono"
-                        />
-                      </div>
-                      <div>
                         <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Price (USD $) *</label>
                         <input
                           type="number"
@@ -4108,37 +3301,6 @@ export default function AdminDashboardModal() {
                           className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono"
                         />
                       </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Old Price NGN (Optional)</label>
-                        <input
-                          type="number"
-                          value={phoneDraft.oldPriceNGN || ''}
-                          onChange={(e) =>
-                            setPhoneDraft({
-                              ...phoneDraft,
-                              oldPriceNGN: e.target.value ? Number(e.target.value) : undefined,
-                            })
-                          }
-                          placeholder="e.g. 500000"
-                          className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Price Segment Tier</label>
-                        <select
-                          value={phoneDraft.priceRange}
-                          onChange={(e) => setPhoneDraft({ ...phoneDraft, priceRange: e.target.value as PriceRangeCategory })}
-                          className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-                        >
-                          <option value="under100k">Under ₦100k (Entry)</option>
-                          <option value="100k-200k">₦100k – ₦200k (Budget)</option>
-                          <option value="200k-350k">₦200k – ₦350k (Mid-Range)</option>
-                          <option value="350k-600k">₦350k – ₦600k (Upper Mid-Range)</option>
-                          <option value="600k-1.2m">₦600k – ₦1.2M (Premium)</option>
-                          <option value="flagship">Flagship (₦1.2M+)</option>
-                        </select>
-                      </div>
                       <div>
                         <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Screen Size (Inches, numeric)</label>
                         <input
@@ -4148,23 +3310,6 @@ export default function AdminDashboardModal() {
                           onChange={(e) => setPhoneDraft({ ...phoneDraft, screenSizeInches: Number(e.target.value) })}
                           className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono"
                         />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Card Accent Glow Color</label>
-                        <div className="flex gap-2">
-                          <input
-                            type="color"
-                            value={phoneDraft.accentColor || '#10b981'}
-                            onChange={(e) => setPhoneDraft({ ...phoneDraft, accentColor: e.target.value })}
-                            className="h-9 w-12 rounded cursor-pointer border border-slate-300 dark:border-slate-700"
-                          />
-                          <input
-                            type="text"
-                            value={phoneDraft.accentColor || '#10b981'}
-                            onChange={(e) => setPhoneDraft({ ...phoneDraft, accentColor: e.target.value })}
-                            className="flex-1 px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono"
-                          />
-                        </div>
                       </div>
                     </div>
 
@@ -4303,7 +3448,7 @@ export default function AdminDashboardModal() {
                               checked={Boolean(phoneDraft.isFeatured)}
                               onChange={(e) => setPhoneDraft({ ...phoneDraft, isFeatured: e.target.checked })}
                             />
-                            <span>Featured on Homepage Hero Carousel</span>
+                            <span>Featured Phone (Homepage Spotlight — if unchecked, appears in Latest Phones)</span>
                           </label>
                           <label className="flex items-center gap-1.5 cursor-pointer font-semibold text-sky-600 dark:text-sky-400">
                             <input
@@ -4328,18 +3473,7 @@ export default function AdminDashboardModal() {
                     setStorageVariantsText
                   )}
 
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
-                    <label className="flex items-center gap-2.5 cursor-pointer bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-emerald-800 dark:text-emerald-300 select-none">
-                      <input
-                        type="checkbox"
-                        checked={pushPhoneToSubscribers}
-                        onChange={(e) => setPushPhoneToSubscribers(e.target.checked)}
-                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
-                      />
-                      <Radio className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-                      <span>Push launch alert to newsletter subscribers ({subscribers.length} recipients)</span>
-                    </label>
-
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
@@ -4410,11 +3544,25 @@ export default function AdminDashboardModal() {
                             <div>
                               <div className="font-bold text-slate-900 dark:text-white">{phone.name}</div>
                               <div className="flex items-center gap-1.5 mt-0.5">
-                                {phone.isFeatured && (
-                                  <span className="px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[10px] font-mono">
-                                    Featured
-                                  </span>
-                                )}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    runWithProgress(
+                                      () => updatePhone({ ...phone, isFeatured: !phone.isFeatured }),
+                                      phone.isFeatured
+                                        ? `${phone.name} moved from Featured to Latest phones.`
+                                        : `${phone.name} assigned to Featured phone!`
+                                    )
+                                  }
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors ${
+                                    phone.isFeatured
+                                      ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/30'
+                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400'
+                                  }`}
+                                  title="Click to toggle Featured Phone status"
+                                >
+                                  {phone.isFeatured ? '★ Featured' : '+ Assign Featured'}
+                                </button>
                                 {phone.keyHighlights.network5g && (
                                   <span className="px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono">
                                     5G
@@ -4518,30 +3666,6 @@ export default function AdminDashboardModal() {
                   </select>
                   <button
                     type="button"
-                    disabled={isAiSourcingPhone}
-                    onClick={() =>
-                      handleAiSourcePhoneSpecs(
-                        'specPhoneDraft',
-                        `${specPhoneDraft.brand} ${specPhoneDraft.name} ${specPhoneDraft.modelNumber || ''}`.trim()
-                      )
-                    }
-                    className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-60 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow"
-                    title="Auto-fill all 12 specification tables from official manufacturer & trusted hardware sources"
-                  >
-                    {isAiSourcingPhone ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Sourcing Official Specs...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Source to Fill All Specs</span>
-                      </>
-                    )}
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => handleViewPhoneOnPublicSite(specPhoneDraft)}
                     className="px-3 py-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                   >
@@ -4557,42 +3681,6 @@ export default function AdminDashboardModal() {
                   </button>
                 </div>
               </div>
-
-              {aiPhoneSources.length > 0 && (
-                <div className="p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/25 border border-emerald-500/30 space-y-2">
-                  <div className="text-[11px] font-mono uppercase tracking-wider font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>Verified Manufacturer &amp; Hardware Authority Sources Used:</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {aiPhoneSources.map((src, idx) => {
-                      const linkUrl = src.url || src.uri || '#';
-                      return (
-                        <a
-                          key={`${linkUrl}-${idx}`}
-                          href={linkUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
-                            src.isManufacturer
-                              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500/25'
-                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-emerald-500/40'
-                          }`}
-                        >
-                          <Globe className="w-3 h-3 text-emerald-500 shrink-0" />
-                          <span className="truncate max-w-[220px]">{src.title || src.domain || linkUrl}</span>
-                        {src.isManufacturer && (
-                          <span className="px-1 py-0.2 rounded bg-emerald-600 text-white text-[9px] font-mono uppercase">
-                            OEM
-                          </span>
-                        )}
-                        <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
-                      </a>
-                    );
-                  })}
-                  </div>
-                </div>
-              )}
 
               {/* GENERAL TABLE FIELDS FOR SELECTED PHONE */}
               <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-sm">
@@ -4651,6 +3739,29 @@ export default function AdminDashboardModal() {
                       className="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-mono"
                     />
                   </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-slate-200 dark:border-slate-800 text-xs">
+                  <label className="flex items-center gap-1.5 cursor-pointer font-semibold text-emerald-600 dark:text-emerald-400">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(specPhoneDraft.isFeatured)}
+                      onChange={(e) =>
+                        setSpecPhoneDraft({ ...specPhoneDraft, isFeatured: e.target.checked })
+                      }
+                    />
+                    <span>Featured Phone (Homepage Hero Spotlight — if unchecked, appears in Latest Phones)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer font-semibold text-sky-600 dark:text-sky-400">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(specPhoneDraft.isPopular)}
+                      onChange={(e) =>
+                        setSpecPhoneDraft({ ...specPhoneDraft, isPopular: e.target.checked })
+                      }
+                    />
+                    <span>Trending / Popular Phone</span>
+                  </label>
                 </div>
 
                 {/* Primary Phone Feature Image inside Full Specs Editor */}
@@ -5013,15 +4124,18 @@ export default function AdminDashboardModal() {
                       className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
                     />
                   </div>
-                  <RichTextEditor
-                    label="Brand Description"
-                    helperText="Supports H1–H3 & Bold"
-                    compactToolbar
-                    rows={3}
-                    value={brandForm.description}
-                    onChange={(val) => setBrandForm({ ...brandForm, description: val })}
-                    placeholder="Write brand overview with headings or bold highlights..."
-                  />
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+                      Brand Description
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={brandForm.description}
+                      onChange={(e) => setBrandForm({ ...brandForm, description: e.target.value })}
+                      placeholder="Write brand overview..."
+                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs leading-relaxed"
+                    />
+                  </div>
 
                   {/* Brand SEO Title & Keywords */}
                   <div className="p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-500/30 space-y-2">
@@ -5454,7 +4568,7 @@ export default function AdminDashboardModal() {
                       setArticleForm({
                         ...articleForm,
                         title: '',
-                        category: 'Buying Guides',
+                        category: 'Buying Guide',
                         summary: '',
                         content: '',
                         tags: 'Buying Guide, Best Phones, Recommendations',
@@ -5494,77 +4608,7 @@ export default function AdminDashboardModal() {
                     {editingArticleId ? 'Edit Post / Guide / Review' : 'Publish New Post / Guide / Review'}
                   </h2>
 
-                  {/* AI Editorial Review & Article Writer Assistant */}
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-sky-500/10 border border-emerald-500/30 space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-mono uppercase tracking-wider font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                        <span>AI Review &amp; Article Assistant</span>
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[9px] font-mono uppercase font-bold">
-                        Manufacturer Grounded
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                      Enter a smartphone model or headline topic below and click <strong>Source &amp; Write</strong> to generate a complete review or article grounded on official manufacturer specs.
-                    </p>
-                    <input
-                      type="text"
-                      value={aiArticleQuery}
-                      onChange={(e) => setAiArticleQuery(e.target.value)}
-                      placeholder="Device or topic (e.g. Samsung Galaxy S25 Ultra Review)"
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                    />
-                    <input
-                      type="text"
-                      value={aiArticleNotes}
-                      onChange={(e) => setAiArticleNotes(e.target.value)}
-                      placeholder="Optional focus (e.g. camera test, gaming & battery)"
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                    />
-                    <button
-                      type="button"
-                      disabled={isAiGeneratingArticle}
-                      onClick={handleAiGenerateEditorialArticle}
-                      className="w-full py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-60 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-                    >
-                      {isAiGeneratingArticle ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Sourcing &amp; Writing with AI...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>Source &amp; Write Review / Article</span>
-                        </>
-                      )}
-                    </button>
-                    {aiArticleSources.length > 0 && (
-                      <div className="pt-1.5 border-t border-emerald-500/20 space-y-1">
-                        <div className="text-[9px] font-mono uppercase text-emerald-700 dark:text-emerald-300 font-bold">
-                          Verified Sources ({aiArticleSources.length}):
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {aiArticleSources.slice(0, 4).map((src, idx) => {
-                            const linkUrl = src.url || src.uri || '#';
-                            return (
-                              <a
-                                key={`${linkUrl}-${idx}`}
-                                href={linkUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] text-emerald-700 dark:text-emerald-300 hover:underline"
-                              >
-                                <Globe className="w-2.5 h-2.5 shrink-0" />
-                                <span className="truncate max-w-[130px]">{src.domain || src.title || linkUrl}</span>
-                              </a>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+
                   <div>
                     <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Headline *</label>
                     <input
@@ -5586,15 +4630,8 @@ export default function AdminDashboardModal() {
                       >
                         <option value="News">News</option>
                         <option value="Reviews">Reviews</option>
-                        <option value="Review">Review</option>
-                        <option value="Buying Guides">Buying Guides</option>
                         <option value="Buying Guide">Buying Guide</option>
-                        <option value="FRP & Servicing Tools">FRP &amp; Servicing Tools</option>
-                        <option value="Charging & Battery">Charging &amp; Battery</option>
-                        <option value="Tips & Security">Tips &amp; Security</option>
                         <option value="Launch">Launch</option>
-                        <option value="Phone News">Phone News</option>
-                        <option value="Tech Updates">Tech Updates</option>
                       </select>
                     </div>
                     <div>
@@ -5638,9 +4675,9 @@ export default function AdminDashboardModal() {
                           const file = e.target.files?.[0];
                           if (!file) return;
                           const cat =
-                            articleForm.category === 'Buying Guides'
+                            articleForm.category === 'Buying Guide'
                               ? 'guide'
-                              : articleForm.category === 'Reviews' || articleForm.category === 'Review'
+                              : articleForm.category === 'Reviews'
                               ? 'review'
                               : 'news';
                           handleDirectFileUploadToServer(
@@ -5686,22 +4723,26 @@ export default function AdminDashboardModal() {
                       className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
                     />
                   </div>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+                      Summary / Lead Excerpt
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={articleForm.summary}
+                      onChange={(e) => setArticleForm({ ...articleForm, summary: e.target.value })}
+                      placeholder="Write a concise lead summary or excerpt..."
+                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
+                    />
+                  </div>
                   <RichTextEditor
-                    label="Summary / Excerpt"
-                    helperText="Supports Bold & Highlights"
-                    compactToolbar
-                    rows={2}
-                    value={articleForm.summary}
-                    onChange={(val) => setArticleForm({ ...articleForm, summary: val })}
-                    placeholder="Write a concise lead summary or bold key highlights..."
-                  />
-                  <RichTextEditor
-                    label="Full Article / Guide / Review Body"
-                    helperText="H1, H2, H3, H4, Bold Text & Bold Paragraph"
-                    rows={8}
+                    label="Article Body (Headings & Bold Text)"
+                    helperText="H1, H2, H3 & Bold text only"
+                    headingsAndBodyOnly
+                    rows={10}
                     value={articleForm.content}
                     onChange={(val) => setArticleForm({ ...articleForm, content: val })}
-                    placeholder="Write your full article, buying guide, or review. Use H1, H2, H3, H4 buttons for section headings and Bold / Bold ¶ to make words or entire paragraphs bold..."
+                    placeholder="Write your article content. Use H1, H2, H3 buttons for section headings and Bold for bold text..."
                   />
 
                   {/* Article / Guide / Review SEO Title & Keywords Box */}
@@ -5710,22 +4751,6 @@ export default function AdminDashboardModal() {
                       <span className="text-[11px] font-mono uppercase font-bold text-emerald-600 dark:text-emerald-400">
                         SEO Title &amp; Focus Keywords
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const title = articleForm.title.trim() || 'Smartphone Guide & News';
-                          setArticleForm((prev) => ({
-                            ...prev,
-                            seoTitle: `${title} | ${websiteContent.siteName || 'GsmScope'}`,
-                            seoKeywords: prev.tags || `${prev.category}, Smartphone Review, Buying Guide, GsmScope`,
-                            seoDescription: prev.summary || title,
-                          }));
-                          showGlobalToast('Auto-filled post SEO fields!', 'info');
-                        }}
-                        className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
-                      >
-                        Auto-Fill SEO
-                      </button>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">
@@ -5775,16 +4800,6 @@ export default function AdminDashboardModal() {
                       />
                       <span>Featured Story</span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 p-2.5 rounded-lg text-xs font-semibold text-emerald-800 dark:text-emerald-300 select-none">
-                      <input
-                        type="checkbox"
-                        checked={pushArticleToSubscribers}
-                        onChange={(e) => setPushArticleToSubscribers(e.target.checked)}
-                        className="w-4 h-4 rounded text-emerald-600 accent-emerald-600 cursor-pointer"
-                      />
-                      <Radio className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>Push post to subscribers ({subscribers.length} audience)</span>
-                    </label>
                   </div>
                   <div className="flex gap-2 pt-2">
                     <button
@@ -5826,7 +4841,7 @@ export default function AdminDashboardModal() {
                         },
                         {
                           id: 'guides',
-                          label: `Buying Guides (${
+                          label: `Buying Guide (${
                             articles.filter((a) => {
                               const c = String(a.category || '').toLowerCase();
                               return (
@@ -6024,107 +5039,7 @@ export default function AdminDashboardModal() {
                     )}
                   </div>
 
-                  {/* AI Review Assistant inside Admin Reviews Section */}
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-sky-500/10 border border-emerald-500/30 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-sm">
-                          <Sparkles className="w-4 h-4" />
-                        </span>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-xs font-bold text-slate-900 dark:text-white">
-                              AI Review Assistant — Source &amp; Write Review
-                            </h3>
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[9px] font-mono uppercase font-bold">
-                              Official OEM &amp; GSMArena Grounded
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                            Select a target phone below or type any smartphone model/number and click <strong>Source &amp; Write Review</strong> to auto-fill a comprehensive, factual review with SEO metadata.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5">
-                      <div className="md:col-span-5">
-                        <input
-                          type="text"
-                          value={aiAdminReviewQuery}
-                          onChange={(e) => setAiAdminReviewQuery(e.target.value)}
-                          placeholder="Optional custom model/number (or leave blank to use selected Target Phone)"
-                          className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                        />
-                      </div>
-                      <div className="md:col-span-4">
-                        <input
-                          type="text"
-                          value={aiAdminReviewNotes}
-                          onChange={(e) => setAiAdminReviewNotes(e.target.value)}
-                          placeholder="Optional focus notes (e.g. 5G battery test, camera zoom, thermal performance)"
-                          className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                        />
-                      </div>
-                      <div className="md:col-span-3">
-                        <button
-                          type="button"
-                          disabled={isAiGeneratingAdminReview}
-                          onClick={handleAiGenerateAdminReview}
-                          className="w-full h-full py-2 px-3 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-60 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-                        >
-                          {isAiGeneratingAdminReview ? (
-                            <>
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              <span>Sourcing &amp; Writing...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="w-3.5 h-3.5" />
-                              <span>Source &amp; Write Review</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {(aiAdminReviewSpecsSummary || aiAdminReviewSources.length > 0) && (
-                      <div className="pt-2 border-t border-emerald-500/20 space-y-2">
-                        {aiAdminReviewSpecsSummary && (
-                          <div className="text-[11px] text-slate-700 dark:text-slate-300 bg-white/80 dark:bg-slate-900/70 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
-                            <span className="font-mono uppercase text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mr-1.5">
-                              Verified Hardware:
-                            </span>
-                            {aiAdminReviewSpecsSummary}
-                          </div>
-                        )}
-                        {aiAdminReviewSources.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-[10px] font-mono uppercase text-emerald-700 dark:text-emerald-300 font-bold flex items-center gap-1">
-                              <ShieldCheck className="w-3 h-3" />
-                              <span>Sources:</span>
-                            </span>
-                            {aiAdminReviewSources.map((src, idx) => {
-                              const linkUrl = src.url || src.uri || '#';
-                              return (
-                                <a
-                                  key={`${linkUrl}-${idx}`}
-                                  href={linkUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] text-slate-700 dark:text-slate-300 hover:border-emerald-500/40"
-                                >
-                                  <Globe className="w-2.5 h-2.5 text-emerald-500" />
-                                  <span className="truncate max-w-[160px]">{src.title || src.domain || linkUrl}</span>
-                                  <ExternalLink className="w-2.5 h-2.5 opacity-60" />
-                                </a>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Target Phone *</label>
@@ -6274,17 +5189,7 @@ export default function AdminDashboardModal() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <label className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={reviewForm.pushToSubscribers}
-                        onChange={(e) => setReviewForm({ ...reviewForm, pushToSubscribers: e.target.checked })}
-                        className="accent-emerald-600"
-                      />
-                      <Radio className="w-3.5 h-3.5" />
-                      <span>Push this review to newsletter subscribers ({subscribers.length})</span>
-                    </label>
+                  <div className="flex justify-end pt-2">
                     <button
                       type="submit"
                       className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer"
@@ -6361,7 +5266,6 @@ export default function AdminDashboardModal() {
                                 imageUrl: rev.imageUrl || '',
                                 seoTitle: rev.seoTitle || '',
                                 seoKeywords: rev.seoKeywords || '',
-                                pushToSubscribers: false,
                               });
                               setShowReviewForm(true);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -6381,25 +5285,6 @@ export default function AdminDashboardModal() {
                           >
                             <Check className="w-3.5 h-3.5" />
                             <span>Approve</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              sendNewsletterBroadcastApi({
-                                type: 'review',
-                                title: `Community Review: ${phone?.name || rev.phoneName || 'Phone'} (★ ${rev.rating}/5)`,
-                                message: `"${rev.comment.slice(0, 150)}..." — Verified owner review by ${rev.userName} from ${rev.location}.`,
-                                actionUrl: `/?phone=${encodeURIComponent(rev.phoneId)}`,
-                                actionLabel: 'Read Full Review',
-                              }).then((res) => {
-                                if (res.broadcast) setBroadcasts((prev) => [res.broadcast!, ...prev]);
-                                showGlobalToast('Pushed review highlight to newsletter subscribers!', 'success');
-                              });
-                            }}
-                            className="px-2.5 py-1.5 rounded bg-sky-600/10 hover:bg-sky-600 text-sky-700 dark:text-sky-300 hover:text-white text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                            title="Broadcast review highlight to newsletter subscribers"
-                          >
-                            <Radio className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Push Review</span>
                           </button>
                           <button
                             onClick={() =>
@@ -6436,10 +5321,10 @@ export default function AdminDashboardModal() {
             <div className="space-y-6">
               <div className="border-b border-slate-200 dark:border-slate-800 pb-4">
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white font-['Space_Grotesk']">
-                  Best Phones, 6 Buying Guide Categories &amp; Compare Phones
+                  Best Phones, 5 Buying Guide Categories &amp; Compare Phones
                 </h1>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Manage Compare Phones settings, Homepage Featured Spotlights, and the 6 Best Phone categories under Explore &amp; Guides (Best phones overall, Best budget, Best camera, Best gaming, Best battery, and Best 5G).
+                  Manage Compare Phones settings, Homepage Featured Spotlights, and the 5 Best Phone categories under Explore &amp; Guides (Best phones overall, Best camera, Best gaming, Best battery, and Best 5G).
                 </p>
               </div>
 
@@ -6541,7 +5426,7 @@ export default function AdminDashboardModal() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <div className="text-xs font-bold uppercase font-mono text-emerald-600 dark:text-emerald-400">
-                      Filter &amp; Curate the 6 Guides Best Phone Categories
+                      Filter &amp; Curate the 5 Guides Best Phone Categories
                     </div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
                       Click any category below to view and manage phones in that list, or toggle badges on any phone in the table below.
@@ -6560,17 +5445,6 @@ export default function AdminDashboardModal() {
                           (p.categories || []).includes('top-rated') ||
                           (p.categories || []).includes('flagship') ||
                           p.isFeatured
-                      ).length,
-                    },
-                    {
-                      id: 'best-budget',
-                      label: 'Best budget phones',
-                      badgeHint: 'best-budget / under-200k',
-                      count: phones.filter(
-                        (p) =>
-                          (p.categories || []).includes('best-budget') ||
-                          (p.categories || []).includes('under-200k') ||
-                          p.priceNGN <= 200000
                       ).length,
                     },
                     {
@@ -6654,9 +5528,6 @@ export default function AdminDashboardModal() {
                         const tags = phone.categories || [];
                         if (featuredCategoryFilter === 'top-rated') {
                           return tags.includes('top-rated') || tags.includes('flagship') || phone.isFeatured;
-                        }
-                        if (featuredCategoryFilter === 'best-budget') {
-                          return tags.includes('best-budget') || tags.includes('under-200k') || phone.priceNGN <= 200000;
                         }
                         if (featuredCategoryFilter === 'best-5g') {
                           return tags.includes('best-5g') || tags.includes('5g') || phone.keyHighlights.network5g;
@@ -6767,7 +5638,7 @@ export default function AdminDashboardModal() {
           )}
 
           {/* =================================================================
-              SECTION 9: MANAGE ADVERTISEMENTS & 7 PAGE AD PLACEMENTS
+              SECTION 9: MANAGE ADVERTISEMENTS & 8 PAGE AD PLACEMENTS
           ================================================================= */}
           {section === 'ads' && (
             <div className="space-y-6">
@@ -6778,14 +5649,14 @@ export default function AdminDashboardModal() {
                     <span>Ad Placements, Learn More Buttons &amp; Script Ad Codes</span>
                   </h1>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Manage all 7 dedicated page ad placements, custom Learn More buttons, banner images, and HTML / JavaScript (&lt;script&gt;) ad codes. When a placement is turned off, its position on the page remains completely normal with zero empty space.
+                    Manage all 8 dedicated page ad placements, custom Learn More buttons, banner images, and HTML / JavaScript (&lt;script&gt;) ad codes. When a placement is turned off, its position on the page remains completely normal with zero empty space.
                   </p>
                 </div>
 
                 <button
                   onClick={() =>
                     runWithProgress(
-                      () => updateAdSettings(localAdSettings),
+                      () => updateAdSettings(localAdSettingsRef.current),
                       'Saved all Ad Placements, Learn More buttons, and Script Ad Codes.'
                     )
                   }
@@ -6813,8 +5684,15 @@ export default function AdminDashboardModal() {
                     file,
                     'banner',
                     `${targetPlacement.name} Banner`,
-                    (url) => {
-                      updatePlacementField(targetPlacementId, { imageUrl: url });
+                    (url, mediaItem, dataUrl) => {
+                      updatePlacementField(
+                        targetPlacementId,
+                        {
+                          imageUrl: url,
+                          imageDataUrl: dataUrl || mediaItem?.dataUrl || undefined,
+                        },
+                        true
+                      );
                     }
                   );
                   e.target.value = '';
@@ -7067,6 +5945,10 @@ export default function AdminDashboardModal() {
                         const item: AdPlacementConfig = {
                           ...DEFAULT_AD_PLACEMENTS[placementId],
                           ...(placementsMap[placementId] || {}),
+                          id: DEFAULT_AD_PLACEMENTS[placementId].id,
+                          name: DEFAULT_AD_PLACEMENTS[placementId].name,
+                          pageLabel: DEFAULT_AD_PLACEMENTS[placementId].pageLabel,
+                          positionLabel: DEFAULT_AD_PLACEMENTS[placementId].positionLabel,
                         };
 
                         return (
@@ -7156,9 +6038,13 @@ export default function AdminDashboardModal() {
                                       key={modeOpt.value}
                                       type="button"
                                       onClick={() =>
-                                        updatePlacementField(placementId, {
-                                          adType: modeOpt.value as AdPlacementConfig['adType'],
-                                        })
+                                        updatePlacementField(
+                                          placementId,
+                                          {
+                                            adType: modeOpt.value as AdPlacementConfig['adType'],
+                                          },
+                                          true
+                                        )
                                       }
                                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
                                         item.adType === modeOpt.value
@@ -7230,18 +6116,11 @@ export default function AdminDashboardModal() {
                                   </div>
 
                                   {/* Optional Banner Image Upload / Media Library */}
-                                  <div>
+                                  <div className="space-y-2">
                                     <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                                      Banner Image URL (Optional — Upload to /uploads or Pick from Media Library)
+                                      Banner Image URL (Optional — Rendered in Original Image Size)
                                     </label>
                                     <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
-                                      {item.imageUrl && (
-                                        <img
-                                          src={item.imageUrl}
-                                          alt={item.title}
-                                          className="w-12 h-9 rounded-lg object-cover bg-slate-950 border border-slate-300 dark:border-slate-700 shrink-0"
-                                        />
-                                      )}
                                       <input
                                         type="text"
                                         value={item.imageUrl || ''}
@@ -7268,7 +6147,17 @@ export default function AdminDashboardModal() {
                                           openMediaPicker(
                                             `Select Banner Image for ${item.name}`,
                                             'banner',
-                                            (url) => updatePlacementField(placementId, { imageUrl: url })
+                                            (url) => {
+                                              const matchedMedia = mediaLibrary.find((m) => m.url === url);
+                                              updatePlacementField(
+                                                placementId,
+                                                {
+                                                  imageUrl: url,
+                                                  imageDataUrl: matchedMedia?.dataUrl || undefined,
+                                                },
+                                                true
+                                              );
+                                            }
                                           )
                                         }
                                         className="px-3 py-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-1 cursor-pointer shrink-0"
@@ -7276,10 +6165,16 @@ export default function AdminDashboardModal() {
                                         <ImageIcon className="w-3.5 h-3.5" />
                                         <span>Library</span>
                                       </button>
-                                      {item.imageUrl && (
+                                      {(item.imageUrl || item.imageDataUrl) && (
                                         <button
                                           type="button"
-                                          onClick={() => updatePlacementField(placementId, { imageUrl: '' })}
+                                          onClick={() =>
+                                            updatePlacementField(
+                                              placementId,
+                                              { imageUrl: '', imageDataUrl: '' },
+                                              true
+                                            )
+                                          }
                                           className="p-2 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-600 hover:text-white text-xs cursor-pointer shrink-0"
                                           title="Remove image"
                                         >
@@ -7287,6 +6182,20 @@ export default function AdminDashboardModal() {
                                         </button>
                                       )}
                                     </div>
+                                    {(item.imageUrl || item.imageDataUrl) && (
+                                      <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center overflow-x-auto">
+                                        <img
+                                          src={item.imageUrl || item.imageDataUrl}
+                                          onError={(e) => {
+                                            if (item.imageDataUrl && e.currentTarget.src !== item.imageDataUrl) {
+                                              e.currentTarget.src = item.imageDataUrl;
+                                            }
+                                          }}
+                                          alt={item.title || item.name}
+                                          className="w-auto h-auto max-w-full block rounded-lg"
+                                        />
+                                      </div>
+                                    )}
                                   </div>
 
                                   {/* Learn More Button Configuration Box */}
@@ -7297,7 +6206,7 @@ export default function AdminDashboardModal() {
                                           type="checkbox"
                                           checked={item.showLearnMore}
                                           onChange={(e) =>
-                                            updatePlacementField(placementId, { showLearnMore: e.target.checked })
+                                            updatePlacementField(placementId, { showLearnMore: e.target.checked }, true)
                                           }
                                           className="accent-emerald-600 cursor-pointer"
                                         />
@@ -7309,7 +6218,7 @@ export default function AdminDashboardModal() {
                                           type="checkbox"
                                           checked={Boolean(item.openInNewTab)}
                                           onChange={(e) =>
-                                            updatePlacementField(placementId, { openInNewTab: e.target.checked })
+                                            updatePlacementField(placementId, { openInNewTab: e.target.checked }, true)
                                           }
                                           className="accent-emerald-600 cursor-pointer"
                                         />
@@ -7370,10 +6279,14 @@ export default function AdminDashboardModal() {
                                               ? `ca-${rawPub}`
                                               : 'ca-pub-0000000000000000';
                                           const snippet = `<!-- Google AdSense Responsive Unit (${item.positionLabel}) -->\n<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${clientPub}" crossorigin="anonymous"></script>\n<ins class="adsbygoogle"\n     style="display:block"\n     data-ad-client="${clientPub}"\n     data-ad-slot="${1000000001 + idx}"\n     data-ad-format="auto"\n     data-full-width-responsive="true"></ins>\n<script>\n     (adsbygoogle = window.adsbygoogle || []).push({});\n</script>`;
-                                          updatePlacementField(placementId, {
-                                            scriptCode: snippet,
-                                            adType: item.adType === 'banner' ? 'script' : item.adType,
-                                          });
+                                          updatePlacementField(
+                                            placementId,
+                                            {
+                                              scriptCode: snippet,
+                                              adType: item.adType === 'banner' ? 'both' : item.adType,
+                                            },
+                                            true
+                                          );
                                           showGlobalToast(`Inserted AdSense template for ${item.positionLabel}`, 'info');
                                         }}
                                         className="px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-600 text-emerald-600 dark:text-emerald-400 hover:text-white text-[10px] font-mono font-bold transition-colors cursor-pointer"
@@ -7419,232 +6332,18 @@ export default function AdminDashboardModal() {
                 );
               })()}
 
-              {/* Global Top Bar, Sidebar Ad & Sponsored Phone Settings */}
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 space-y-6 max-w-4xl">
-                <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
-                  <h2 className="text-sm font-bold uppercase font-mono text-emerald-600 dark:text-emerald-400">
-                    Additional Sitewide Banners &amp; Sponsored Phone Spotlight
-                  </h2>
-                </div>
-
-                {/* Top Banner */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-mono uppercase font-bold text-emerald-600">Top Leaderboard Banner</h3>
-                    <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={localAdSettings.topBanner.enabled}
-                        onChange={(e) => {
-                          const enabled = e.target.checked;
-                          const currentHeaderTop = localAdSettings.placements?.header_top || DEFAULT_AD_PLACEMENTS.header_top;
-                          setLocalAdSettings({
-                            ...localAdSettings,
-                            topBanner: { ...localAdSettings.topBanner, enabled },
-                            placements: {
-                              ...localAdSettings.placements,
-                              header_top: { ...currentHeaderTop, enabled },
-                            },
-                          });
-                        }}
-                        className="accent-emerald-600"
-                      />
-                      <span>Enable Top Banner</span>
-                    </label>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] text-slate-500 mb-1">Banner Title</label>
-                      <input
-                        type="text"
-                        value={localAdSettings.topBanner.title}
-                        onChange={(e) => {
-                          const title = e.target.value;
-                          const currentHeaderTop = localAdSettings.placements?.header_top || DEFAULT_AD_PLACEMENTS.header_top;
-                          setLocalAdSettings({
-                            ...localAdSettings,
-                            topBanner: { ...localAdSettings.topBanner, title },
-                            placements: {
-                              ...localAdSettings.placements,
-                              header_top: { ...currentHeaderTop, title },
-                            },
-                          });
-                        }}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-slate-500 mb-1">Tag Label</label>
-                      <input
-                        type="text"
-                        value={localAdSettings.topBanner.tag}
-                        onChange={(e) => {
-                          const tag = e.target.value;
-                          const currentHeaderTop = localAdSettings.placements?.header_top || DEFAULT_AD_PLACEMENTS.header_top;
-                          setLocalAdSettings({
-                            ...localAdSettings,
-                            topBanner: { ...localAdSettings.topBanner, tag },
-                            placements: {
-                              ...localAdSettings.placements,
-                              header_top: { ...currentHeaderTop, badgeText: tag },
-                            },
-                          });
-                        }}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Subtitle / Description</label>
-                    <input
-                      type="text"
-                      value={localAdSettings.topBanner.subtitle}
-                      onChange={(e) => {
-                        const subtitle = e.target.value;
-                        const currentHeaderTop = localAdSettings.placements?.header_top || DEFAULT_AD_PLACEMENTS.header_top;
-                        setLocalAdSettings({
-                          ...localAdSettings,
-                          topBanner: { ...localAdSettings.topBanner, subtitle },
-                          placements: {
-                            ...localAdSettings.placements,
-                            header_top: { ...currentHeaderTop, subtitle },
-                          },
-                        });
-                      }}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Destination Link URL</label>
-                    <input
-                      type="text"
-                      value={localAdSettings.topBanner.linkUrl}
-                      onChange={(e) => {
-                        const linkUrl = e.target.value;
-                        const currentHeaderTop = localAdSettings.placements?.header_top || DEFAULT_AD_PLACEMENTS.header_top;
-                        setLocalAdSettings({
-                          ...localAdSettings,
-                          topBanner: { ...localAdSettings.topBanner, linkUrl },
-                          placements: {
-                            ...localAdSettings.placements,
-                            header_top: { ...currentHeaderTop, learnMoreUrl: linkUrl },
-                          },
-                        });
-                      }}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                    />
-                  </div>
-                </div>
-
-                {/* Sidebar Banner */}
-                <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-mono uppercase font-bold text-emerald-600">Sidebar / In-Feed Banner</h3>
-                    <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={localAdSettings.sidebarBanner.enabled}
-                        onChange={(e) =>
-                          setLocalAdSettings({
-                            ...localAdSettings,
-                            sidebarBanner: { ...localAdSettings.sidebarBanner, enabled: e.target.checked },
-                          })
-                        }
-                        className="accent-emerald-600"
-                      />
-                      <span>Enable Sidebar Ad</span>
-                    </label>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] text-slate-500 mb-1">Sponsor Title</label>
-                      <input
-                        type="text"
-                        value={localAdSettings.sidebarBanner.title}
-                        onChange={(e) =>
-                          setLocalAdSettings({
-                            ...localAdSettings,
-                            sidebarBanner: { ...localAdSettings.sidebarBanner, title: e.target.value },
-                          })
-                        }
-                        className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-slate-500 mb-1">Sponsor Brand</label>
-                      <input
-                        type="text"
-                        value={localAdSettings.sidebarBanner.sponsor}
-                        onChange={(e) =>
-                          setLocalAdSettings({
-                            ...localAdSettings,
-                            sidebarBanner: { ...localAdSettings.sidebarBanner, sponsor: e.target.value },
-                          })
-                        }
-                        className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Subtitle</label>
-                    <input
-                      type="text"
-                      value={localAdSettings.sidebarBanner.subtitle}
-                      onChange={(e) =>
-                        setLocalAdSettings({
-                          ...localAdSettings,
-                          sidebarBanner: { ...localAdSettings.sidebarBanner, subtitle: e.target.value },
-                        })
-                      }
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Destination Link URL</label>
-                    <input
-                      type="text"
-                      value={localAdSettings.sidebarBanner.linkUrl}
-                      onChange={(e) =>
-                        setLocalAdSettings({
-                          ...localAdSettings,
-                          sidebarBanner: { ...localAdSettings.sidebarBanner, linkUrl: e.target.value },
-                        })
-                      }
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                    />
-                  </div>
-                </div>
-
-                {/* Sponsored Phone */}
-                <div className="space-y-2 pt-4 border-t border-slate-200 dark:border-slate-800">
-                  <label className="block text-[11px] font-bold uppercase text-slate-500">Sponsored Phone Spotlight</label>
-                  <select
-                    value={localAdSettings.sponsoredPhoneId || ''}
-                    onChange={(e) =>
-                      setLocalAdSettings({
-                        ...localAdSettings,
-                        sponsoredPhoneId: e.target.value || null,
-                      })
-                    }
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                  >
-                    <option value="">None</option>
-                    {phones.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.brand} — {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
+              <div className="flex justify-end pt-2">
                 <button
                   onClick={() =>
-                    runWithProgress(() => updateAdSettings(localAdSettings), 'Advertisement settings saved.')
+                    runWithProgress(
+                      () => updateAdSettings(localAdSettingsRef.current),
+                      'Saved all Ad Placements, Learn More buttons, and Script Ad Codes.'
+                    )
                   }
-                  className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 cursor-pointer"
+                  className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 cursor-pointer shadow-md"
                 >
                   <Save className="w-4 h-4" />
-                  <span>Save Advertisement Settings</span>
+                  <span>Save All Ad Placements</span>
                 </button>
               </div>
             </div>
@@ -7695,13 +6394,14 @@ export default function AdminDashboardModal() {
                   <button
                     type="button"
                     onClick={() => {
-                      setWebsiteContent({
-                        ...websiteContent,
-                        headerLogoDarkUrl: '/assets/aistudio/GsmScope_header_logo_dark.webp',
-                        headerLogoLightUrl: '/assets/aistudio/GsmScope_header_logo_light.webp',
-                        faviconUrl: '/favicon.svg',
-                      });
-                      showGlobalToast('Restored default GsmScope logos. Click Save All Site Settings to apply.', 'info');
+                      applyAndPersistWebsiteContentPatch(
+                        {
+                          headerLogoDarkUrl: '/assets/aistudio/GsmScope_header_logo_dark.webp',
+                          headerLogoLightUrl: '/assets/aistudio/GsmScope_header_logo_fc9cfbb4.webp',
+                          faviconUrl: '/favicon.ico',
+                        },
+                        'Restored and saved default GsmScope logos and favicon.'
+                      );
                     }}
                     className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-[11px] font-semibold text-slate-600 dark:text-slate-300 cursor-pointer"
                   >
@@ -7722,7 +6422,11 @@ export default function AdminDashboardModal() {
                       file,
                       'logo',
                       'Main Header Logo (Dark)',
-                      (url) => setWebsiteContent((prev) => ({ ...prev, headerLogoDarkUrl: url }))
+                      (url) =>
+                        applyAndPersistWebsiteContentPatch(
+                          { headerLogoDarkUrl: url, headerLogoUrl: url },
+                          'Main Header Logo uploaded and saved.'
+                        )
                     );
                     e.target.value = '';
                   }}
@@ -7739,7 +6443,11 @@ export default function AdminDashboardModal() {
                       file,
                       'logo',
                       'Footer / Light Header Logo',
-                      (url) => setWebsiteContent((prev) => ({ ...prev, headerLogoLightUrl: url }))
+                      (url) =>
+                        applyAndPersistWebsiteContentPatch(
+                          { headerLogoLightUrl: url },
+                          'Footer / Light Logo uploaded and saved.'
+                        )
                     );
                     e.target.value = '';
                   }}
@@ -7756,7 +6464,11 @@ export default function AdminDashboardModal() {
                       file,
                       'logo',
                       'Site Favicon',
-                      (url) => setWebsiteContent((prev) => ({ ...prev, faviconUrl: url }))
+                      (url) =>
+                        applyAndPersistWebsiteContentPatch(
+                          { faviconUrl: url },
+                          'Browser Tab Favicon uploaded and saved.'
+                        )
                     );
                     e.target.value = '';
                   }}
@@ -7797,7 +6509,10 @@ export default function AdminDashboardModal() {
                         type="button"
                         onClick={() =>
                           openMediaPicker('Select Main Header Logo', 'logo', (url) =>
-                            setWebsiteContent((prev) => ({ ...prev, headerLogoDarkUrl: url }))
+                            applyAndPersistWebsiteContentPatch(
+                              { headerLogoDarkUrl: url, headerLogoUrl: url },
+                              'Main Header Logo selected and saved.'
+                            )
                           )
                         }
                         className="py-1.5 px-2.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-800 dark:text-slate-200 text-[11px] font-semibold cursor-pointer"
@@ -7814,7 +6529,7 @@ export default function AdminDashboardModal() {
                     </div>
                     <div className="h-20 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 flex items-center justify-center p-3">
                       <img
-                        src={websiteContent.headerLogoLightUrl || '/assets/aistudio/GsmScope_header_logo_light.webp'}
+                        src={websiteContent.headerLogoLightUrl || '/assets/aistudio/GsmScope_header_logo_fc9cfbb4.webp'}
                         alt="Light Header Logo Preview"
                         className="max-h-12 w-auto object-contain"
                       />
@@ -7825,7 +6540,7 @@ export default function AdminDashboardModal() {
                       onChange={(e) =>
                         setWebsiteContent({ ...websiteContent, headerLogoLightUrl: e.target.value })
                       }
-                      placeholder="/assets/aistudio/GsmScope_header_logo_light.webp"
+                      placeholder="/assets/aistudio/GsmScope_header_logo_fc9cfbb4.webp"
                       className="w-full px-2.5 py-1.5 rounded bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-[11px] font-mono"
                     />
                     <div className="flex items-center gap-2">
@@ -7841,7 +6556,10 @@ export default function AdminDashboardModal() {
                         type="button"
                         onClick={() =>
                           openMediaPicker('Select Footer / Light Logo', 'logo', (url) =>
-                            setWebsiteContent((prev) => ({ ...prev, headerLogoLightUrl: url }))
+                            applyAndPersistWebsiteContentPatch(
+                              { headerLogoLightUrl: url },
+                              'Footer / Light Logo selected and saved.'
+                            )
                           )
                         }
                         className="py-1.5 px-2.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-800 dark:text-slate-200 text-[11px] font-semibold cursor-pointer"
@@ -7858,18 +6576,18 @@ export default function AdminDashboardModal() {
                     </div>
                     <div className="h-20 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center p-3">
                       <img
-                        src={websiteContent.faviconUrl || '/favicon.svg'}
+                        src={websiteContent.faviconUrl || '/favicon.ico'}
                         alt="Favicon Preview"
                         className="w-10 h-10 object-contain"
                       />
                     </div>
                     <input
                       type="text"
-                      value={websiteContent.faviconUrl || '/favicon.svg'}
+                      value={websiteContent.faviconUrl || '/favicon.ico'}
                       onChange={(e) =>
                         setWebsiteContent({ ...websiteContent, faviconUrl: e.target.value })
                       }
-                      placeholder="/favicon.svg"
+                      placeholder="/favicon.ico"
                       className="w-full px-2.5 py-1.5 rounded bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-[11px] font-mono"
                     />
                     <div className="flex items-center gap-2">
@@ -7885,7 +6603,10 @@ export default function AdminDashboardModal() {
                         type="button"
                         onClick={() =>
                           openMediaPicker('Select Site Favicon', 'logo', (url) =>
-                            setWebsiteContent((prev) => ({ ...prev, faviconUrl: url }))
+                            applyAndPersistWebsiteContentPatch(
+                              { faviconUrl: url },
+                              'Browser Tab Favicon selected and saved.'
+                            )
                           )
                         }
                         className="py-1.5 px-2.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-800 dark:text-slate-200 text-[11px] font-semibold cursor-pointer"
@@ -7950,11 +6671,11 @@ export default function AdminDashboardModal() {
                 </div>
               </div>
 
-              {/* 3. CORE WEBSITE COPY, HERO HEADLINES & CONTACT DETAILS */}
+              {/* 3. SITE IDENTITY, CONTACT INFORMATION & FOOTER TEXT */}
               <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 space-y-4 max-w-5xl shadow-sm">
                 <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
                   <h2 className="text-sm font-bold uppercase font-mono text-emerald-600 dark:text-emerald-400">
-                    3. Core Website Copy, Hero Headlines & Contact Information
+                    3. Site Identity, Contact Information &amp; Footer Text
                   </h2>
                 </div>
 
@@ -7979,96 +6700,7 @@ export default function AdminDashboardModal() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                    Top Announcement Bar Message
-                  </label>
-                  <input
-                    type="text"
-                    value={websiteContent.announcementBar}
-                    onChange={(e) => setWebsiteContent({ ...websiteContent, announcementBar: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                  />
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Homepage Hero Headline</label>
-                    <input
-                      type="text"
-                      value={websiteContent.heroHeadline}
-                      onChange={(e) => setWebsiteContent({ ...websiteContent, heroHeadline: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Homepage Hero Subtitle</label>
-                    <input
-                      type="text"
-                      value={websiteContent.heroSubtitle}
-                      onChange={(e) => setWebsiteContent({ ...websiteContent, heroSubtitle: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <RichTextEditor
-                  label="About Us Summary Copy"
-                  helperText="Supports H1–H4 Headings, Bold Text & Bold Paragraph"
-                  rows={3}
-                  value={websiteContent.aboutSummary}
-                  onChange={(val) => setWebsiteContent({ ...websiteContent, aboutSummary: val })}
-                  placeholder="Write About Us summary with headings or bold highlights..."
-                />
-
-                {/* Company Pages Rich Text Content Editors (About Us, Contact Us, Advertise with Us, Privacy Policy, Terms of Service) */}
-                <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-4">
-                  <div className="text-[11px] font-bold uppercase font-mono text-emerald-600 dark:text-emerald-400">
-                    Company Pages Rich Content Editors (About Us · Contact Us · Advertise with Us · Privacy Policy · Terms of Service)
-                  </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <RichTextEditor
-                      label="About Us Page — Additional Custom Section (Optional)"
-                      helperText="H1–H4 & Bold"
-                      rows={4}
-                      value={websiteContent.aboutPageContent || ''}
-                      onChange={(val) => setWebsiteContent({ ...websiteContent, aboutPageContent: val })}
-                      placeholder="Add custom H1/H2/H3 headings, bold paragraphs, or editorial notes to the About Us page..."
-                    />
-                    <RichTextEditor
-                      label="Contact Us Page — Additional Custom Section (Optional)"
-                      helperText="H1–H4 & Bold"
-                      rows={4}
-                      value={websiteContent.contactPageContent || ''}
-                      onChange={(val) => setWebsiteContent({ ...websiteContent, contactPageContent: val })}
-                      placeholder="Add custom office hours, support notes, or H2/H3 headings to the Contact Us page..."
-                    />
-                    <RichTextEditor
-                      label="Advertise with Us Page — Additional Custom Section (Optional)"
-                      helperText="H1–H4 & Bold"
-                      rows={4}
-                      value={websiteContent.advertisePageContent || ''}
-                      onChange={(val) => setWebsiteContent({ ...websiteContent, advertisePageContent: val })}
-                      placeholder="Add custom sponsorship tiers, H2/H3 headings, or bold announcements to the Advertise with Us page..."
-                    />
-                    <RichTextEditor
-                      label="Privacy Policy — Additional Custom Section (Optional)"
-                      helperText="H1–H4 & Bold"
-                      rows={4}
-                      value={websiteContent.privacyPolicyContent || ''}
-                      onChange={(val) => setWebsiteContent({ ...websiteContent, privacyPolicyContent: val })}
-                      placeholder="Add custom privacy clauses with H2/H3 headings and bold paragraphs..."
-                    />
-                    <RichTextEditor
-                      label="Terms of Service — Additional Custom Section (Optional)"
-                      helperText="H1–H4 & Bold"
-                      rows={4}
-                      value={websiteContent.termsOfServiceContent || ''}
-                      onChange={(val) => setWebsiteContent({ ...websiteContent, termsOfServiceContent: val })}
-                      placeholder="Add custom terms or legal notices with H2/H3 headings and bold paragraphs..."
-                    />
-                  </div>
-                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
@@ -8105,7 +6737,7 @@ export default function AdminDashboardModal() {
                   <div className="text-[11px] font-bold uppercase font-mono text-emerald-600 dark:text-emerald-400 mb-3">
                     Social Media & Community Links (Footer & Contact Page)
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] text-slate-500 mb-1">Facebook Page URL</label>
                       <input
@@ -8126,55 +6758,16 @@ export default function AdminDashboardModal() {
                         className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-mono"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[11px] text-slate-500 mb-1">X (Twitter) Profile URL</label>
-                      <input
-                        type="text"
-                        value={websiteContent.twitterUrl || ''}
-                        onChange={(e) => setWebsiteContent({ ...websiteContent, twitterUrl: e.target.value })}
-                        placeholder="https://x.com/gsmscope"
-                        className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-slate-500 mb-1">Instagram URL</label>
-                      <input
-                        type="text"
-                        value={websiteContent.instagramUrl || ''}
-                        onChange={(e) => setWebsiteContent({ ...websiteContent, instagramUrl: e.target.value })}
-                        placeholder="https://instagram.com/gsmscope"
-                        className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-slate-500 mb-1">WhatsApp Support Number</label>
-                      <input
-                        type="text"
-                        value={websiteContent.whatsappNumber || ''}
-                        onChange={(e) => setWebsiteContent({ ...websiteContent, whatsappNumber: e.target.value })}
-                        placeholder="+2348004767267"
-                        className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-mono"
-                      />
-                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
                   <div>
                     <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Footer Copyright Text</label>
                     <input
                       type="text"
                       value={websiteContent.footerCopyright}
                       onChange={(e) => setWebsiteContent({ ...websiteContent, footerCopyright: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Footer Price Disclaimer</label>
-                    <input
-                      type="text"
-                      value={websiteContent.footerDisclaimer}
-                      onChange={(e) => setWebsiteContent({ ...websiteContent, footerDisclaimer: e.target.value })}
                       className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
                     />
                   </div>
@@ -8781,7 +7374,7 @@ export default function AdminDashboardModal() {
                       <span>cPanel & Live Server Connection Diagnostics</span>
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Verifies backend API, persistent disk permissions (<code className="font-mono">data/database.json</code> &amp; <code className="font-mono">/uploads</code>), <code className="font-mono">app.cjs</code> startup, and SEO routes.
+                      Verifies backend API, persistent disk permissions (<code className="font-mono">data/database.json</code> &amp; <code className="font-mono">/uploads</code>), and SEO routes.
                     </p>
                   </div>
                   <button
@@ -8823,13 +7416,13 @@ export default function AdminDashboardModal() {
 
                     <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60">
                       <div className="flex items-center justify-between text-xs font-bold">
-                        <span className="text-slate-600 dark:text-slate-400">cPanel & SEO Endpoints</span>
-                        <span className={connectionReport.health?.cpanelStartupReady && connectionReport.seoEndpoints?.sitemapXmlOk ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}>
-                          {connectionReport.health?.cpanelStartupReady ? 'app.cjs Ready' : 'Check app.cjs'}
+                        <span className="text-slate-600 dark:text-slate-400">SEO &amp; Sitemap Endpoints</span>
+                        <span className={connectionReport.seoEndpoints?.sitemapXmlOk && connectionReport.seoEndpoints?.adsTxtOk ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}>
+                          {connectionReport.seoEndpoints?.sitemapXmlOk && connectionReport.seoEndpoints?.adsTxtOk ? 'Active' : 'Check Endpoints'}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 mt-1">
-                        ads.txt: {connectionReport.seoEndpoints?.adsTxtOk ? 'OK' : 'Err'} • sitemap: {connectionReport.seoEndpoints?.sitemapXmlOk ? 'OK' : 'Err'} • AI: {connectionReport.health?.services?.aiConfigured ? 'Active' : 'Key Optional'}
+                        ads.txt: {connectionReport.seoEndpoints?.adsTxtOk ? 'OK' : 'Err'} • sitemap: {connectionReport.seoEndpoints?.sitemapXmlOk ? 'OK' : 'Err'}
                       </p>
                     </div>
                   </div>
@@ -8886,7 +7479,7 @@ export default function AdminDashboardModal() {
           )}
 
           {/* =================================================================
-              SECTION 14: CONTACT FORM INQUIRIES & DIRECT REPLY CENTER
+              SECTION 14: MESSAGES
           ================================================================= */}
           {section === 'messages' && (
             <div className="space-y-6">
@@ -8894,10 +7487,10 @@ export default function AdminDashboardModal() {
                 <div>
                   <h1 className="text-2xl font-bold text-slate-900 dark:text-white font-['Space_Grotesk'] flex items-center gap-2.5">
                     <Mail className="w-6 h-6 text-cyan-500" />
-                    <span>Contact Messages & Inquiries ({contactInquiries.length})</span>
+                    <span>Messages ({contactInquiries.length})</span>
                   </h1>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Manage incoming submissions from the public Contact page. View messages, filter by status, and draft and dispatch official replies to senders.
+                    Receive, read, and delete messages submitted through the website.
                   </p>
                 </div>
 
@@ -8909,77 +7502,23 @@ export default function AdminDashboardModal() {
                         stopGlobalLoading();
                         if (data && Array.isArray(data)) {
                           setContactInquiries(data);
-                          showGlobalToast(`Refreshed inbox (${data.length} messages)`, 'info');
+                          try {
+                            localStorage.setItem('gsmscope_contact_inquiries_v1', JSON.stringify(data));
+                          } catch {}
+                          showGlobalToast(`Refreshed messages (${data.length})`, 'info');
                         }
                       });
                     }}
                     className="px-3.5 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:border-cyan-500 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Refresh Inbox</span>
+                    <span>Refresh</span>
                   </button>
                 </div>
               </div>
 
-              {/* Status Metric Highlights */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                <div
-                  onClick={() => setInquiryFilter('all')}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                    inquiryFilter === 'all'
-                      ? 'bg-cyan-500/10 border-cyan-500 shadow-sm'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-cyan-500/50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span>Total Inquiries Received</span>
-                    <Inbox className="w-4 h-4 text-cyan-500" />
-                  </div>
-                  <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5 font-mono">
-                    {contactInquiries.length}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">All customer & partner messages</div>
-                </div>
-
-                <div
-                  onClick={() => setInquiryFilter('unread')}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                    inquiryFilter === 'unread'
-                      ? 'bg-rose-500/10 border-rose-500 shadow-sm'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-rose-500/50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span>Unread & Awaiting Reply</span>
-                    <AlertCircle className="w-4 h-4 text-rose-500" />
-                  </div>
-                  <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1.5 font-mono">
-                    {unreadMessagesCount}
-                  </div>
-                  <div className="text-[11px] text-rose-500/90 mt-0.5">Action required</div>
-                </div>
-
-                <div
-                  onClick={() => setInquiryFilter('replied')}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                    inquiryFilter === 'replied'
-                      ? 'bg-emerald-500/10 border-emerald-500 shadow-sm'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-emerald-500/50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span>Replied / Resolved</span>
-                    <CheckCheck className="w-4 h-4 text-emerald-500" />
-                  </div>
-                  <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1.5 font-mono">
-                    {contactInquiries.filter((i) => i.replied || i.status === 'replied').length}
-                  </div>
-                  <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">Official response dispatched</div>
-                </div>
-              </div>
-
-              {/* Search & Filter Toolbar */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+              {/* Search Toolbar */}
+              <div className="flex items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
@@ -8998,39 +7537,11 @@ export default function AdminDashboardModal() {
                     </button>
                   )}
                 </div>
-
-                <div className="flex items-center gap-1.5 self-start sm:self-auto overflow-x-auto pb-1 sm:pb-0">
-                  <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1 pr-1">
-                    <Filter className="w-3 h-3" /> Filter:
-                  </span>
-                  {(['all', 'unread', 'replied'] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      onClick={() => setInquiryFilter(mode)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize cursor-pointer transition-colors ${
-                        inquiryFilter === mode
-                          ? 'bg-cyan-600 text-white font-bold'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                      }`}
-                    >
-                      {mode}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               {/* Messages List / Cards */}
               <div className="space-y-3">
                 {contactInquiries
-                  .filter((item) => {
-                    if (inquiryFilter === 'unread') {
-                      return item.status !== 'read' && item.status !== 'replied' && !item.replied;
-                    }
-                    if (inquiryFilter === 'replied') {
-                      return item.replied || item.status === 'replied';
-                    }
-                    return true;
-                  })
                   .filter((item) => {
                     const q = inquirySearch.toLowerCase().trim();
                     if (!q) return true;
@@ -9042,163 +7553,85 @@ export default function AdminDashboardModal() {
                       (item.phone && item.phone.toLowerCase().includes(q))
                     );
                   })
-                  .map((item) => {
-                    const isUnread = item.status !== 'read' && item.status !== 'replied' && !item.replied;
-                    const isReplied = item.replied || item.status === 'replied';
-
-                    return (
-                      <div
-                        key={item.id}
-                        className={`rounded-2xl border p-4 sm:p-5 transition-all space-y-3 ${
-                          isUnread
-                            ? 'bg-cyan-50/30 dark:bg-cyan-950/20 border-cyan-300 dark:border-cyan-800/80 shadow-sm'
-                            : isReplied
-                            ? 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-950/60'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                          <div className="space-y-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-bold text-sm text-slate-900 dark:text-white">
-                                {item.name}
+                  .map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-2xl border p-4 sm:p-5 transition-all space-y-3 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-bold text-sm text-slate-900 dark:text-white">
+                              {item.name}
+                            </span>
+                            {item.category && (
+                              <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                                {item.category}
                               </span>
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-mono uppercase font-bold ${
-                                  isUnread
-                                    ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
-                                    : isReplied
-                                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
-                                    : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                                }`}
-                              >
-                                {isUnread ? 'Unread Inquiry' : isReplied ? 'Replied' : 'Read'}
-                              </span>
-                              {item.category && (
-                                <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] font-medium text-slate-500 dark:text-slate-400">
-                                  {item.category}
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                              <a
-                                href={`mailto:${item.email}`}
-                                className="flex items-center gap-1 hover:text-cyan-500 font-mono text-cyan-600 dark:text-cyan-400"
-                              >
-                                <Mail className="w-3.5 h-3.5" />
-                                <span>{item.email}</span>
-                              </a>
-                              {item.phone && (
-                                <a
-                                  href={`tel:${item.phone}`}
-                                  className="flex items-center gap-1 hover:text-emerald-500 font-mono"
-                                >
-                                  <PhoneCall className="w-3.5 h-3.5" />
-                                  <span>{item.phone}</span>
-                                </a>
-                              )}
-                              <span className="flex items-center gap-1 text-[11px] font-mono text-slate-400">
-                                <Clock className="w-3.5 h-3.5" />
-                                <span>{new Date(item.createdAt).toLocaleString()}</span>
-                              </span>
-                            </div>
+                            )}
                           </div>
 
-                          {/* Quick Action Buttons */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              onClick={() => {
-                                setActiveReplyInquiry(item);
-                                setReplySubject(
-                                  item.subject.toLowerCase().startsWith('re:')
-                                    ? item.subject
-                                    : `Re: ${item.subject || 'Your Inquiry on GsmScope'}`
-                                );
-                                setReplyMessage(
-                                  `Hello ${item.name.split(' ')[0] || item.name},\n\nThank you for reaching out to GsmScope regarding "${item.subject}".\n\n`
-                                );
-                              }}
-                              className="px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer transition-colors"
-                            >
-                              <Reply className="w-3.5 h-3.5" />
-                              <span>{isReplied ? 'Reply Again' : 'Reply'}</span>
-                            </button>
-
-                            <button
-                              onClick={() => {
-                                const nextStatus = item.status === 'read' ? 'unread' : 'read';
-                                updateContactInquiryStatusApi(item.id, nextStatus).then(() => {
-                                  setContactInquiries((prev) =>
-                                    prev.map((i) => (i.id === item.id ? { ...i, status: nextStatus } : i))
-                                  );
-                                  showGlobalToast(
-                                    nextStatus === 'read' ? 'Marked message as read' : 'Marked as unread',
-                                    'info'
-                                  );
-                                });
-                              }}
-                              className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs text-slate-600 dark:text-slate-300 font-medium cursor-pointer"
-                              title={item.status === 'read' ? 'Mark as Unread' : 'Mark as Read'}
-                            >
-                              {item.status === 'read' ? 'Mark Unread' : 'Mark Read'}
-                            </button>
-
-                            <button
-                              onClick={() => {
-                                deleteContactInquiryApi(item.id).then(() => {
-                                  setContactInquiries((prev) => prev.filter((i) => i.id !== item.id));
-                                  showGlobalToast('Deleted inquiry.', 'success');
-                                });
-                              }}
-                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-600 text-rose-500 hover:text-white cursor-pointer transition-colors"
-                              title="Delete Message"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="flex items-center gap-1 font-mono text-cyan-600 dark:text-cyan-400">
+                              <Mail className="w-3.5 h-3.5" />
+                              <span>{item.email}</span>
+                            </span>
+                            {item.phone && (
+                              <span className="flex items-center gap-1 font-mono">
+                                <PhoneCall className="w-3.5 h-3.5" />
+                                <span>{item.phone}</span>
+                              </span>
+                            )}
+                            <span className="flex items-center gap-1 text-[11px] font-mono text-slate-400">
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>{new Date(item.createdAt).toLocaleString()}</span>
+                            </span>
                           </div>
                         </div>
 
-                        {/* Subject & Message Body */}
-                        <div className="bg-slate-50 dark:bg-slate-950/70 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
-                          <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                            <span className="text-slate-400 font-normal">Subject:</span>
-                            <span>{item.subject}</span>
-                          </div>
-                          <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-                            {item.message}
-                          </p>
+                        {/* Delete Button */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => {
+                              deleteContactInquiryApi(item.id).then(() => {
+                                setContactInquiries((prev) => {
+                                  const next = prev.filter((i) => i.id !== item.id);
+                                  try {
+                                    localStorage.setItem('gsmscope_contact_inquiries_v1', JSON.stringify(next));
+                                  } catch {}
+                                  return next;
+                                });
+                                showGlobalToast('Deleted message.', 'success');
+                              });
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-600 text-rose-500 hover:text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+                            title="Delete Message"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
+                          </button>
                         </div>
-
-                        {/* Dispatched Reply History Box */}
-                        {isReplied && item.replyMessage && (
-                          <div className="bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800/60 p-3.5 rounded-xl space-y-1 text-xs">
-                            <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400 font-semibold">
-                              <span className="flex items-center gap-1.5">
-                                <CheckCheck className="w-3.5 h-3.5" />
-                                <span>Official Reply Dispatched</span>
-                              </span>
-                              {item.repliedAt && (
-                                <span className="font-mono text-[11px] text-slate-400">
-                                  {new Date(item.repliedAt).toLocaleString()}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-slate-800 dark:text-slate-200 whitespace-pre-wrap pt-0.5 leading-relaxed font-sans">
-                              {item.replyMessage}
-                            </p>
-                          </div>
-                        )}
                       </div>
-                    );
-                  })}
+
+                      {/* Subject & Message Body */}
+                      <div className="bg-slate-50 dark:bg-slate-950/70 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+                        <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <span className="text-slate-400 font-normal">Subject:</span>
+                          <span>{item.subject}</span>
+                        </div>
+                        <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                          {item.message}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
 
                 {contactInquiries.length === 0 && (
                   <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
                     <Mail className="w-10 h-10 text-slate-400 mx-auto" />
-                    <div className="text-sm font-bold text-slate-900 dark:text-white">Inbox is clear</div>
+                    <div className="text-sm font-bold text-slate-900 dark:text-white">No messages</div>
                     <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                      No customer inquiries have been received through the contact form yet.
+                      No messages have been received yet.
                     </p>
                   </div>
                 )}
@@ -9206,633 +7639,7 @@ export default function AdminDashboardModal() {
             </div>
           )}
 
-          {/* =================================================================
-              SECTION 15: PUSH BROADCASTS & SUBSCRIBERS AUDIENCE
-          ================================================================= */}
-          {section === 'broadcasts' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900 dark:text-white font-['Space_Grotesk'] flex items-center gap-2.5">
-                    <Radio className="w-6 h-6 text-emerald-500 animate-pulse" />
-                    <span>Push Updates, Alerts & News to Subscribers</span>
-                  </h1>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Compose and blast instant breaking news alerts, price drops, buying guides, and phone launch notices directly to all registered newsletter subscribers.
-                  </p>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      const csvHeader = 'Email,SubscribedAt,Status\n';
-                      const csvRows = subscribers.map((s) => `"${s.email}","${s.subscribedAt}","${s.status}"`).join('\n');
-                      const blob = new Blob([csvHeader + csvRows], { type: 'text/csv' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `gsmscope-subscribers-${new Date().toISOString().slice(0, 10)}.csv`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                      showGlobalToast(`Exported ${subscribers.length} subscriber emails.`, 'success');
-                    }}
-                    className="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:border-emerald-500 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Export CSV ({subscribers.length})</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Audience Metric Highlights */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span>Newsletter Audience</span>
-                    <Users className="w-4 h-4 text-emerald-500" />
-                  </div>
-                  <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5 font-mono">
-                    {subscribers.length}
-                  </div>
-                  <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">
-                    Active subscribers receiving broadcasts
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span>Broadcasts Dispatched</span>
-                    <Send className="w-4 h-4 text-sky-500" />
-                  </div>
-                  <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5 font-mono">
-                    {broadcasts.length}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Launches, alerts & news posts</div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span>Total Recipient Impressions</span>
-                    <Bell className="w-4 h-4 text-purple-500" />
-                  </div>
-                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1.5 font-mono">
-                    {broadcasts.reduce((sum, b) => sum + (b.recipientCount || subscribers.length || 0), 0)}
-                  </div>
-                  <div className="text-[11px] text-purple-500 mt-0.5">Total notifications delivered</div>
-                </div>
-              </div>
-
-              {/* Push Broadcast Composer Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                {/* Form Column */}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!broadcastTitle.trim() || !broadcastMessage.trim()) {
-                      showGlobalToast('Please enter both broadcast title and message.', 'error');
-                      return;
-                    }
-                    setIsBroadcasting(true);
-                    sendNewsletterBroadcastApi({
-                      type: broadcastType,
-                      title: broadcastTitle.trim(),
-                      message: broadcastMessage.trim(),
-                      actionUrl: broadcastActionUrl.trim() || '/?tab=news',
-                      actionLabel: broadcastActionLabel.trim() || 'Learn More',
-                    })
-                      .then((res) => {
-                        setIsBroadcasting(false);
-                        if (res.broadcast) {
-                          setBroadcasts((prev) => [res.broadcast!, ...prev]);
-                        }
-                        showGlobalToast(
-                          `Successfully broadcasted "${broadcastTitle}" to ${res.broadcast?.recipientCount || subscribers.length} subscribers!`,
-                          'success'
-                        );
-                        setBroadcastTitle('');
-                        setBroadcastMessage('');
-                      })
-                      .catch(() => {
-                        setIsBroadcasting(false);
-                        showGlobalToast('Failed to dispatch broadcast.', 'error');
-                      });
-                  }}
-                  className="lg:col-span-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm"
-                >
-                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                    <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-emerald-500" />
-                      <span>Compose New Push Alert</span>
-                    </h2>
-                    <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded">
-                      Audience: {subscribers.length} Subscribers
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                      Broadcast Category / Alert Type *
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {(
-                        [
-                          { id: 'news', label: 'News Update', icon: FileText },
-                          { id: 'price', label: 'Price Alert', icon: DollarSign },
-                          { id: 'phone', label: 'New Phone Launch', icon: Smartphone },
-                          { id: 'guide', label: 'Buying Guide', icon: Sparkles },
-                          { id: 'review', label: 'Review Spotlight', icon: MessageSquare },
-                          { id: 'notice', label: 'Important Notice', icon: Bell },
-                        ] as const
-                      ).map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setBroadcastType(item.id)}
-                          className={`p-2.5 rounded-xl border text-left flex items-center gap-2 text-xs font-semibold cursor-pointer transition-colors ${
-                            broadcastType === item.id
-                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                              : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-emerald-500/50'
-                          }`}
-                        >
-                          <item.icon className="w-3.5 h-3.5 shrink-0" />
-                          <span className="truncate">{item.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                      Alert Headline / Title *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={broadcastTitle}
-                      onChange={(e) => setBroadcastTitle(e.target.value)}
-                      placeholder="e.g. Flash Price Drop: Galaxy S25 Ultra now ₦1,750,000 in Nigerian Hubs"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-medium"
-                    />
-                  </div>
-
-                  <RichTextEditor
-                    label="Alert Body / Push Message *"
-                    helperText="Supports Headings & Bold"
-                    compactToolbar
-                    required
-                    rows={4}
-                    value={broadcastMessage}
-                    onChange={(val) => setBroadcastMessage(val)}
-                    placeholder="Write your push notification message. Include key specs, price reductions, availability dates, or exclusive insights..."
-                  />
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                        Call-to-Action Link URL
-                      </label>
-                      <input
-                        type="text"
-                        value={broadcastActionUrl}
-                        onChange={(e) => setBroadcastActionUrl(e.target.value)}
-                        placeholder="/?tab=news or /?phone=..."
-                        className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                        Button Label
-                      </label>
-                      <input
-                        type="text"
-                        value={broadcastActionLabel}
-                        onChange={(e) => setBroadcastActionLabel(e.target.value)}
-                        placeholder="e.g. View Device Specs"
-                        className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBroadcastTitle('');
-                        setBroadcastMessage('');
-                      }}
-                      className="px-3.5 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400 font-semibold cursor-pointer"
-                    >
-                      Clear
-                    </button>
-
-                    <button
-                      type="submit"
-                      disabled={isBroadcasting}
-                      className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 cursor-pointer shadow-lg disabled:opacity-50 transition-colors"
-                    >
-                      <Send className="w-4 h-4" />
-                      <span>{isBroadcasting ? 'Dispatching...' : `Broadcast to ${subscribers.length} Subscribers`}</span>
-                    </button>
-                  </div>
-                </form>
-
-                {/* Live Preview Column */}
-                <div className="lg:col-span-2 space-y-4">
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-3">
-                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
-                      <div className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">
-                        Live Subscriber Preview
-                      </div>
-                      <span className="text-[10px] text-emerald-500 font-bold">Real-time Push Card</span>
-                    </div>
-
-                    <div className="bg-slate-900 text-slate-100 rounded-xl p-4 border border-slate-800 shadow-xl space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <img
-                            src="/assets/aistudio/GsmScope_header_logo_dark.webp"
-                            alt="GsmScope"
-                            className="h-4 w-auto object-contain"
-                          />
-                          <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider font-semibold">
-                            Push Notification
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-mono text-slate-500 uppercase px-1.5 py-0.5 rounded bg-slate-800">
-                          {broadcastType}
-                        </span>
-                      </div>
-
-                      <div className="space-y-1">
-                        <h4 className="text-xs font-bold text-white line-clamp-2">
-                          {broadcastTitle || 'Alert Title Appears Here...'}
-                        </h4>
-                        <p className="text-[11px] text-slate-300 leading-relaxed line-clamp-4">
-                          {broadcastMessage ||
-                            'Broadcast message copy detailing phone specs, price shifts, or breaking tech news will be rendered here for your audience.'}
-                        </p>
-                      </div>
-
-                      <div className="pt-1 flex items-center justify-between">
-                        <span className="text-[10px] text-slate-500 font-mono">Sent to {subscribers.length} subscribers</span>
-                        <span className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-bold">
-                          {broadcastActionLabel || 'Read Details'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                      💡 Dispatches automatically trigger browser alerts and email digests to subscribers who opt-in to updates.
-                    </p>
-                  </div>
-
-                  {/* Quick Add Subscriber Box */}
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-3">
-                    <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-slate-500 dark:text-slate-400">
-                      Add Subscriber Manually
-                    </h3>
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (!newSubscriberEmail.trim() || !newSubscriberEmail.includes('@')) {
-                          showGlobalToast('Please enter a valid email address.', 'error');
-                          return;
-                        }
-                        const email = newSubscriberEmail.trim().toLowerCase();
-                        if (subscribers.some((s) => s.email.toLowerCase() === email)) {
-                          showGlobalToast('Subscriber is already registered.', 'error');
-                          return;
-                        }
-                        subscribeNewsletterApi(email).then((res) => {
-                          if (res.success) {
-                            const newSub: NewsletterSubscriber = {
-                              email,
-                              subscribedAt: new Date().toISOString(),
-                              status: 'active',
-                            };
-                            setSubscribers((prev) => [newSub, ...prev.filter((s) => s.email.toLowerCase() !== email)]);
-                            setNewSubscriberEmail('');
-                            showGlobalToast(`Added ${email} to newsletter audience.`, 'success');
-                          } else {
-                            showGlobalToast(res.message || 'Failed to add subscriber.', 'error');
-                          }
-                        });
-                      }}
-                      className="flex gap-2"
-                    >
-                      <input
-                        type="email"
-                        required
-                        value={newSubscriberEmail}
-                        onChange={(e) => setNewSubscriberEmail(e.target.value)}
-                        placeholder="subscriber@email.com"
-                        className="flex-1 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-mono"
-                      />
-                      <button
-                        type="submit"
-                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer shrink-0"
-                      >
-                        Add
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              </div>
-
-              {/* Broadcasts History Table */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden space-y-3 p-5 shadow-sm">
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                      Broadcast Dispatch History ({broadcasts.length})
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      Record of all push notifications and alerts sent to the subscriber community.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-[10px] font-mono uppercase text-slate-500">
-                        <th className="py-2.5 px-3">Type</th>
-                        <th className="py-2.5 px-3">Headline & Summary</th>
-                        <th className="py-2.5 px-3">Recipients</th>
-                        <th className="py-2.5 px-3">Timestamp</th>
-                        <th className="py-2.5 px-3 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                      {broadcasts.map((b) => (
-                        <tr key={b.id} className="hover:bg-slate-50 dark:hover:bg-slate-950/40">
-                          <td className="py-3 px-3">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                              {b.type}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3">
-                            <div className="font-bold text-slate-900 dark:text-white">{b.title}</div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">{b.message}</div>
-                          </td>
-                          <td className="py-3 px-3 font-mono font-bold text-slate-700 dark:text-slate-300">
-                            {b.recipientCount} subs
-                          </td>
-                          <td className="py-3 px-3 font-mono text-slate-400 text-[11px]">
-                            {new Date(b.sentAt).toLocaleString()}
-                          </td>
-                          <td className="py-3 px-3 text-right">
-                            <button
-                              onClick={() => {
-                                deleteNewsletterBroadcastApi(b.id).then(() => {
-                                  setBroadcasts((prev) => prev.filter((item) => item.id !== b.id));
-                                  showGlobalToast('Deleted broadcast log.', 'info');
-                                });
-                              }}
-                              className="p-1 rounded bg-rose-500/10 text-rose-500 hover:bg-rose-600 hover:text-white cursor-pointer"
-                              title="Delete Record"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {broadcasts.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="py-8 text-center text-slate-400">
-                            No broadcasts dispatched yet. Use the composer above to publish your first push update!
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Subscribers Directory Table */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden p-5 space-y-3 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                      Registered Subscribers Directory ({subscribers.length})
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      Users subscribed to phone launches, price changes, and buyer updates.
-                    </p>
-                  </div>
-                  <div className="relative w-full sm:w-64">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={subscriberSearch}
-                      onChange={(e) => setSubscriberSearch(e.target.value)}
-                      placeholder="Search subscribers..."
-                      className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-72 overflow-y-auto">
-                  {subscribers
-                    .filter((s) => !subscriberSearch || s.email.toLowerCase().includes(subscriberSearch.toLowerCase()))
-                    .map((sub, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between gap-2 text-xs"
-                      >
-                        <div className="min-w-0">
-                          <div className="font-mono text-slate-900 dark:text-slate-100 truncate">{sub.email}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            Joined: {new Date(sub.subscribedAt).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">
-                            {sub.status || 'active'}
-                          </span>
-                          <button
-                            onClick={() => {
-                              deleteNewsletterSubscriberApi(sub.email).then(() => {
-                                setSubscribers((prev) =>
-                                  prev.filter((s) => s.email.toLowerCase() !== sub.email.toLowerCase())
-                                );
-                                showGlobalToast(`Removed subscriber ${sub.email}.`, 'info');
-                              });
-                            }}
-                            className="p-1 rounded bg-rose-500/10 text-rose-500 hover:bg-rose-600 hover:text-white cursor-pointer"
-                            title="Remove Subscriber"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* =================================================================
-              MODAL: DIRECT CONTACT MESSAGE REPLY COMPOSER
-          ================================================================= */}
-          {activeReplyInquiry && (
-            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl space-y-4 p-5 sm:p-6"
-              >
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <Reply className="w-5 h-5 text-cyan-500" />
-                      <span>Send Official Reply</span>
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Replying to <strong>{activeReplyInquiry.name}</strong> ({activeReplyInquiry.email})
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setActiveReplyInquiry(null)}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                {/* Original Inquiry Quote Card */}
-                <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1 text-xs">
-                  <div className="text-[11px] font-mono font-bold uppercase text-slate-400">
-                    Original Message ({new Date(activeReplyInquiry.createdAt).toLocaleDateString()})
-                  </div>
-                  <div className="font-semibold text-slate-800 dark:text-slate-200">
-                    Subject: {activeReplyInquiry.subject}
-                  </div>
-                  <p className="text-slate-600 dark:text-slate-400 italic line-clamp-3">
-                    "{activeReplyInquiry.message}"
-                  </p>
-                </div>
-
-                {/* Quick Response Templates */}
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold uppercase font-mono text-slate-400">
-                    Insert Quick Response Template
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      {
-                        label: 'General Inquiry',
-                        text: `Hello ${activeReplyInquiry.name},\n\nThank you for reaching out to GsmScope! We have received your inquiry regarding "${activeReplyInquiry.subject}".\n\nOur editorial and technical teams are reviewing the details and will provide a complete answer shortly. Please let us know if you have any additional questions.\n\nWarm regards,\nGsmScope Team`,
-                      },
-                      {
-                        label: 'Price & Stock Verification',
-                        text: `Hello ${activeReplyInquiry.name},\n\nThank you for contacting GsmScope regarding device pricing and retail availability.\n\nOur Nigerian Naira (₦) and USD ($) pricing indices are sourced directly from authorized regional distributors, Computer Village vendors, and verified partner retail outlets. Listings reflect daily market exchange adjustments.\n\nPlease check the live phone detail page for updated variant prices and warranty partner info.\n\nBest regards,\nGsmScope Price Index Team`,
-                      },
-                      {
-                        label: 'Advertising / Media Kit',
-                        text: `Hello ${activeReplyInquiry.name},\n\nThank you for your interest in advertising with GsmScope.\n\nWe provide high-visibility brand placements including top header billboards, sponsored phone spotlight cards, and dedicated launch event features. Our media kit and rate card are available upon request.\n\nPlease let us know your planned campaign dates and target audience objectives.\n\nSincerely,\nGsmScope Commercial & Partnerships`,
-                      },
-                      {
-                        label: 'Specs Correction Received',
-                        text: `Hello ${activeReplyInquiry.name},\n\nThank you for taking the time to report a hardware specification correction to GsmScope.\n\nOur hardware editors have cross-referenced the technical whitepapers and verified the details. The specification database has been updated accordingly on the live website.\n\nThank you for helping keep GsmScope accurate!\n\nBest regards,\nGsmScope Hardware Editorial`,
-                      },
-                    ].map((tpl, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => setReplyMessage(tpl.text)}
-                        className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-cyan-600 hover:text-white text-[11px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer transition-colors"
-                      >
-                        {tpl.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Reply Form */}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!replyMessage.trim()) return;
-                    setIsSendingReply(true);
-                    replyToContactInquiryApi(activeReplyInquiry.id, replySubject, replyMessage)
-                      .then((res) => {
-                        setIsSendingReply(false);
-                        if (res.inquiry) {
-                          setContactInquiries((prev) =>
-                            prev.map((i) => (i.id === activeReplyInquiry.id ? res.inquiry! : i))
-                          );
-                        } else {
-                          setContactInquiries((prev) =>
-                            prev.map((i) =>
-                              i.id === activeReplyInquiry.id
-                                ? {
-                                    ...i,
-                                    status: 'replied',
-                                    replied: true,
-                                    replyMessage,
-                                    repliedAt: new Date().toISOString(),
-                                  }
-                                : i
-                            )
-                          );
-                        }
-                        showGlobalToast(`Reply successfully sent to ${activeReplyInquiry.email}!`, 'success');
-                        setActiveReplyInquiry(null);
-                      })
-                      .catch(() => {
-                        setIsSendingReply(false);
-                        showGlobalToast('Failed to send reply. Please try again.', 'error');
-                      });
-                  }}
-                  className="space-y-3"
-                >
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                      Email Subject *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={replySubject}
-                      onChange={(e) => setReplySubject(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-medium"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                      Reply Message *
-                    </label>
-                    <textarea
-                      rows={7}
-                      required
-                      value={replyMessage}
-                      onChange={(e) => setReplyMessage(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-sans leading-relaxed"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-200 dark:border-slate-800">
-                    <button
-                      type="button"
-                      onClick={() => setActiveReplyInquiry(null)}
-                      className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-semibold cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSendingReply}
-                      className="px-5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow disabled:opacity-50 transition-colors"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>{isSendingReply ? 'Sending Reply...' : 'Send Official Reply'}</span>
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
 
           {/* =================================================================
               UNIVERSAL MEDIA LIBRARY PICKER MODAL (cPanel /uploads + Library)

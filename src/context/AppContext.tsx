@@ -34,6 +34,7 @@ import {
   updatePhoneApi, 
   deletePhoneApi, 
   recordPhoneViewApi,
+  recordArticleViewApi,
   createBrandApi,
   updateBrandApi,
   deleteBrandApi,
@@ -99,7 +100,7 @@ interface AppContextType {
 
   // Admin and Auth methods
   isAdminAuthenticated: boolean;
-  adminLogin: (username: string, password: string) => { success: boolean; message: string };
+  adminLogin: (username: string, password: string, rememberMe?: boolean) => { success: boolean; message: string };
   adminRequestOtp: () => string;
   adminVerifyOtp: (code: string) => { success: boolean; message: string };
   adminLogout: () => void;
@@ -124,6 +125,7 @@ interface AppContextType {
   addArticle: (article: Article) => void;
   updateArticle: (article: Article) => void;
   deleteArticle: (id: string) => void;
+  recordArticleView: (articleId: string) => void;
 
   addReview: (reviewData: Omit<Review, 'id' | 'date' | 'status'>) => void;
   updateReview: (review: Review) => void;
@@ -242,12 +244,21 @@ function normalizePhoneRecord(raw: any): Phone {
     rating: Number(raw?.rating) || 0,
     reviewsCount: Number(raw?.reviewsCount) || 0,
     viewsCount: typeof raw?.viewsCount === 'number' ? raw.viewsCount : (Number(raw?.views) || 0),
-    categories: Array.isArray(raw?.categories)
-      ? raw.categories
-      : Array.isArray(raw?.categoryTags)
-      ? raw.categoryTags
-      : ['flagship', '5g'],
-    isFeatured: Boolean(raw?.isFeatured),
+    categories: (() => {
+      const rawCats = Array.isArray(raw?.categories)
+        ? raw.categories
+        : Array.isArray(raw?.categoryTags)
+        ? raw.categoryTags
+        : ['flagship', '5g'];
+      const cleaned = rawCats.filter(
+        (c: string) => !['best-budget', 'under-200k', 'under-100k', 'under-300k'].includes(String(c).toLowerCase())
+      );
+      return cleaned.length > 0 ? cleaned : ['best-battery'];
+    })(),
+    isFeatured: Boolean(
+      raw?.isFeatured ||
+      (Array.isArray(raw?.categories) && raw.categories.some((c: string) => String(c).toLowerCase() === 'featured'))
+    ),
     isPopular: raw?.isPopular !== undefined ? Boolean(raw.isPopular) : true,
     screenSizeInches: Number(raw?.screenSizeInches) || 6.7,
     seoTitle: raw?.seoTitle || undefined,
@@ -334,6 +345,10 @@ function normalizePhoneRecord(raw: any): Phone {
   };
 }
 
+export const SEED_PHONE_IDS = new Set<string>(
+  INITIAL_PHONES.map((p) => p.id)
+);
+
 const SEED_PHONE_IMAGE_MAP = new Map<string, string>(
   INITIAL_PHONES.map((p) => [p.id, p.image])
 );
@@ -364,14 +379,14 @@ function mergePhonesAndSync(
     }
   }
 
-  const mergedResult: Phone[] = [];
+  const mergedById = new Map<string, Phone>();
 
   for (const localPhone of normalizedLocal) {
     const apiPhone = apiById.get(localPhone.id);
     if (!apiPhone) {
       // Locally created phone not yet on backend -> push to backend
       createPhoneApi(localPhone).catch(() => {});
-      mergedResult.push(localPhone);
+      mergedById.set(localPhone.id, localPhone);
       continue;
     }
 
@@ -406,27 +421,103 @@ function mergePhonesAndSync(
       images: combinedGallery,
     });
 
-    // If local state has a newer/custom image or specs not yet reflected on the backend, push to backend
-    if (mergedPhone.image !== apiPhone.image || mergedPhone.name !== apiPhone.name || mergedPhone.priceNGN !== apiPhone.priceNGN) {
+    // If local state has a newer/custom image, specs, or featured status not yet reflected on the backend, push to backend
+    if (
+      mergedPhone.image !== apiPhone.image ||
+      mergedPhone.name !== apiPhone.name ||
+      mergedPhone.priceNGN !== apiPhone.priceNGN ||
+      mergedPhone.isFeatured !== apiPhone.isFeatured ||
+      mergedPhone.isPopular !== apiPhone.isPopular ||
+      JSON.stringify(mergedPhone.categories) !== JSON.stringify(apiPhone.categories)
+    ) {
       updatePhoneApi(mergedPhone.id, mergedPhone).catch(() => {});
     }
 
-    mergedResult.push(mergedPhone);
+    mergedById.set(mergedPhone.id, mergedPhone);
   }
 
-  // Append any phones from API that weren't in local state
+  // Include any phones from API that weren't in local state
   for (const apiPhone of normalizedApi) {
     if (!localById.has(apiPhone.id)) {
-      mergedResult.push(apiPhone);
+      mergedById.set(apiPhone.id, apiPhone);
     }
   }
 
-  return mergedResult;
+  // Order:
+  // 1. Newly added custom phones (not in SEED_PHONE_IDS) first, preserving local/API insertion order
+  // 2. Remaining phones in local/API order
+  const customPhones: Phone[] = [];
+  const seenIds = new Set<string>();
+
+  for (const p of normalizedLocal) {
+    if (!SEED_PHONE_IDS.has(p.id) && !seenIds.has(p.id)) {
+      const m = mergedById.get(p.id);
+      if (m) {
+        customPhones.push(m);
+        seenIds.add(p.id);
+      }
+    }
+  }
+  for (const p of normalizedApi) {
+    if (!SEED_PHONE_IDS.has(p.id) && !seenIds.has(p.id)) {
+      const m = mergedById.get(p.id);
+      if (m) {
+        customPhones.push(m);
+        seenIds.add(p.id);
+      }
+    }
+  }
+
+  const remainingPhones: Phone[] = [];
+  for (const p of normalizedLocal) {
+    if (!seenIds.has(p.id)) {
+      const m = mergedById.get(p.id);
+      if (m) {
+        remainingPhones.push(m);
+        seenIds.add(p.id);
+      }
+    }
+  }
+  for (const p of normalizedApi) {
+    if (!seenIds.has(p.id)) {
+      const m = mergedById.get(p.id);
+      if (m) {
+        remainingPhones.push(m);
+        seenIds.add(p.id);
+      }
+    }
+  }
+
+  return [...customPhones, ...remainingPhones];
+}
+
+function getDeletedBrandKeys(): Set<string> {
+  const defaults = ['nothing', 'brand-nothing'];
+  if (typeof window === 'undefined') return new Set(defaults);
+  try {
+    const raw = localStorage.getItem('gsmscope_deleted_brand_keys_v1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return new Set(parsed.map((k) => String(k || '').toLowerCase()).filter(Boolean));
+      }
+    }
+    localStorage.setItem('gsmscope_deleted_brand_keys_v1', JSON.stringify(defaults));
+  } catch {}
+  return new Set(defaults);
+}
+
+function saveDeletedBrandKeys(keysSet: Set<string>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('gsmscope_deleted_brand_keys_v1', JSON.stringify(Array.from(keysSet)));
+  } catch {}
 }
 
 function mergeBrandsAndSync(localBrands: Brand[], apiBrands: Brand[]): Brand[] {
   const result: Brand[] = [];
   const seenKeys = new Set<string>();
+  const deletedKeys = getDeletedBrandKeys();
 
   const getBrandKeys = (b: Brand) => [
     (b.id || '').toLowerCase(),
@@ -434,70 +525,100 @@ function mergeBrandsAndSync(localBrands: Brand[], apiBrands: Brand[]): Brand[] {
     (b.name || '').toLowerCase(),
   ].filter(Boolean);
 
-  const apiByKey = new Map<string, Brand>();
-  for (const ab of apiBrands) {
-    for (const k of getBrandKeys(ab)) {
-      apiByKey.set(k, ab);
+  const localByKey = new Map<string, Brand>();
+  for (const lb of localBrands) {
+    for (const k of getBrandKeys(lb)) {
+      localByKey.set(k, lb);
     }
   }
 
-  // 1. Process all local brands (preserving any newly added 24th+ brands in localStorage)
-  for (const lb of localBrands) {
-    const keys = getBrandKeys(lb);
+  for (const ab of apiBrands) {
+    const keys = getBrandKeys(ab);
+    if (keys.some((k) => deletedKeys.has(k))) {
+      deleteBrandApi(ab.id || ab.slug || ab.name).catch(() => {});
+      continue;
+    }
     if (keys.some((k) => seenKeys.has(k))) continue;
     keys.forEach((k) => seenKeys.add(k));
 
-    const matchedApi = keys.map((k) => apiByKey.get(k)).find(Boolean);
-    if (!matchedApi) {
-      // Brand exists in localStorage (e.g. 24th brand added in Admin) but missing on server -> sync to server!
-      createBrandApi(lb).catch(() => {});
-      result.push(lb);
-    } else {
+    const matchedLocal = keys.map((k) => localByKey.get(k)).find(Boolean);
+    if (matchedLocal) {
       const merged: Brand = {
-        ...matchedApi,
-        ...lb,
-        logoUrl: lb.logoUrl || matchedApi.logoUrl,
+        ...ab,
+        ...matchedLocal,
+        logoUrl: matchedLocal.logoUrl || ab.logoUrl,
       };
-      if (lb.logoUrl && lb.logoUrl !== matchedApi.logoUrl) {
+      if (matchedLocal.logoUrl && matchedLocal.logoUrl !== ab.logoUrl) {
         updateBrandApi(merged.id, merged).catch(() => {});
       }
       result.push(merged);
+    } else {
+      result.push(ab);
     }
   }
 
-  // 2. Add any brands from API that weren't in localBrands
-  for (const ab of apiBrands) {
-    const keys = getBrandKeys(ab);
-    if (keys.some((k) => seenKeys.has(k))) continue;
-    keys.forEach((k) => seenKeys.add(k));
-    result.push(ab);
-  }
+  try {
+    localStorage.setItem('gsmscope_brands_v3', JSON.stringify(result));
+  } catch {}
 
   return result;
 }
 
-const FALLBACK_ARTICLE_IMAGE = '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg';
+const FALLBACK_ARTICLE_IMAGE = '/src/assets/images/hero_flagship_phones_1792578844852.jpg';
 
 function normalizeArticleRecord(raw: any): Article {
   const rawCover = typeof raw?.coverImage === 'string' ? raw.coverImage.trim() : '';
   const validCover =
-    !rawCover || rawCover.includes('news_5g_nigeria.png')
+    !rawCover ||
+    rawCover.includes('news_5g_nigeria.png') ||
+    rawCover.includes('/assets/aistudio/IMG_')
       ? FALLBACK_ARTICLE_IMAGE
       : rawCover;
+
+  const hasExplicitViews =
+    typeof raw?.viewsCount === 'number' || typeof raw?.views === 'number';
+  const rawViews =
+    typeof raw?.viewsCount === 'number'
+      ? raw.viewsCount
+      : typeof raw?.views === 'number'
+      ? raw.views
+      : Number(raw?.viewsCount) || Number(raw?.views) || 0;
+
+  // Stable visitor views generator for seed articles without view count
+  const idStr = String(raw?.id || raw?.title || '');
+  let hash = 0;
+  for (let i = 0; i < idStr.length; i++) {
+    hash = (hash * 31 + idStr.charCodeAt(i)) % 10000;
+  }
+  const defaultViews = 8000 + Math.abs(hash * 2);
+
+  const rawCategory = String(raw?.category || 'News').trim();
+  const normalizedCategory =
+    rawCategory === 'Phone News' || rawCategory === 'Tech Updates' || rawCategory === 'Smartphone News'
+      ? 'News'
+      : rawCategory === 'Review'
+      ? 'Reviews'
+      : rawCategory === 'Buying Guides' ||
+        rawCategory === 'FRP & Servicing Tools' ||
+        rawCategory === 'Charging & Battery' ||
+        rawCategory === 'Tips & Security'
+      ? 'Buying Guide'
+      : rawCategory || 'News';
 
   return {
     id: raw?.id || `art-${Date.now()}`,
     title: raw?.title || 'Untitled Article',
     slug: raw?.slug || raw?.id || `article-${Date.now()}`,
-    category: raw?.category || 'News',
+    category: normalizedCategory,
     coverImage: validCover,
     summary: raw?.summary || '',
     content: raw?.content || '',
     author: raw?.author || { name: 'GsmScope Editorial', role: 'Senior Hardware Editor' },
     date: raw?.date || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     readTime: raw?.readTime || '4 min read',
-    tags: Array.isArray(raw?.tags) && raw.tags.length > 0 ? raw.tags : [raw?.category || 'News'],
+    tags: Array.isArray(raw?.tags) && raw.tags.length > 0 ? raw.tags : [normalizedCategory],
     featured: Boolean(raw?.featured),
+    viewsCount: hasExplicitViews ? rawViews : (rawViews > 0 ? rawViews : defaultViews),
     relatedPhoneIds: Array.isArray(raw?.relatedPhoneIds) ? raw.relatedPhoneIds : [],
     ...(raw?.seoTitle ? { seoTitle: raw.seoTitle } : {}),
     ...(raw?.seoKeywords ? { seoKeywords: raw.seoKeywords } : {}),
@@ -770,13 +891,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setReviews(prev => mergeReviewsAndSync(prev, apiReviews));
       }
       if (apiAdSettings) {
-        setAdSettings(normalizeAdSettings(apiAdSettings));
+        setAdSettings(prev => mergeAdSettingsAndSync(prev, apiAdSettings, apiMediaItems || undefined));
       }
       if (apiWebsiteContent) {
         setWebsiteContentState(prev => normalizeWebsiteContent({ ...prev, ...apiWebsiteContent }));
       }
       if (apiMediaItems && Array.isArray(apiMediaItems)) {
-        setMediaLibraryState(apiMediaItems);
+        setMediaLibraryState(prev => {
+          const apiByUrl = new Map(apiMediaItems.map(m => [m.url, m]));
+          const mergedMedia = apiMediaItems.map(m => {
+            const localMatch = prev.find(p => p.id === m.id || p.url === m.url);
+            return localMatch?.dataUrl && !m.dataUrl ? { ...m, dataUrl: localMatch.dataUrl } : m;
+          });
+          for (const localItem of prev) {
+            if (localItem?.url && !apiByUrl.has(localItem.url) && !localItem.url.includes('/assets/aistudio/IMG_')) {
+              mergedMedia.unshift(localItem);
+              addMediaItemApi(localItem).catch(() => {});
+            }
+          }
+          return mergedMedia;
+        });
       }
     } catch (err) {
       console.warn('Failed to refresh data:', err);
@@ -843,8 +977,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [brands, setBrands] = useState<Brand[]>(() => {
     try {
-      const saved = localStorage.getItem('gsmscope_brands_v2');
-      return saved ? JSON.parse(saved) : INITIAL_BRANDS;
+      localStorage.removeItem('gsmscope_brands_v2');
+      const deletedKeys = getDeletedBrandKeys();
+      const saved = localStorage.getItem('gsmscope_brands_v3');
+      const parsed: Brand[] = saved ? JSON.parse(saved) : INITIAL_BRANDS;
+      return (Array.isArray(parsed) ? parsed : INITIAL_BRANDS).filter(
+        (b) =>
+          b &&
+          !deletedKeys.has(String(b.id || '').toLowerCase()) &&
+          !deletedKeys.has(String(b.slug || '').toLowerCase()) &&
+          !deletedKeys.has(String(b.name || '').toLowerCase())
+      );
     } catch {
       return INITIAL_BRANDS;
     }
@@ -881,20 +1024,47 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
 
   const localAdModifiedRef = useRef(false);
+  const localWebsiteContentModifiedRef = useRef(false);
 
-  const normalizeAdSettings = (raw?: Partial<AdSettings> | null): AdSettings => {
+  const normalizeAdSettings = (raw?: Partial<AdSettings> | null, mediaItems?: MediaItem[]): AdSettings => {
     const base = raw || INITIAL_AD_SETTINGS;
     const basePlacements = (base.placements || {}) as Partial<Record<AdPlacementId, AdPlacementConfig>>;
+
+    // Build lookup of known base64 dataUrls for /uploads/... images so banners self-heal after container updates
+    const dataUrlByPath = new Map<string, string>();
+    try {
+      const addFromList = (list?: MediaItem[] | null) => {
+        if (!Array.isArray(list)) return;
+        for (const m of list) {
+          if (m && m.url && m.dataUrl && m.dataUrl.startsWith('data:')) {
+            dataUrlByPath.set(m.url, m.dataUrl);
+          }
+        }
+      };
+      addFromList(mediaItems);
+      const localMediaRaw = typeof window !== 'undefined' ? localStorage.getItem('gsmscope_media_library_v1') : null;
+      if (localMediaRaw) {
+        addFromList(JSON.parse(localMediaRaw));
+      }
+    } catch {}
     
-    // Normalize every placement so enabled is strictly boolean
+    // Normalize every placement so enabled is strictly boolean and canonical labels are preserved
     const normalizedPlacements = { ...DEFAULT_AD_PLACEMENTS } as Record<AdPlacementId, AdPlacementConfig>;
     (Object.keys(DEFAULT_AD_PLACEMENTS) as AdPlacementId[]).forEach((pid) => {
       const def = DEFAULT_AD_PLACEMENTS[pid];
       const inc = basePlacements[pid];
       if (inc) {
+        const imgUrl = typeof inc.imageUrl === 'string' ? inc.imageUrl.trim() : '';
+        const resolvedDataUrl = inc.imageDataUrl || (imgUrl ? dataUrlByPath.get(imgUrl) : undefined);
         normalizedPlacements[pid] = {
           ...def,
           ...inc,
+          id: def.id,
+          name: def.name,
+          pageLabel: def.pageLabel,
+          positionLabel: def.positionLabel,
+          imageUrl: imgUrl,
+          ...(resolvedDataUrl ? { imageDataUrl: resolvedDataUrl } : {}),
           enabled: inc.enabled !== undefined ? Boolean(inc.enabled) : Boolean(def.enabled),
         };
       } else {
@@ -902,7 +1072,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Ensure header_top is synced with topBanner and strictly respects disabled state
+    // Ensure header_top is synced with topBanner and strictly respects enabled state
     const initialHeaderTop = DEFAULT_AD_PLACEMENTS.header_top;
     const rawHeaderTop = basePlacements.header_top;
     const rawTopBanner = base.topBanner;
@@ -916,9 +1086,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isHeaderTopEnabled = Boolean(initialHeaderTop.enabled);
     }
 
+    const headerImgUrl = typeof rawHeaderTop?.imageUrl === 'string' ? rawHeaderTop.imageUrl.trim() : '';
+    const headerDataUrl = rawHeaderTop?.imageDataUrl || (headerImgUrl ? dataUrlByPath.get(headerImgUrl) : undefined);
+
     const mergedHeaderTop: AdPlacementConfig = {
       ...initialHeaderTop,
       ...(rawHeaderTop || {}),
+      id: initialHeaderTop.id,
+      name: initialHeaderTop.name,
+      pageLabel: initialHeaderTop.pageLabel,
+      positionLabel: initialHeaderTop.positionLabel,
+      imageUrl: headerImgUrl,
+      ...(headerDataUrl ? { imageDataUrl: headerDataUrl } : {}),
       enabled: isHeaderTopEnabled,
       title: rawHeaderTop?.title ?? rawTopBanner?.title ?? initialHeaderTop.title,
       subtitle: rawHeaderTop?.subtitle ?? rawTopBanner?.subtitle ?? initialHeaderTop.subtitle,
@@ -950,7 +1129,146 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           : Boolean(INITIAL_AD_SETTINGS.sidebarBanner.enabled),
       },
       placements: normalizedPlacements,
+      updatedAt: base.updatedAt,
     };
+  };
+
+  const isPlacementCustomizedFromSeed = (p?: AdPlacementConfig | null): boolean => {
+    if (!p) return false;
+    const def = DEFAULT_AD_PLACEMENTS[p.id];
+    if (!def) return Boolean(p.enabled);
+    return (
+      Boolean(p.enabled) ||
+      Boolean(p.imageUrl && p.imageUrl.trim()) ||
+      Boolean(p.imageDataUrl && p.imageDataUrl.trim()) ||
+      Boolean(p.scriptCode && p.scriptCode.trim()) ||
+      p.adType !== def.adType ||
+      p.title !== def.title ||
+      p.subtitle !== def.subtitle ||
+      p.badgeText !== def.badgeText ||
+      p.learnMoreText !== def.learnMoreText ||
+      p.learnMoreUrl !== def.learnMoreUrl ||
+      Boolean(p.showLearnMore) !== Boolean(def.showLearnMore)
+    );
+  };
+
+  const mergeAdSettingsAndSync = (
+    currentState: Partial<AdSettings> | null | undefined,
+    apiRaw: Partial<AdSettings> | null | undefined,
+    mediaItems?: MediaItem[]
+  ): AdSettings => {
+    let savedLocalParsed: Partial<AdSettings> | null = null;
+    let wasLocallySavedByAdmin = false;
+    try {
+      const savedLocalRaw = localStorage.getItem('gsmscope_ads_v3');
+      wasLocallySavedByAdmin = localStorage.getItem('gsmscope_ads_admin_saved_v1') === 'true';
+      if (savedLocalRaw) {
+        savedLocalParsed = JSON.parse(savedLocalRaw);
+      }
+    } catch {}
+
+    const localNorm = normalizeAdSettings(savedLocalParsed || currentState || INITIAL_AD_SETTINGS, mediaItems);
+    const stateNorm = normalizeAdSettings(currentState || localNorm, mediaItems);
+    const apiNorm = normalizeAdSettings(apiRaw || INITIAL_AD_SETTINGS, mediaItems);
+
+    // Pick whichever local source (React state vs localStorage) is newer or has active edits
+    const effectiveLocal =
+      stateNorm.updatedAt && (!localNorm.updatedAt || stateNorm.updatedAt >= localNorm.updatedAt)
+        ? stateNorm
+        : localNorm;
+
+    const localHasCustomizations =
+      wasLocallySavedByAdmin ||
+      Boolean(effectiveLocal.updatedAt) ||
+      Object.values(effectiveLocal.placements || {}).some((p) => isPlacementCustomizedFromSeed(p)) ||
+      Boolean(effectiveLocal.adsensePublisherId?.trim()) ||
+      Boolean(effectiveLocal.adsenseAutoAdsEnabled);
+
+    const apiServerWasReset =
+      !apiRaw?.updatedAt &&
+      !Object.values(apiNorm.placements || {}).some((p) => isPlacementCustomizedFromSeed(p));
+
+    const localIsNewerThanServer =
+      typeof effectiveLocal.updatedAt === 'string' &&
+      Boolean(effectiveLocal.updatedAt) &&
+      (!apiNorm.updatedAt || effectiveLocal.updatedAt >= apiNorm.updatedAt);
+
+    const mergedPlacements = { ...DEFAULT_AD_PLACEMENTS } as Record<AdPlacementId, AdPlacementConfig>;
+    let needsServerPush = false;
+
+    (Object.keys(DEFAULT_AD_PLACEMENTS) as AdPlacementId[]).forEach((pid) => {
+      const locP = effectiveLocal.placements?.[pid] || DEFAULT_AD_PLACEMENTS[pid];
+      const srvP = apiNorm.placements?.[pid] || DEFAULT_AD_PLACEMENTS[pid];
+
+      const locCustom = isPlacementCustomizedFromSeed(locP);
+      const srvCustom = isPlacementCustomizedFromSeed(srvP);
+
+      const useLocalPlacement =
+        (locP.updatedAt && (!srvP.updatedAt || locP.updatedAt >= srvP.updatedAt)) ||
+        (localIsNewerThanServer && localHasCustomizations) ||
+        (apiServerWasReset && localHasCustomizations) ||
+        (locCustom && !srvCustom);
+
+      const chosen = useLocalPlacement ? locP : srvP;
+      const imageDataUrl = chosen.imageDataUrl || locP.imageDataUrl || srvP.imageDataUrl;
+      mergedPlacements[pid] = {
+        ...chosen,
+        ...(imageDataUrl ? { imageDataUrl } : {}),
+      };
+
+      if (
+        mergedPlacements[pid].enabled !== srvP.enabled ||
+        (mergedPlacements[pid].imageUrl || '') !== (srvP.imageUrl || '') ||
+        (mergedPlacements[pid].imageDataUrl || '') !== (srvP.imageDataUrl || '') ||
+        mergedPlacements[pid].title !== srvP.title ||
+        mergedPlacements[pid].subtitle !== srvP.subtitle ||
+        mergedPlacements[pid].badgeText !== srvP.badgeText ||
+        mergedPlacements[pid].learnMoreUrl !== srvP.learnMoreUrl ||
+        mergedPlacements[pid].scriptCode !== srvP.scriptCode ||
+        mergedPlacements[pid].adType !== srvP.adType
+      ) {
+        needsServerPush = true;
+      }
+    });
+
+    const useLocalGlobal = localIsNewerThanServer || (apiServerWasReset && localHasCustomizations);
+    const mergedAds = normalizeAdSettings(
+      {
+        ...apiNorm,
+        ...(useLocalGlobal ? effectiveLocal : {}),
+        adsensePublisherId:
+          (useLocalGlobal ? effectiveLocal.adsensePublisherId : apiNorm.adsensePublisherId) ||
+          effectiveLocal.adsensePublisherId ||
+          apiNorm.adsensePublisherId,
+        adsenseAutoAdsEnabled: useLocalGlobal
+          ? effectiveLocal.adsenseAutoAdsEnabled
+          : (apiNorm.adsenseAutoAdsEnabled ?? effectiveLocal.adsenseAutoAdsEnabled),
+        adsTxtContent:
+          (useLocalGlobal ? effectiveLocal.adsTxtContent : apiNorm.adsTxtContent) ||
+          effectiveLocal.adsTxtContent ||
+          apiNorm.adsTxtContent,
+        placements: mergedPlacements,
+        updatedAt:
+          (useLocalGlobal ? effectiveLocal.updatedAt : apiNorm.updatedAt) ||
+          effectiveLocal.updatedAt ||
+          apiNorm.updatedAt ||
+          new Date().toISOString(),
+      },
+      mediaItems
+    );
+
+    try {
+      localStorage.setItem('gsmscope_ads_v3', JSON.stringify(mergedAds));
+      if (localHasCustomizations) {
+        localStorage.setItem('gsmscope_ads_admin_saved_v1', 'true');
+      }
+    } catch {}
+
+    if (needsServerPush && localHasCustomizations) {
+      updateAdSettingsApi(mergedAds).catch(() => {});
+    }
+
+    return mergedAds;
   };
 
   const [adSettings, setAdSettings] = useState<AdSettings>(() => {
@@ -995,7 +1313,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [mediaLibrary, setMediaLibraryState] = useState<MediaItem[]>(() => {
     try {
       const saved = localStorage.getItem('gsmscope_media_library_v1');
-      return saved ? JSON.parse(saved) : INITIAL_MEDIA_ITEMS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter(
+            (m: any) =>
+              m &&
+              typeof m.url === 'string' &&
+              !m.url.includes('/assets/aistudio/IMG_') &&
+              !m.url.includes('phone_galaxy_s24_ultra.png')
+          );
+          if (cleaned.length > 0) return cleaned;
+        }
+      }
+      return INITIAL_MEDIA_ITEMS;
     } catch {
       return INITIAL_MEDIA_ITEMS;
     }
@@ -1015,10 +1346,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  // Admin Authentication State
+  // Admin Authentication State (persists across browser restarts when Remember Me is used until explicit Logout)
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
     try {
-      return sessionStorage.getItem('gsmscope_admin_auth') === 'true';
+      return (
+        localStorage.getItem('gsmscope_admin_auth') === 'true' ||
+        sessionStorage.getItem('gsmscope_admin_auth') === 'true'
+      );
     } catch {
       return false;
     }
@@ -1701,7 +2035,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem('gsmscope_brands_v2', JSON.stringify(brands));
+      localStorage.setItem('gsmscope_brands_v3', JSON.stringify(brands));
     } catch (e) {
       console.warn('LocalStorage save failed for brands', e);
     }
@@ -1722,14 +2056,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       console.warn('LocalStorage save failed for reviews', e);
     }
   }, [reviews]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('gsmscope_ads_v3', JSON.stringify(adSettings));
-    } catch (e) {
-      console.warn('LocalStorage save failed for ads', e);
-    }
-  }, [adSettings]);
 
   useEffect(() => {
     try {
@@ -1766,33 +2092,69 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (apiReviews && apiReviews.length > 0) {
             setReviews(prev => mergeReviewsAndSync(prev, apiReviews));
           }
-          if (apiAdSettings && !localAdModifiedRef.current) {
-            setAdSettings(prev => {
-              const savedLocal = localStorage.getItem('gsmscope_ads_v3');
-              if (savedLocal) {
-                try {
-                  const parsedLocal = JSON.parse(savedLocal);
-                  const normalizedLocal = normalizeAdSettings(parsedLocal);
-                  // Sync local ad settings to backend so both stay identical
-                  updateAdSettingsApi(normalizedLocal).catch(() => {});
-                  return normalizedLocal;
-                } catch {}
-              }
-              return normalizeAdSettings(apiAdSettings);
-            });
+          if (apiAdSettings) {
+            setAdSettings((prev) => mergeAdSettingsAndSync(prev, apiAdSettings, apiMedia || undefined));
           }
-          if (apiSettings) {
-            const merged = normalizeWebsiteContent(apiSettings);
-            setWebsiteContentState(merged);
-            try {
-              localStorage.setItem('gsmscope_website_content_v1', JSON.stringify(merged));
-            } catch {}
+          if (apiSettings && !localWebsiteContentModifiedRef.current) {
+            setWebsiteContentState(() => {
+              let merged = normalizeWebsiteContent(apiSettings);
+              try {
+                const savedLocalRaw = localStorage.getItem('gsmscope_website_content_v1');
+                if (savedLocalRaw) {
+                  const savedLocal = JSON.parse(savedLocalRaw) as Partial<WebsiteContent>;
+                  const customOverrides: Partial<WebsiteContent> = {};
+                  (Object.keys(savedLocal) as Array<keyof WebsiteContent>).forEach((key) => {
+                    const localVal = savedLocal[key];
+                    const defaultVal = INITIAL_WEBSITE_CONTENT[key];
+                    const apiVal = (apiSettings as any)[key];
+                    if (
+                      localVal !== undefined &&
+                      localVal !== null &&
+                      localVal !== '' &&
+                      JSON.stringify(localVal) !== JSON.stringify(defaultVal) &&
+                      JSON.stringify(apiVal) === JSON.stringify(defaultVal)
+                    ) {
+                      (customOverrides as any)[key] = localVal;
+                    }
+                  });
+                  if (Object.keys(customOverrides).length > 0) {
+                    merged = normalizeWebsiteContent({ ...merged, ...customOverrides });
+                    updateWebsiteContentApi(merged).catch(() => {});
+                  }
+                }
+                localStorage.setItem('gsmscope_website_content_v1', JSON.stringify(merged));
+              } catch {}
+              return merged;
+            });
           }
           if (apiMedia && apiMedia.length > 0) {
             setMediaLibraryState(prev => {
               const apiIds = new Set(apiMedia.map(m => m.id));
-              const localOnly = prev.filter(m => !apiIds.has(m.id));
-              const combined = [...localOnly, ...apiMedia];
+              const apiUrls = new Set(apiMedia.map(m => m.url));
+              const localOnly = prev.filter(
+                m =>
+                  !apiIds.has(m.id) &&
+                  !apiUrls.has(m.url) &&
+                  typeof m.url === 'string' &&
+                  !m.url.includes('/assets/aistudio/IMG_') &&
+                  !m.url.includes('phone_galaxy_s24_ultra.png')
+              );
+              // Re-sync any local uploaded media back to the backend if the container restarted
+              for (const localItem of localOnly) {
+                addMediaItemApi(localItem).catch(() => {});
+              }
+              const cleanedApi = apiMedia
+                .filter(
+                  m =>
+                    typeof m.url === 'string' &&
+                    !m.url.includes('/assets/aistudio/IMG_') &&
+                    !m.url.includes('phone_galaxy_s24_ultra.png')
+                )
+                .map(m => {
+                  const localMatch = prev.find(p => p.id === m.id || p.url === m.url);
+                  return localMatch?.dataUrl && !m.dataUrl ? { ...m, dataUrl: localMatch.dataUrl } : m;
+                });
+              const combined = [...localOnly, ...cleanedApi];
               try {
                 localStorage.setItem('gsmscope_media_library_v1', JSON.stringify(combined));
               } catch {}
@@ -1805,7 +2167,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     }
     loadBackendData();
-    return () => { isMounted = false; };
+
+    // Keep ad placements synchronized across open browser tabs and after app updates / container restarts
+    const handleStorageSync = (e: StorageEvent) => {
+      if (e.key === 'gsmscope_ads_v3' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setAdSettings(normalizeAdSettings(parsed));
+        } catch {}
+      }
+    };
+
+    const handleFocusOrVisibilitySync = () => {
+      if (document.visibilityState === 'hidden') return;
+      fetchAdSettingsFromApi()
+        .then((srvAds) => {
+          if (srvAds && isMounted) {
+            setAdSettings((prev) => mergeAdSettingsAndSync(prev, srvAds));
+          }
+        })
+        .catch(() => {});
+    };
+
+    window.addEventListener('storage', handleStorageSync);
+    window.addEventListener('focus', handleFocusOrVisibilitySync);
+    document.addEventListener('visibilitychange', handleFocusOrVisibilitySync);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('storage', handleStorageSync);
+      window.removeEventListener('focus', handleFocusOrVisibilitySync);
+      document.removeEventListener('visibilitychange', handleFocusOrVisibilitySync);
+    };
   }, []);
 
   // Pricing Helpers
@@ -1876,15 +2269,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     let nextFilter: FilterState = { ...defaultFilterState };
     switch (presetKey) {
-      case 'under-100k':
-        nextFilter = { ...defaultFilterState, maxPrice: 100000, categoryPreset: 'Under ₦100,000' };
-        break;
-      case 'under-200k':
-        nextFilter = { ...defaultFilterState, maxPrice: 200000, categoryPreset: 'Under ₦200,000' };
-        break;
-      case 'under-300k':
-        nextFilter = { ...defaultFilterState, maxPrice: 300000, categoryPreset: 'Under ₦300,000' };
-        break;
       case 'best-camera':
         nextFilter = { ...defaultFilterState, minCameraMP: 50, sortBy: 'rating', categoryPreset: 'Best Camera Phones' };
         break;
@@ -1910,7 +2294,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Admin Authentication Logic
   const adminUrl = typeof window !== 'undefined' ? `${window.location.origin}/admin` : '/admin';
 
-  const adminLogin = (username: string, password: string): { success: boolean; message: string } => {
+  const adminLogin = (username: string, password: string, rememberMe = true): { success: boolean; message: string } => {
     const trimmedUser = (username || '').trim();
     const validUsername =
       trimmedUser === 'gsM-scopE' ||
@@ -1945,6 +2329,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsAdminAuthenticated(true);
       try {
         sessionStorage.setItem('gsmscope_admin_auth', 'true');
+        if (rememberMe !== false) {
+          localStorage.setItem('gsmscope_admin_auth', 'true');
+          localStorage.setItem('gsmscope_admin_remember_user', trimmedUser);
+        } else {
+          localStorage.removeItem('gsmscope_admin_auth');
+          localStorage.removeItem('gsmscope_admin_remember_user');
+        }
       } catch {}
       adminLoginApi(username, password).catch(() => {});
       return {
@@ -1980,6 +2371,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCurrentOtp(null);
       try {
         sessionStorage.setItem('gsmscope_admin_auth', 'true');
+        localStorage.setItem('gsmscope_admin_auth', 'true');
       } catch {}
       adminVerifyOtpApi(trimmed).catch(() => {});
       return { success: true, message: 'OTP verified successfully. Administrator session activated.' };
@@ -1991,6 +2383,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setIsAdminAuthenticated(false);
     try {
       sessionStorage.removeItem('gsmscope_admin_auth');
+      localStorage.removeItem('gsmscope_admin_auth');
     } catch {}
     setActiveTabState('admin');
     if (typeof window !== 'undefined') {
@@ -2003,7 +2396,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // CRUD Operations
-  const recordPhoneView = (phoneId: string) => {
+  const recordPhoneView = useCallback((phoneId: string) => {
+    if (!phoneId) return;
     // Deduplicate views per browser session so refreshing the page does not add multiple views
     if (typeof window !== 'undefined') {
       try {
@@ -2028,7 +2422,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return prev;
     });
-  };
+  }, []);
 
   const addPhone = (newPhone: Phone) => {
     const normalized = normalizePhoneRecord(newPhone);
@@ -2050,7 +2444,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         : updated.images
     });
     setPhones(prev => {
-      const next = prev.map(p => p.id === normalized.id ? normalized : p);
+      const existing = prev.find(p => p.id === normalized.id);
+      const justFeatured = normalized.isFeatured && (!existing || !existing.isFeatured);
+      const next = justFeatured
+        ? [normalized, ...prev.filter(p => p.id !== normalized.id)]
+        : prev.map(p => p.id === normalized.id ? normalized : p);
       try {
         localStorage.setItem('gsmscope_phones_v3', JSON.stringify(next));
       } catch {}
@@ -2102,6 +2500,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addBrand = (brand: Brand) => {
+    const deletedKeys = getDeletedBrandKeys();
+    [brand.id, brand.slug, brand.name].forEach((k) => {
+      if (k) deletedKeys.delete(k.toLowerCase());
+    });
+    saveDeletedBrandKeys(deletedKeys);
+
     setBrands(prev => {
       const existingIdx = prev.findIndex(
         b => b.id === brand.id || b.slug.toLowerCase() === brand.slug.toLowerCase() || b.name.toLowerCase() === brand.name.toLowerCase()
@@ -2110,7 +2514,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ? prev.map((b, i) => (i === existingIdx ? { ...b, ...brand } : b))
         : [...prev, brand];
       try {
-        localStorage.setItem('gsmscope_brands_v2', JSON.stringify(next));
+        localStorage.setItem('gsmscope_brands_v3', JSON.stringify(next));
       } catch {}
       return next;
     });
@@ -2121,7 +2525,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setBrands(prev => {
       const next = prev.map(b => (b.id === updated.id || b.slug === updated.slug ? updated : b));
       try {
-        localStorage.setItem('gsmscope_brands_v2', JSON.stringify(next));
+        localStorage.setItem('gsmscope_brands_v3', JSON.stringify(next));
       } catch {}
       return next;
     });
@@ -2130,13 +2534,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteBrand = (id: string) => {
+    const targetLower = String(id || '').toLowerCase();
+    const deletedKeys = getDeletedBrandKeys();
+    deletedKeys.add(targetLower);
+
     setBrands(prev => {
-      const next = prev.filter(b => b.id !== id);
+      const matched = prev.find(
+        b =>
+          b.id.toLowerCase() === targetLower ||
+          b.slug.toLowerCase() === targetLower ||
+          b.name.toLowerCase() === targetLower
+      );
+      if (matched) {
+        if (matched.id) deletedKeys.add(matched.id.toLowerCase());
+        if (matched.slug) deletedKeys.add(matched.slug.toLowerCase());
+        if (matched.name) deletedKeys.add(matched.name.toLowerCase());
+      }
+      saveDeletedBrandKeys(deletedKeys);
+
+      const next = prev.filter(
+        b =>
+          b.id.toLowerCase() !== targetLower &&
+          b.slug.toLowerCase() !== targetLower &&
+          b.name.toLowerCase() !== targetLower
+      );
       try {
-        localStorage.setItem('gsmscope_brands_v2', JSON.stringify(next));
+        localStorage.setItem('gsmscope_brands_v3', JSON.stringify(next));
       } catch {}
       return next;
     });
+    setSelectedBrandState(prev =>
+      prev &&
+      (prev.id.toLowerCase() === targetLower ||
+        prev.slug.toLowerCase() === targetLower ||
+        prev.name.toLowerCase() === targetLower)
+        ? null
+        : prev
+    );
     deleteBrandApi(id).catch(console.warn);
   };
 
@@ -2189,6 +2623,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     deleteArticleApi(id).catch(console.warn);
   };
+
+  const recordArticleView = useCallback((articleId: string) => {
+    if (!articleId) return;
+    if (typeof window !== 'undefined') {
+      try {
+        const sessionKey = `gsmscope_viewed_art_${articleId}`;
+        if (sessionStorage.getItem(sessionKey)) {
+          return;
+        }
+        sessionStorage.setItem(sessionKey, '1');
+      } catch {}
+    }
+    setArticles(prev => {
+      const next = prev.map(a => {
+        if (a.id === articleId) {
+          return { ...a, viewsCount: (a.viewsCount || 0) + 1 };
+        }
+        return a;
+      });
+      try {
+        localStorage.setItem('gsmscope_articles_v2', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    setSelectedArticleState(prev => {
+      if (prev && prev.id === articleId) {
+        return { ...prev, viewsCount: (prev.viewsCount || 0) + 1 };
+      }
+      return prev;
+    });
+    recordArticleViewApi(articleId).catch(() => {});
+  }, []);
 
   const addReview = (reviewData: Omit<Review, 'id' | 'date' | 'status'>) => {
     const newRev: Review = {
@@ -2259,23 +2725,50 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateAdSettings = (settings: AdSettings) => {
     localAdModifiedRef.current = true;
-    const normalized = normalizeAdSettings(settings);
+    const nowIso = new Date().toISOString();
+    const normalized = normalizeAdSettings({
+      ...settings,
+      updatedAt: nowIso,
+    });
     setAdSettings(normalized);
     try {
       localStorage.setItem('gsmscope_ads_v3', JSON.stringify(normalized));
+      localStorage.setItem('gsmscope_ads_admin_saved_v1', 'true');
     } catch {}
-    updateAdSettingsApi(normalized).catch(console.warn);
+    updateAdSettingsApi(normalized)
+      .then((serverSaved) => {
+        if (serverSaved && typeof serverSaved === 'object') {
+          const synced = normalizeAdSettings({
+            ...normalized,
+            ...(serverSaved as Record<string, unknown>),
+            placements: normalized.placements,
+            updatedAt: nowIso,
+          });
+          try {
+            localStorage.setItem('gsmscope_ads_v3', JSON.stringify(synced));
+          } catch {}
+        }
+      })
+      .catch(console.warn);
   };
 
   const updateWebsiteContent = async (content: Partial<WebsiteContent>): Promise<boolean> => {
-    const next = { ...websiteContent, ...content };
-    setWebsiteContentState(next);
-    try {
-      localStorage.setItem('gsmscope_website_content_v1', JSON.stringify(next));
-    } catch {}
-    const res = await updateWebsiteContentApi(next);
+    localWebsiteContentModifiedRef.current = true;
+    let mergedNext: WebsiteContent = normalizeWebsiteContent({ ...websiteContent, ...content });
+    setWebsiteContentState((prev) => {
+      mergedNext = normalizeWebsiteContent({ ...prev, ...content });
+      try {
+        localStorage.setItem('gsmscope_website_content_v1', JSON.stringify(mergedNext));
+      } catch {}
+      return mergedNext;
+    });
+    const res = await updateWebsiteContentApi(mergedNext);
     if (res) {
-      setWebsiteContentState({ ...INITIAL_WEBSITE_CONTENT, ...res });
+      const serverSynced = normalizeWebsiteContent({ ...mergedNext, ...res, ...content });
+      setWebsiteContentState(serverSynced);
+      try {
+        localStorage.setItem('gsmscope_website_content_v1', JSON.stringify(serverSynced));
+      } catch {}
       return true;
     }
     return true;
@@ -2284,10 +2777,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshMediaLibrary = async () => {
     const items = await fetchMediaItemsApi();
     if (items) {
-      setMediaLibraryState(items);
-      try {
-        localStorage.setItem('gsmscope_media_library_v1', JSON.stringify(items));
-      } catch {}
+      setMediaLibraryState((prev) => {
+        const merged = items.map((m) => {
+          const localMatch = prev.find((p) => p.id === m.id || p.url === m.url);
+          return localMatch?.dataUrl && !m.dataUrl ? { ...m, dataUrl: localMatch.dataUrl } : m;
+        });
+        try {
+          localStorage.setItem('gsmscope_media_library_v1', JSON.stringify(merged));
+        } catch {}
+        return merged;
+      });
     }
   };
 
@@ -2302,11 +2801,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }) => {
     const res = await uploadMediaImageApi(payload);
     const resolvedMedia: MediaItem = (res.success && res.media)
-      ? res.media
+      ? {
+          ...res.media,
+          dataUrl: res.media.dataUrl || payload.data,
+        }
       : {
           id: `media-${Date.now()}`,
           name: payload.name || payload.filename || 'Uploaded Image',
           url: res.url || payload.data,
+          dataUrl: payload.data,
           uploadedAt: new Date().toISOString(),
           category: payload.category || 'phone',
           alt: payload.alt || payload.name || payload.filename || 'Uploaded image',
@@ -2471,6 +2974,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('gsmscope_phones_v2');
     localStorage.removeItem('gsmscope_phones_v3');
     localStorage.removeItem('gsmscope_brands_v2');
+    localStorage.removeItem('gsmscope_brands_v3');
+    localStorage.removeItem('gsmscope_deleted_brand_keys_v1');
     localStorage.removeItem('gsmscope_articles_v2');
     localStorage.removeItem('gsmscope_deleted_article_ids');
     localStorage.removeItem('gsmscope_reviews_v2');
@@ -2594,6 +3099,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addArticle,
         updateArticle,
         deleteArticle,
+        recordArticleView,
         addReview,
         updateReview,
         updateReviewStatus,

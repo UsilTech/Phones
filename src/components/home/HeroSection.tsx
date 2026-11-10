@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useApp, SEED_PHONE_IDS } from '../../context/AppContext';
 import { ArrowRight, Scale, Eye, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 
 export default function HeroSection() {
@@ -15,15 +15,23 @@ export default function HeroSection() {
     formatUSD
   } = useApp();
 
-  // Featured phones: include any phone marked isFeatured by Admin first, plus default featured IDs
+  // Featured phones: prioritize newly added custom phones marked isFeatured first, then featured catalog phones, plus fallback IDs
   const defaultFeaturedIds = ['smart-20', 'oneplus-12r', 'google-pixel-8-pro', 'tecno-camon-30-pro-5g', 'samsung-galaxy-s24-ultra'];
-  const adminFeatured = phones.filter(p => p.isFeatured);
+  const customFeatured = phones.filter(p => !SEED_PHONE_IDS.has(p.id) && p.isFeatured);
+  const seedFeatured = phones.filter(p => SEED_PHONE_IDS.has(p.id) && p.isFeatured);
+  const adminFeatured = [...customFeatured, ...seedFeatured];
   const fallbackFeatured = defaultFeaturedIds
     .map(id => phones.find(p => p.id === id))
     .filter((p): p is typeof phones[number] => Boolean(p && !adminFeatured.some(af => af.id === p.id)));
   const featuredPhones = [...adminFeatured, ...fallbackFeatured].slice(0, 5);
 
   const [activeSlide, setActiveSlide] = useState(0);
+  const firstFeaturedId = featuredPhones[0]?.id || '';
+
+  // Jump to slide 0 whenever the top featured phone changes (e.g. when a newly added/assigned Featured phone is saved)
+  useEffect(() => {
+    setActiveSlide(0);
+  }, [firstFeaturedId]);
 
   // Auto carousel slide every 4s (reduced by 4s from 8s)
   useEffect(() => {
@@ -35,7 +43,10 @@ export default function HeroSection() {
   }, [featuredPhones.length]);
 
   const currentPhone = featuredPhones[activeSlide] || featuredPhones[0];
-  const mostReadArticles = articles.slice(0, 4);
+  // Most read articles sorted by highest number of visitor views
+  const mostReadArticles = [...articles]
+    .sort((a, b) => (b.viewsCount || 0) - (a.viewsCount || 0))
+    .slice(0, 4);
 
   return (
     <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">

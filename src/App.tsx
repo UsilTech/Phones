@@ -1,9 +1,8 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
-import { AppProvider, useApp } from './context/AppContext';
+import { useState, useEffect } from 'react';
+import { AppProvider, useApp, SEED_PHONE_IDS } from './context/AppContext';
 import Header from './components/common/Header';
 import Breadcrumbs from './components/common/Breadcrumbs';
 import Footer from './components/common/Footer';
-import AdBanner from './components/common/AdBanner';
 import AdPlacementSlot from './components/common/AdPlacementSlot';
 import PredictiveSearchDropdown from './components/common/PredictiveSearchDropdown';
 import HeroSection from './components/home/HeroSection';
@@ -14,34 +13,12 @@ import QuickCompareBanner from './components/home/QuickCompareBanner';
 import PhoneCard from './components/phones/PhoneCard';
 import PhoneFilterDrawer from './components/phones/PhoneFilterDrawer';
 
-// Resilient lazy loader that retries dynamically imported chunks if network glitches or HMR occurs
-function safeLazy<T extends React.ComponentType<any>>(
-  factory: () => Promise<{ default: T }>
-) {
-  return lazy(async () => {
-    try {
-      return await factory();
-    } catch (err) {
-      console.warn('Dynamic chunk import error, retrying in 300ms...', err);
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        return await factory();
-      } catch (retryErr) {
-        console.error('Failed to load module chunk after retry:', retryErr);
-        throw retryErr;
-      }
-    }
-  });
-}
-
-// Code-split heavy modals & detail views
-const PhoneDetailPage = safeLazy(() => import('./components/phones/PhoneDetailPage'));
-const ArticleDetailPage = safeLazy(() => import('./components/news/ArticleDetailPage'));
-const CompareView = safeLazy(() => import('./components/compare/CompareView'));
-const AdminDashboardModal = safeLazy(() => import('./components/admin/AdminDashboardModal'));
-const AdminLoginView = safeLazy(() => import('./components/admin/AdminLoginView'));
-
-// Direct imports for page views to prevent dynamic import fetch errors
+// Direct imports for all views so pages open immediately without a circular preloader
+import PhoneDetailPage from './components/phones/PhoneDetailPage';
+import ArticleDetailPage from './components/news/ArticleDetailPage';
+import CompareView from './components/compare/CompareView';
+import AdminDashboardModal from './components/admin/AdminDashboardModal';
+import AdminLoginView from './components/admin/AdminLoginView';
 import BrandsView from './components/brands/BrandsView';
 import NewsView from './components/news/NewsView';
 import ReviewArticlesView from './components/pages/ReviewArticlesView';
@@ -57,7 +34,6 @@ import JsonLdScript from './components/seo/JsonLdScript';
 import SeoMeta from './components/seo/SeoMeta';
 import BrandLogo from './components/common/BrandLogo';
 import GlobalProgressBar from './components/common/GlobalProgressBar';
-import PullToRefresh from './components/common/PullToRefresh';
 import GlobalToast from './components/common/GlobalToast';
 import PrivacyNotice from './components/common/PrivacyNotice';
 import { 
@@ -148,10 +124,16 @@ function MainApp() {
   useEffect(() => {
     const favUrl = websiteContent?.faviconUrl?.trim();
     if (!favUrl) return;
-    const iconLinks = document.querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]');
-    iconLinks.forEach((link) => {
-      if (link.href !== favUrl) {
-        link.href = favUrl;
+    const rels = ['icon', 'shortcut icon', 'apple-touch-icon'];
+    rels.forEach((rel) => {
+      let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      if (link.getAttribute('href') !== favUrl) {
+        link.setAttribute('href', favUrl);
       }
     });
   }, [websiteContent?.faviconUrl]);
@@ -188,12 +170,9 @@ function MainApp() {
       if (!filterState.selectedBrands.includes(phone.brand)) return false;
     }
 
-    // Price (allow Admin 'best-budget' / 'under-200k' / 'under-300k' badges to appear in budget presets)
+    // Price
     const cats = (phone.categories || []).map((c) => c.toLowerCase());
-    const hasBudgetCat =
-      (filterState.categoryPreset === 'Under ₦200,000' && (cats.includes('best-budget') || cats.includes('under-200k'))) ||
-      (filterState.categoryPreset === 'Under ₦300,000' && cats.includes('under-300k'));
-    if (!hasBudgetCat && (phone.priceNGN < filterState.minPrice || phone.priceNGN > filterState.maxPrice)) {
+    if (phone.priceNGN < filterState.minPrice || phone.priceNGN > filterState.maxPrice) {
       return false;
     }
 
@@ -267,9 +246,6 @@ function MainApp() {
         if (filterState.categoryPreset === 'Top Rated Overall') {
           return cats.includes('top-rated') || cats.includes('flagship') || Boolean(isFeat);
         }
-        if (filterState.categoryPreset === 'Under ₦200,000') {
-          return cats.includes('best-budget') || cats.includes('under-200k');
-        }
         if (filterState.categoryPreset === 'Best Camera Phones') {
           return cats.includes('best-camera');
         }
@@ -332,49 +308,39 @@ function MainApp() {
           />
           <GlobalProgressBar />
           <GlobalToast />
-          <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div>}>
-            <AdminLoginView />
-          </Suspense>
+          <AdminLoginView />
         </div>
       );
     }
 
     return (
-      <div className="min-h-screen bg-[#f0f0f1] dark:bg-slate-950 text-[var(--text-main)] flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200 w-full max-w-full overflow-x-clip">
+      <div className="min-h-screen bg-[#f0f0f1] dark:bg-slate-950 text-[var(--text-main)] flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200 w-full max-w-full overflow-x-hidden">
         <SeoMeta
           title="Admin Dashboard — GsmScope CMS"
           description="Manage smartphones, full hardware specifications, brands, pricing, articles, user reviews, and site settings in the GsmScope Admin Dashboard."
           canonicalPath="/admin"
         />
         <GlobalProgressBar />
-        <PullToRefresh />
         <GlobalToast />
         <JsonLdScript />
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center py-24"><Loader2 className="w-7 h-7 animate-spin text-emerald-600" /></div>}>
-          <AdminDashboardModal />
-        </Suspense>
+        <AdminDashboardModal />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-color)] text-[var(--text-main)] flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200 w-full max-w-full overflow-x-clip">
-      {/* Global Animated Top Progress Bar & Pull-To-Refresh */}
+    <div className="min-h-screen bg-[var(--bg-color)] text-[var(--text-main)] flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200 w-full max-w-full">
+      {/* Global Animated Top Progress Bar */}
       <GlobalProgressBar />
-      <PullToRefresh />
       <GlobalToast />
 
       <JsonLdScript />
 
-      {/* WordPress-style Top Admin Bar when Administrator is logged in */}
-      {isAdminAuthenticated && (
-        <Suspense fallback={null}>
-          <AdminDashboardModal />
-        </Suspense>
-      )}
-      
-      {/* Main Header (3-zone Top Bar with Currency Switcher) - Remains permanently dark */}
-      <Header />
+      {/* Sticky Top Header Container (Admin Bar when logged in + Main Site Header) */}
+      <div className="sticky-top-header sticky top-0 z-50 w-full">
+        {isAdminAuthenticated && <AdminDashboardModal />}
+        <Header />
+      </div>
 
       {/* World Notable Brands Slider - Shown across all pages except About Us, Contact Us, Privacy Policy, Terms of Service, Advertise with Us */}
       {!isBrandSliderExcluded && (
@@ -385,27 +351,23 @@ function MainApp() {
       <Breadcrumbs />
 
       {/* Main Content Viewport */}
-      <main className={`flex-1 w-full max-w-full px-[calc(1rem-5px)] sm:px-[calc(2rem-5px)] lg:px-[calc(3rem-5px)] pt-5 pb-7 space-y-7 overflow-x-clip ${selectedPhone && !selectedArticle ? 'phone-detail-text-scale' : 'page-text-scale'}`}>
+      <main className={`flex-1 w-full max-w-full px-[calc(1rem-5px)] sm:px-[calc(2rem-5px)] lg:px-[calc(3rem-5px)] pt-5 pb-7 space-y-7 overflow-x-hidden ${selectedPhone && !selectedArticle ? 'phone-detail-text-scale' : 'page-text-scale'}`}>
         {selectedArticle ? (
-          <Suspense fallback={<div className="py-16 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div>}>
-            <ArticleDetailPage
-              article={selectedArticle}
-              onBack={() => {
-                goBack();
-                window.scrollTo({ top: 0, behavior: 'instant' });
-              }}
-            />
-          </Suspense>
+          <ArticleDetailPage
+            article={selectedArticle}
+            onBack={() => {
+              goBack();
+              window.scrollTo({ top: 0, behavior: 'instant' });
+            }}
+          />
         ) : selectedPhone ? (
-          <Suspense fallback={<div className="py-16 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div>}>
-            <PhoneDetailPage
-              phone={phones.find((p) => p.id === selectedPhone.id) || selectedPhone}
-              onBack={() => {
-                goBack();
-                window.scrollTo({ top: 0, behavior: 'instant' });
-              }}
-            />
-          </Suspense>
+          <PhoneDetailPage
+            phone={phones.find((p) => p.id === selectedPhone.id) || selectedPhone}
+            onBack={() => {
+              goBack();
+              window.scrollTo({ top: 0, behavior: 'instant' });
+            }}
+          />
         ) : (
           <>
             {/* VIEW: HOME */}
@@ -423,15 +385,15 @@ function MainApp() {
             {/* 1. Hero Carousel + Most Read Articles - Remains permanently dark as requested */}
             <HeroSection />
 
-            {/* Ad Placement: Homepage — Above Trending phones section */}
+            {/* Ad Placement: Homepage — Above Latest phones section */}
             <AdPlacementSlot placementId="home_above_trending" />
 
-            {/* 2. Trending Phones Section (Columns layout, images fit column size without padding) */}
+            {/* 2. Latest Phones Section (Columns layout, images fit column size without padding) */}
             <section className="space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
                 <div>
                   <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-['Space_Grotesk']">
-                    Trending phones
+                    Latest phones
                   </h2>
                 </div>
                 <button
@@ -452,7 +414,24 @@ function MainApp() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                {phones.slice(0, 8).map((phone, idx) => {
+                {(() => {
+                  // Newly added phones not selected as featured come first in Latest phones;
+                  // newly added phones selected as featured appear in Featured phone hero carousel instead.
+                  const newlyAddedNonFeatured = phones.filter(
+                    (p) => !SEED_PHONE_IDS.has(p.id) && !p.isFeatured
+                  );
+                  const seedNonFeatured = phones.filter(
+                    (p) => SEED_PHONE_IDS.has(p.id) && !p.isFeatured
+                  );
+                  const seedFallback = phones.filter(
+                    (p) => SEED_PHONE_IDS.has(p.id) && p.isFeatured
+                  );
+                  const latestPhonesToShow = [
+                    ...newlyAddedNonFeatured,
+                    ...seedNonFeatured,
+                    ...seedFallback,
+                  ].slice(0, 8);
+                  return latestPhonesToShow.map((phone) => {
                   const inComp = isInCompare(phone.id);
                   return (
                     <div
@@ -528,7 +507,8 @@ function MainApp() {
                       </div>
                     </div>
                   );
-                })}
+                });
+                })()}
               </div>
             </section>
 
@@ -613,8 +593,8 @@ function MainApp() {
                           referrerPolicy="no-referrer"
                           onError={(e) => {
                             const target = e.currentTarget;
-                            if (!target.src.includes('IMG_20261026_152954_83c935f6.jpg')) {
-                              target.src = '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg';
+                            if (!target.src.includes('hero_flagship_phones_1792578844852.jpg')) {
+                              target.src = '/src/assets/images/hero_flagship_phones_1792578844852.jpg';
                             }
                           }}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -668,8 +648,8 @@ function MainApp() {
                                   referrerPolicy="no-referrer"
                                   onError={(e) => {
                                     const target = e.currentTarget;
-                                    if (!target.src.includes('IMG_20261026_152954_83c935f6.jpg')) {
-                                      target.src = '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg';
+                                    if (!target.src.includes('hero_flagship_phones_1792578844852.jpg')) {
+                                      target.src = '/src/assets/images/hero_flagship_phones_1792578844852.jpg';
                                     }
                                   }}
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -881,15 +861,15 @@ function MainApp() {
                 ]);
                 const priorityOrder = ['Apple', 'Google', 'Xiaomi', 'OnePlus', 'Honor', 'Oppo', 'TCL', 'Huawei', 'Samsung', 'Motorola'];
                 const sortedBrands = [...brands].sort((a, b) => {
-                  const isCustomA = !defaultSeedBrandNames.has(a.name.toLowerCase()) && !defaultSeedBrandNames.has((a.slug || '').toLowerCase());
-                  const isCustomB = !defaultSeedBrandNames.has(b.name.toLowerCase()) && !defaultSeedBrandNames.has((b.slug || '').toLowerCase());
-                  if (isCustomA && !isCustomB) return -1;
-                  if (!isCustomA && isCustomB) return 1;
                   const idxA = priorityOrder.findIndex((p) => p.toLowerCase() === a.name.toLowerCase());
                   const idxB = priorityOrder.findIndex((p) => p.toLowerCase() === b.name.toLowerCase());
                   if (idxA !== -1 && idxB !== -1) return idxA - idxB;
                   if (idxA !== -1) return -1;
                   if (idxB !== -1) return 1;
+                  const isCustomA = !defaultSeedBrandNames.has(a.name.toLowerCase()) && !defaultSeedBrandNames.has((a.slug || '').toLowerCase());
+                  const isCustomB = !defaultSeedBrandNames.has(b.name.toLowerCase()) && !defaultSeedBrandNames.has((b.slug || '').toLowerCase());
+                  if (isCustomA && !isCustomB) return 1;
+                  if (!isCustomA && isCustomB) return -1;
                   return a.name.localeCompare(b.name);
                 });
 
@@ -1370,40 +1350,38 @@ function MainApp() {
           </div>
         )}
 
-        <Suspense fallback={<div className="py-16 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div>}>
-          {/* VIEW: COMPARE */}
-          {activeTab === 'compare' && <CompareView />}
+        {/* VIEW: COMPARE */}
+        {activeTab === 'compare' && <CompareView />}
 
-          {/* VIEW: NEWS */}
-          {activeTab === 'news' && <NewsView />}
+        {/* VIEW: NEWS */}
+        {activeTab === 'news' && <NewsView />}
 
-          {/* VIEW: REVIEWS (Review Articles Archive) */}
-          {activeTab === 'reviews' && <ReviewArticlesView />}
+        {/* VIEW: REVIEWS (Review Articles Archive) */}
+        {activeTab === 'reviews' && <ReviewArticlesView />}
 
-          {/* VIEW: USER REVIEWS */}
-          {activeTab === 'user-reviews' && <ReviewsView />}
+        {/* VIEW: USER REVIEWS */}
+        {activeTab === 'user-reviews' && <ReviewsView />}
 
-          {/* VIEW: GUIDES */}
-          {activeTab === 'guides' && <GuidesView />}
+        {/* VIEW: GUIDES */}
+        {activeTab === 'guides' && <GuidesView />}
 
-          {/* VIEW: BRANDS */}
-          {activeTab === 'brands' && <BrandsView />}
+        {/* VIEW: BRANDS */}
+        {activeTab === 'brands' && <BrandsView />}
 
-          {/* VIEW: ABOUT */}
-          {activeTab === 'about' && <AboutView />}
+        {/* VIEW: ABOUT */}
+        {activeTab === 'about' && <AboutView />}
 
-          {/* VIEW: CONTACT */}
-          {activeTab === 'contact' && <ContactView />}
+        {/* VIEW: CONTACT */}
+        {activeTab === 'contact' && <ContactView />}
 
-          {/* VIEW: ADVERTISE */}
-          {activeTab === 'advertise' && <AdvertiseView />}
+        {/* VIEW: ADVERTISE */}
+        {activeTab === 'advertise' && <AdvertiseView />}
 
-          {/* VIEW: PRIVACY POLICY */}
-          {activeTab === 'privacy' && <PrivacyPolicyView />}
+        {/* VIEW: PRIVACY POLICY */}
+        {activeTab === 'privacy' && <PrivacyPolicyView />}
 
-          {/* VIEW: TERMS OF SERVICE */}
-          {activeTab === 'terms' && <TermsOfServiceView />}
-        </Suspense>
+        {/* VIEW: TERMS OF SERVICE */}
+        {activeTab === 'terms' && <TermsOfServiceView />}
           </>
         )}
       </main>

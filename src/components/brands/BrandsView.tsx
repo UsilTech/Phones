@@ -33,22 +33,22 @@ export default function BrandsView() {
     canonicalPath: selectedBrand ? `/?tab=brands&brand=${encodeURIComponent(selectedBrand.name)}` : '/?tab=brands',
   });
 
-  // Priority sort matching brand slider: custom added brands first, then Apple, Google, Xiaomi, OnePlus, Honor, Oppo, TCL, Huawei, Samsung, Motorola
+  // Priority sort matching brand slider: Apple, Google, Xiaomi, OnePlus, Honor, Oppo, TCL, Huawei, Samsung, Motorola first, then default brands alphabetically, then newly added brands
   const defaultSeedBrandNames = new Set([
     'apple', 'google', 'xiaomi', 'oneplus', 'honor', 'oppo', 'tcl', 'huawei', 'samsung', 'motorola',
     'alcatel', 'asus', 'infinix', 'iqoo', 'itel', 'oscal', 'oukitel', 'realme', 'sony', 'tecno', 'umidigi', 'vivo', 'zte'
   ]);
   const priorityOrder = ['Apple', 'Google', 'Xiaomi', 'OnePlus', 'Honor', 'Oppo', 'TCL', 'Huawei', 'Samsung', 'Motorola'];
   const sortedBrands = [...brands].sort((a, b) => {
-    const isCustomA = !defaultSeedBrandNames.has(a.name.toLowerCase()) && !defaultSeedBrandNames.has((a.slug || '').toLowerCase());
-    const isCustomB = !defaultSeedBrandNames.has(b.name.toLowerCase()) && !defaultSeedBrandNames.has((b.slug || '').toLowerCase());
-    if (isCustomA && !isCustomB) return -1;
-    if (!isCustomA && isCustomB) return 1;
     const idxA = priorityOrder.findIndex((p) => p.toLowerCase() === a.name.toLowerCase());
     const idxB = priorityOrder.findIndex((p) => p.toLowerCase() === b.name.toLowerCase());
     if (idxA !== -1 && idxB !== -1) return idxA - idxB;
     if (idxA !== -1) return -1;
     if (idxB !== -1) return 1;
+    const isCustomA = !defaultSeedBrandNames.has(a.name.toLowerCase()) && !defaultSeedBrandNames.has((a.slug || '').toLowerCase());
+    const isCustomB = !defaultSeedBrandNames.has(b.name.toLowerCase()) && !defaultSeedBrandNames.has((b.slug || '').toLowerCase());
+    if (isCustomA && !isCustomB) return 1;
+    if (!isCustomA && isCustomB) return -1;
     return a.name.localeCompare(b.name);
   });
 

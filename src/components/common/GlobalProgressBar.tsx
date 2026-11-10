@@ -4,6 +4,10 @@ import { useApp } from '../../context/AppContext';
 export default function GlobalProgressBar() {
   const { isGlobalLoading, globalProgress } = useApp();
 
+  if (!isGlobalLoading && globalProgress <= 0) {
+    return null;
+  }
+
   return (
     <div
       role="progressbar"
@@ -14,19 +18,17 @@ export default function GlobalProgressBar() {
       className={`fixed top-0 left-0 right-0 z-[999999] pointer-events-none transition-opacity duration-200 ${
         isGlobalLoading ? 'opacity-100' : 'opacity-0'
       }`}
+      style={{ boxShadow: '0 -4px 0 0 #061a11' }}
     >
       {/* High-visibility top track */}
-      <div className="w-full h-[3.5px] bg-emerald-950/30 overflow-hidden">
+      <div className="w-full h-[3px] bg-[#061a11]">
         {/* Animated Fill Bar */}
         <div
-          className={`h-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-200 shadow-[0_0_14px_rgba(16,185,129,1),0_0_6px_rgba(52,211,153,0.95)] relative ${
+          className={`h-full bg-emerald-500 bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-300 shadow-[0_0_10px_rgba(16,185,129,0.9)] relative ${
             globalProgress === 0 ? 'transition-none' : 'transition-[width] duration-200 ease-out'
           }`}
           style={{ width: `${globalProgress}%` }}
-        >
-          {/* Radiant glowing head accent */}
-          <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-r from-transparent via-emerald-200/80 to-white blur-[0.5px]" />
-        </div>
+        />
       </div>
     </div>
   );

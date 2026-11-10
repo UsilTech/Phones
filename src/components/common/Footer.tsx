@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { ActiveTab } from '../../types';
-import { Mail, Check, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
-import { subscribeNewsletterApi } from '../../services/api';
+import { Mail, Check, ShieldCheck, ArrowRight } from 'lucide-react';
 
 export default function Footer() {
   const { 
@@ -18,50 +17,6 @@ export default function Footer() {
     showGlobalToast,
     websiteContent
   } = useApp();
-  const [subEmail, setSubEmail] = useState('');
-  const [subscribed, setSubscribed] = useState(false);
-  const [subMessage, setSubMessage] = useState('Confirmation email sent!');
-  const [isSubscribing, setIsSubscribing] = useState(false);
-
-  const handleSubscribe = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubscribing) return;
-    const email = subEmail.trim();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-      showGlobalToast('Please enter a valid email address.', 'error');
-      return;
-    }
-
-    setIsSubscribing(true);
-    startGlobalLoading('Subscribing to newsletter');
-
-    try {
-      const [result] = await Promise.all([
-        subscribeNewsletterApi(email),
-        new Promise((res) => setTimeout(res, 400))
-      ]);
-      if (!result.success) {
-        showGlobalToast(result.message || 'Please enter a valid email address.', 'error');
-        return;
-      }
-      setSubMessage(result.message || `Confirmation email sent to ${email}!`);
-      setSubscribed(true);
-      setSubEmail('');
-      showGlobalToast(
-        result.message || `Confirmation email sent to ${email}!`,
-        result.alreadySubscribed ? 'info' : 'success'
-      );
-      setTimeout(() => {
-        setSubscribed(false);
-      }, 5000);
-    } catch {
-      showGlobalToast('Failed to subscribe. Please try again.', 'error');
-    } finally {
-      stopGlobalLoading();
-      setIsSubscribing(false);
-    }
-  };
 
   const handleFooterNav = (tab: ActiveTab) => {
     triggerNavigation(() => {
@@ -81,68 +36,6 @@ export default function Footer() {
 
   return (
     <footer className="border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#061a11] text-slate-600 dark:text-slate-300 text-xs">
-      {/* Newsletter Strip from GsmScope: Price drop and launch alerts */}
-      <div className="border-b border-slate-200 dark:border-emerald-950/80 bg-white dark:bg-[#0a2a1a]/50 py-8 px-[calc(1rem-5px)] sm:px-[calc(2rem-5px)] lg:px-[calc(3rem-5px)]">
-        <div className="w-full flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="max-w-xl space-y-1">
-            <span className="text-[11px] font-mono font-semibold uppercase text-emerald-600 dark:text-emerald-400">
-              Stay Ahead
-            </span>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white font-['Space_Grotesk']">
-              News update &amp; launch alerts
-            </h3>
-            <p className="text-xs text-slate-600 dark:text-slate-300">
-              Join the GsmScope newsletter for global price trends, new device launches, and authoritative buying guides.
-            </p>
-          </div>
-
-          <form onSubmit={handleSubscribe} noValidate className="w-full md:w-auto flex-1 max-w-md">
-            {subscribed ? (
-              <div className="px-4 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-semibold flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span className="truncate">{subMessage}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSubscribed(false)}
-                  className="text-[11px] font-normal underline hover:text-emerald-500 shrink-0 cursor-pointer"
-                >
-                  Done
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <input
-                  type="email"
-                  required
-                  disabled={isSubscribing}
-                  value={subEmail}
-                  onChange={(e) => setSubEmail(e.target.value)}
-                  placeholder="Enter your email address..."
-                  aria-label="Email address for newsletter alerts"
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700/80 text-slate-900 dark:text-white placeholder-slate-400 text-xs focus:outline-none focus:border-emerald-500 disabled:opacity-60"
-                />
-                <button
-                  type="submit"
-                  disabled={isSubscribing}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold rounded-xl text-xs transition-colors shrink-0 cursor-pointer shadow-md flex items-center gap-1.5"
-                >
-                  {isSubscribing ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Subscribing...</span>
-                    </>
-                  ) : (
-                    <span>Subscribe</span>
-                  )}
-                </button>
-              </div>
-            )}
-          </form>
-        </div>
-      </div>
-
       {/* Main Footer Links Columns */}
       <div className="w-full px-[calc(1rem-5px)] sm:px-[calc(2rem-5px)] lg:px-[calc(3rem-5px)] py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-12">
@@ -200,17 +93,12 @@ export default function Footer() {
               </li>
               <li>
                 <button onClick={() => handleFooterNav('news')} className="hover:text-emerald-400 transition-colors text-left cursor-pointer">
-                  News &amp; Articles
+                  Articles
                 </button>
               </li>
               <li>
                 <button onClick={() => handleFooterNav('user-reviews')} className="hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   User Reviews
-                </button>
-              </li>
-              <li>
-                <button onClick={() => handleFooterNav('guides')} className="hover:text-emerald-400 transition-colors text-left cursor-pointer">
-                  Guides
                 </button>
               </li>
               <li>
@@ -230,11 +118,6 @@ export default function Footer() {
               <li>
                 <button onClick={() => { setCategoryPreset('top-rated'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
                   Best phones overall
-                </button>
-              </li>
-              <li>
-                <button onClick={() => { setCategoryPreset('under-200k'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer">
-                  Best budget phones
                 </button>
               </li>
               <li>

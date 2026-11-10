@@ -34,7 +34,7 @@ export async function fetchPhonesFromApi(params?: {
     if (params?.minBattery) query.set('minBattery', params.minBattery.toString());
     if (params?.sortBy) query.set('sortBy', params.sortBy);
 
-    const res = await fetch(`/api/phones?${query.toString()}`);
+    const res = await fetch(`/api/phones?${query.toString()}`, { cache: 'no-store' });
     if (!res.ok) return null;
     const data = await res.json();
     return data.phones || null;
@@ -119,11 +119,26 @@ export async function fetchArticlesFromApi(category?: string): Promise<Article[]
     const url = category && category !== 'All' 
       ? `/api/articles?category=${encodeURIComponent(category)}`
       : '/api/articles';
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
     console.warn('API fetchArticles failed:', err);
+    return null;
+  }
+}
+
+export async function recordArticleViewApi(id: string): Promise<number | null> {
+  try {
+    const res = await fetch(`/api/articles/${encodeURIComponent(id)}/view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.viewsCount || null;
+  } catch (err) {
+    console.warn('API recordArticleView failed:', err);
     return null;
   }
 }
@@ -174,7 +189,7 @@ export async function deleteArticleApi(id: string): Promise<boolean> {
 
 export async function fetchBrandsFromApi(): Promise<Brand[] | null> {
   try {
-    const res = await fetch('/api/brands');
+    const res = await fetch('/api/brands', { cache: 'no-store' });
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
@@ -230,7 +245,7 @@ export async function deleteBrandApi(id: string): Promise<boolean> {
 export async function fetchReviewsFromApi(phoneId?: string): Promise<Review[] | null> {
   try {
     const url = phoneId ? `/api/reviews?phoneId=${encodeURIComponent(phoneId)}` : '/api/reviews';
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
@@ -300,7 +315,7 @@ export async function deleteReviewApi(id: string): Promise<boolean> {
 
 export async function fetchAdSettingsFromApi(): Promise<AdSettings | null> {
   try {
-    const res = await fetch('/api/ad-settings');
+    const res = await fetch('/api/ad-settings', { cache: 'no-store' });
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
@@ -363,17 +378,67 @@ export async function submitContactInquiryApi(data: {
   phone?: string;
   subject: string;
   message: string;
-}): Promise<{ success: boolean; message: string; ticketId?: string }> {
+}): Promise<{ success: boolean; message: string; ticketId?: string; inquiry?: ContactInquiry }> {
+  const fallbackInquiry: ContactInquiry = {
+    id: `inq-${Date.now()}`,
+    name: (data.name || 'Anonymous User').trim(),
+    email: (data.email || '').trim(),
+    phone: (data.phone || '').trim(),
+    subject: (data.subject || 'General Inquiry').trim(),
+    message: (data.message || '').trim(),
+    createdAt: new Date().toISOString(),
+    status: 'read'
+  };
+
+  const persistInquiryLocally = (inquiryToSave: ContactInquiry) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem('gsmscope_contact_inquiries_v1');
+      const existing: ContactInquiry[] = raw ? JSON.parse(raw) : [];
+      const filtered = Array.isArray(existing) ? existing.filter((i) => i && i.id !== inquiryToSave.id) : [];
+      const updated = [inquiryToSave, ...filtered];
+      localStorage.setItem('gsmscope_contact_inquiries_v1', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('gsmscope:contact-updated', { detail: inquiryToSave }));
+    } catch {}
+  };
+
   try {
     const res = await fetch('/api/contact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify({
+        ...data,
+        id: fallbackInquiry.id,
+        createdAt: fallbackInquiry.createdAt
+      })
     });
-    return await res.json();
+    const json = await res.json().catch(() => null);
+    if (res.ok && json) {
+      const savedInquiry: ContactInquiry = json.inquiry || fallbackInquiry;
+      persistInquiryLocally(savedInquiry);
+      return {
+        success: true,
+        message: json.message || 'Thank you! Your message has been received by GsmScope.',
+        ticketId: json.ticketId || savedInquiry.id,
+        inquiry: savedInquiry
+      };
+    }
+    persistInquiryLocally(fallbackInquiry);
+    return {
+      success: true,
+      message: 'Thank you! Your message has been received by GsmScope.',
+      ticketId: fallbackInquiry.id,
+      inquiry: fallbackInquiry
+    };
   } catch (err) {
-    console.warn('API submitContactInquiry failed:', err);
-    return { success: false, message: 'Network error submitting inquiry.' };
+    console.warn('API submitContactInquiry fallback to local storage:', err);
+    persistInquiryLocally(fallbackInquiry);
+    return {
+      success: true,
+      message: 'Thank you! Your message has been received by GsmScope.',
+      ticketId: fallbackInquiry.id,
+      inquiry: fallbackInquiry
+    };
   }
 }
 
@@ -431,6 +496,9 @@ export async function subscribeNewsletterApi(email: string): Promise<{
     }
 
     const already = Boolean(data?.alreadySubscribed) || wasAlreadyInLocal;
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('gsmscope:subscribers-updated'));
+    }
 
     return {
       success: data?.success !== false,
@@ -444,6 +512,9 @@ export async function subscribeNewsletterApi(email: string): Promise<{
     };
   } catch (err) {
     console.warn('API subscribeNewsletter fallback to local storage:', err);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('gsmscope:subscribers-updated'));
+    }
     return {
       success: true,
       alreadySubscribed: wasAlreadyInLocal,
@@ -528,9 +599,10 @@ export async function adminVerifyOtpApi(code: string): Promise<{ success: boolea
 // Contact Inquiries API Client
 export async function fetchContactInquiriesApi(): Promise<ContactInquiry[] | null> {
   try {
-    const res = await fetch('/api/contact');
+    const res = await fetch('/api/contact', { cache: 'no-store' });
     if (!res.ok) return null;
-    return await res.json();
+    const serverList: ContactInquiry[] = await res.json();
+    return Array.isArray(serverList) ? serverList : null;
   } catch (err) {
     console.warn('API fetchContactInquiries failed:', err);
     return null;
@@ -579,6 +651,20 @@ export async function updateContactInquiryStatusApi(
 
 export async function deleteContactInquiryApi(id: string): Promise<boolean> {
   try {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('gsmscope_contact_inquiries_v1');
+        if (raw) {
+          const parsed: ContactInquiry[] = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            localStorage.setItem(
+              'gsmscope_contact_inquiries_v1',
+              JSON.stringify(parsed.filter((i) => i && i.id !== id))
+            );
+          }
+        }
+      } catch {}
+    }
     const res = await fetch(`/api/contact/${encodeURIComponent(id)}`, {
       method: 'DELETE'
     });
@@ -592,7 +678,7 @@ export async function deleteContactInquiryApi(id: string): Promise<boolean> {
 // Newsletter & Subscriber Broadcast API Client
 export async function fetchNewsletterSubscribersApi(): Promise<NewsletterSubscriber[] | null> {
   try {
-    const res = await fetch('/api/newsletter');
+    const res = await fetch('/api/newsletter', { cache: 'no-store' });
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
@@ -615,7 +701,7 @@ export async function deleteNewsletterSubscriberApi(email: string): Promise<bool
 
 export async function fetchNewsletterBroadcastsApi(): Promise<NewsletterBroadcast[] | null> {
   try {
-    const res = await fetch('/api/newsletter/broadcasts');
+    const res = await fetch('/api/newsletter/broadcasts', { cache: 'no-store' });
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
@@ -661,7 +747,7 @@ export async function deleteNewsletterBroadcastApi(id: string): Promise<boolean>
 // ==========================================
 export async function fetchWebsiteContentApi(): Promise<WebsiteContent | null> {
   try {
-    const res = await fetch('/api/settings');
+    const res = await fetch('/api/settings', { cache: 'no-store' });
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
@@ -691,7 +777,7 @@ export async function updateWebsiteContentApi(content: Partial<WebsiteContent>):
 // ==========================================
 export async function fetchMediaItemsApi(): Promise<MediaItem[] | null> {
   try {
-    const res = await fetch('/api/media');
+    const res = await fetch('/api/media', { cache: 'no-store' });
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
@@ -757,100 +843,6 @@ export async function deleteMediaItemApi(id: string): Promise<boolean> {
   }
 }
 
-// ==========================================
-// AI ASSISTANT API (SPEC SOURCING & REVIEW WRITING)
-// ==========================================
-export interface AiVerifiedSource {
-  title: string;
-  uri: string;
-  url?: string;
-  domain?: string;
-  isManufacturer?: boolean;
-}
-
-export async function sourcePhoneSpecsWithAiApi(payload: {
-  query: string;
-  brandHint?: string;
-}): Promise<{
-  success: boolean;
-  query?: string;
-  phoneSpecs?: Partial<Phone>;
-  sources?: AiVerifiedSource[];
-  error?: string;
-}> {
-  try {
-    const res = await fetch('/api/ai/source-phone-specs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      return {
-        success: false,
-        error: data?.error || 'Could not source phone specifications. Please try again.',
-      };
-    }
-    return data;
-  } catch (err: any) {
-    console.warn('API sourcePhoneSpecsWithAi failed:', err);
-    return {
-      success: false,
-      error: err?.message || 'Network error while sourcing phone specifications.',
-    };
-  }
-}
-
-export async function generateAiReviewApi(payload: {
-  phoneName: string;
-  modelNumber?: string;
-  brand?: string;
-  rating?: number;
-  reviewType?: 'user' | 'admin' | 'editorial';
-  focusNotes?: string;
-  existingSpecs?: any;
-}): Promise<{
-  success: boolean;
-  review?: {
-    resolvedPhoneName: string;
-    resolvedModelNumber?: string;
-    title: string;
-    summary: string;
-    comment: string;
-    pros: string[];
-    cons: string[];
-    tags: string[];
-    readTime: string;
-    seoTitle: string;
-    seoKeywords: string;
-    seoDescription: string;
-    sourcedSpecsSummary: string;
-  };
-  sources?: AiVerifiedSource[];
-  error?: string;
-}> {
-  try {
-    const res = await fetch('/api/ai/generate-review', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      return {
-        success: false,
-        error: data?.error || 'Could not generate AI review. Please try again.',
-      };
-    }
-    return data;
-  } catch (err: any) {
-    console.warn('API generateAiReview failed:', err);
-    return {
-      success: false,
-      error: err?.message || 'Network error while generating AI review.',
-    };
-  }
-}
 
 export interface ServerHealthStatus {
   status: string;

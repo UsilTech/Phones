@@ -11,8 +11,21 @@ export default function AdminLoginView() {
     websiteContent
   } = useApp();
 
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(() => {
+    try {
+      return localStorage.getItem('gsmscope_admin_remember_user') || '';
+    } catch {
+      return '';
+    }
+  });
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('gsmscope_admin_remember_pref') !== 'false';
+    } catch {
+      return true;
+    }
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,7 +38,7 @@ export default function AdminLoginView() {
     startGlobalLoading();
 
     setTimeout(() => {
-      const res = adminLogin(username, password);
+      const res = adminLogin(username, password, rememberMe);
       setIsLoading(false);
       stopGlobalLoading();
       if (res.success) {
@@ -113,6 +126,24 @@ export default function AdminLoginView() {
                 {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
             </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-0.5">
+            <label className="inline-flex items-center gap-2 text-slate-300 hover:text-white cursor-pointer select-none text-[11px]">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setRememberMe(checked);
+                  try {
+                    localStorage.setItem('gsmscope_admin_remember_pref', checked ? 'true' : 'false');
+                  } catch {}
+                }}
+                className="w-3.5 h-3.5 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500 accent-emerald-500 cursor-pointer"
+              />
+              <span>Remember me</span>
+            </label>
           </div>
 
           <button

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Article, Phone } from '../../types';
+import { INITIAL_ARTICLES } from '../../data/seedData';
 import { useApp } from '../../context/AppContext';
 import { useSeoMeta } from '../seo/SeoMeta';
 import SocialShareBar from '../common/SocialShareBar';
@@ -25,6 +26,21 @@ interface ArticleDetailPageProps {
   onBack: () => void;
 }
 
+const DEFAULT_ARTICLE_COMMENTS = [
+  {
+    id: 'c-1',
+    name: 'Chidi Okafor',
+    text: 'Really solid breakdown. The real-world battery endurance numbers are super helpful before upgrading.',
+    date: '2 hours ago'
+  },
+  {
+    id: 'c-2',
+    name: 'Bisi Adeleke',
+    text: 'Pricing has been fluctuating a lot lately, glad to see verified retail estimates included here.',
+    date: '5 hours ago'
+  }
+];
+
 export default function ArticleDetailPage({ article, onBack }: ArticleDetailPageProps) {
   const { 
     articles, 
@@ -36,31 +52,33 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
     setActiveTab,
     formatNaira,
     formatUSD,
-    addToCompare
+    addToCompare,
+    recordArticleView
   } = useApp();
 
   const articleContentRef = useRef<HTMLElement>(null);
   const [commentName, setCommentName] = useState('');
   const [commentText, setCommentText] = useState('');
-  const [comments, setComments] = useState<Array<{ id: string; name: string; text: string; date: string }>>([
-    {
-      id: 'c1',
-      name: 'Chidi Okafor',
-      text: 'Very accurate analysis on the global 5G band support. Most retail vendors don\'t clarify sub-6GHz carrier compatibility before selling.',
-      date: '2 days ago'
-    },
-    {
-      id: 'c2',
-      name: 'Bisi Adeleke',
-      text: 'Thanks for including the official warranty and service coverage details. Makes choosing between mid-range options much easier with current market prices.',
-      date: 'Yesterday'
-    }
-  ]);
+  const isSeedArticle = INITIAL_ARTICLES.some((a) => a.id === article?.id);
+  const [comments, setComments] = useState<Array<{ id: string; name: string; text: string; date: string }>>(
+    isSeedArticle ? DEFAULT_ARTICLE_COMMENTS : []
+  );
   const [commentSubmitted, setCommentSubmitted] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [article.id]);
+    if (article?.id) {
+      recordArticleView(article.id);
+      const fallback = INITIAL_ARTICLES.some((a) => a.id === article.id) ? DEFAULT_ARTICLE_COMMENTS : [];
+      try {
+        const raw = localStorage.getItem('gsmscope_article_comments_v1');
+        const map = raw ? JSON.parse(raw) : {};
+        setComments(Array.isArray(map[article.id]) ? map[article.id] : fallback);
+      } catch {
+        setComments(fallback);
+      }
+    }
+  }, [article?.id]);
 
   useSeoMeta({
     title: article.seoTitle || `${article.title} — GsmScope`,
@@ -75,7 +93,7 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
     if (commentName.trim() && commentText.trim()) {
-      setComments([
+      const nextComments = [
         ...comments,
         {
           id: 'c-' + Date.now(),
@@ -83,7 +101,14 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
           text: commentText.trim(),
           date: 'Just now'
         }
-      ]);
+      ];
+      setComments(nextComments);
+      try {
+        const raw = localStorage.getItem('gsmscope_article_comments_v1');
+        const map = raw ? JSON.parse(raw) : {};
+        map[article.id] = nextComments;
+        localStorage.setItem('gsmscope_article_comments_v1', JSON.stringify(map));
+      } catch {}
       setCommentSubmitted(true);
       setCommentName('');
       setCommentText('');
@@ -104,14 +129,14 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
   // Check if this is an individual phone review article and resolve the reviewed phone
   const isReviewArticle =
     article.category.toLowerCase().includes('review') ||
-    article.title.toLowerCase().includes('review') ||
-    (article.tags || []).some((t) => t.toLowerCase().includes('review'));
+    /\breview\b/i.test(article.title);
 
   const reviewedPhone: Phone | undefined = (() => {
+    if (!isReviewArticle) return undefined;
     const titleLower = article.title.toLowerCase();
     const slugLower = (article.slug || '').toLowerCase();
 
-    // 1. If relatedPhoneIds has an exact single phone or first linked phone matching title
+    // 1. If relatedPhoneIds has an exact single phone
     if (mentionedPhones.length === 1) {
       return mentionedPhones[0];
     }
@@ -134,7 +159,7 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
     const slugMatched = phones.find((p) => slugLower.includes(p.id.toLowerCase()));
     if (slugMatched) return slugMatched;
 
-    return selectedPhone || phones[0];
+    return undefined;
   })();
 
   const specScores = (() => {
@@ -315,9 +340,10 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
 
   const formatScoreValue = (val: number) => Number(val.toFixed(1)).toString();
 
-  // SIDEBAR 2: Trending & Most Read Articles
-  const trendingArticles = articles
+  // SIDEBAR 2: Trending & Most Read Articles (sorted by highest visitor views)
+  const trendingArticles = [...articles]
     .filter(a => a.id !== article.id)
+    .sort((a, b) => (b.viewsCount || 0) - (a.viewsCount || 0))
     .slice(0, 5);
 
   // SIDEBAR 3: Popular smartphones in Nigeria by views

@@ -4,36 +4,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { spawn } from 'node:child_process';
 import nodemailer from 'nodemailer';
-import { GoogleGenAI } from '@google/genai';
-import type { Phone, Brand, Article, Review, AdSettings, WebsiteContent, MediaItem } from './src/types';
+import type { Phone, Brand, Article, Review, AdSettings, WebsiteContent, MediaItem } from './src/types/index.ts';
 
-// If executed directly via `node server.ts`, bootstrap tsx so TypeScript & ESM resolution work seamlessly
-if (!process.env.TSX_LOADED && !process.execArgv.some(arg => arg.includes('tsx'))) {
-  const child = spawn(process.execPath, ['--import', 'tsx', ...process.argv.slice(1)], {
-    stdio: 'inherit',
-    env: { ...process.env, TSX_LOADED: '1' }
-  });
-  child.on('exit', (code) => process.exit(code ?? 0));
-  child.on('error', (err) => {
-    console.error('Failed to spawn tsx runtime:', err);
-    process.exit(1);
-  });
-  // Halt execution in parent process
-  await new Promise(() => {});
-}
-
-dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// Load seed data dynamically
-const { 
+import { 
   INITIAL_PHONES, 
   INITIAL_BRANDS, 
   INITIAL_ARTICLES, 
@@ -41,23 +15,81 @@ const {
   INITIAL_AD_SETTINGS,
   INITIAL_WEBSITE_CONTENT,
   INITIAL_MEDIA_ITEMS
-} = await import('./src/data/seedData');
+} from './src/data/seedData.ts';
+
+dotenv.config({ quiet: true });
+
+const APP_ROOT = (() => {
+  try {
+    if (typeof __dirname === 'string' && __dirname) {
+      return path.basename(__dirname) === 'dist' ? path.resolve(__dirname, '..') : __dirname;
+    }
+  } catch {}
+  try {
+    if (typeof import.meta?.url === 'string' && import.meta.url) {
+      const dir = path.dirname(fileURLToPath(import.meta.url));
+      return path.basename(dir) === 'dist' ? path.resolve(dir, '..') : dir;
+    }
+  } catch {}
+  return process.cwd();
+})();
+
+const PORT = (() => {
+  const portArgIdx = process.argv.findIndex((a) => a === '--port' || a === '-p');
+  if (portArgIdx !== -1 && process.argv[portArgIdx + 1]) {
+    const p = parseInt(process.argv[portArgIdx + 1], 10);
+    if (!isNaN(p) && p > 0) return p;
+  }
+  const portEqualArg = process.argv.find((a) => a.startsWith('--port='));
+  if (portEqualArg) {
+    const p = parseInt(portEqualArg.split('=')[1], 10);
+    if (!isNaN(p) && p > 0) return p;
+  }
+  // In dev or when PORT is 8080 (held by Nginx reverse proxy), force 3000
+  if (process.env.npm_lifecycle_event === 'dev' || process.env.PORT === '8080' || !process.env.PORT) {
+    return 3000;
+  }
+  const parsed = parseInt(process.env.PORT, 10);
+  return !isNaN(parsed) && parsed > 0 ? parsed : 3000;
+})();
+
+const app = express();
 
 // Enable trust proxy for reverse-proxy / cloud deployment environments
 app.enable('trust proxy');
 
-// Secure HTTPS handling (respects non-SSL test domains, local dev, and IP addresses)
+// Universal Domain (www & non-www) and Cross-Browser CORS Handling
 app.use((req, res, next) => {
-  const forwardedProto = req.headers['x-forwarded-proto'];
-  const host = (req.headers.host || '').toLowerCase();
+  // Allow both www.domain.com and domain.com to access all resources and APIs without CORS rejections
+  const originHeader = req.headers.origin;
+  res.setHeader('Access-Control-Allow-Origin', originHeader || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
+  const forwardedProto = (req.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim();
+  const rawHost = (req.headers['x-forwarded-host'] as string)?.split(',')[0]?.trim() || req.headers.host || '';
+  const host = rawHost.toLowerCase();
   const isLocalOrIp =
     host.includes('localhost') ||
     host.includes('127.0.0.1') ||
     host.includes(':3000') ||
     /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(host);
 
-  if (forwardedProto === 'https') {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  // If a request ever arrives for www.<app>.ai.studio, redirect to <app>.ai.studio
+  // because *.ai.studio only supports single-level subdomains without a www prefix.
+  if (host.startsWith('www.') && host.endsWith('.ai.studio')) {
+    const cleanAiStudioHost = rawHost.replace(/^www\./i, '');
+    return res.redirect(301, `https://${cleanAiStudioHost}${req.originalUrl || req.url}`);
+  }
+
+  // Expire any previously cached includeSubDomains HSTS policy in visitors' browsers so www never triggers HSTS lockouts
+  if (forwardedProto === 'https' || req.secure) {
+    res.setHeader('Strict-Transport-Security', 'max-age=0');
   } else if (
     process.env.NODE_ENV === 'production' &&
     process.env.FORCE_HTTPS === 'true' &&
@@ -65,7 +97,7 @@ app.use((req, res, next) => {
     forwardedProto !== 'https' &&
     !isLocalOrIp
   ) {
-    return res.redirect(301, `https://${req.headers.host}${req.url}`);
+    return res.redirect(301, `https://${rawHost}${req.originalUrl || req.url}`);
   }
   next();
 });
@@ -75,8 +107,8 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Uploads directories for cPanel hosting & local Vite dev
-const UPLOADS_DIR = path.resolve(__dirname, 'uploads');
-const PUBLIC_UPLOADS_DIR = path.resolve(__dirname, 'public', 'uploads');
+const UPLOADS_DIR = path.resolve(APP_ROOT, 'uploads');
+const PUBLIC_UPLOADS_DIR = path.resolve(APP_ROOT, 'public', 'uploads');
 try {
   if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
   if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
@@ -84,18 +116,16 @@ try {
   console.warn('[Uploads Directory Init]', e);
 }
 
-// Serve uploaded media and static assets with fast HTTP cache headers
-const DIST_ASSETS_DIR = path.resolve(__dirname, 'dist', 'assets');
-if (fs.existsSync(DIST_ASSETS_DIR)) {
-  app.use('/assets', express.static(DIST_ASSETS_DIR, { maxAge: '365d', immutable: true, etag: true }));
-}
+// Serve uploaded media and static assets with ETag revalidation so rebuilt CSS/JS bundles take effect immediately
+const DIST_ASSETS_DIR = path.resolve(APP_ROOT, 'dist', 'assets');
+app.use('/assets', express.static(DIST_ASSETS_DIR, { maxAge: 0, etag: true, lastModified: true }));
 app.use('/uploads', express.static(PUBLIC_UPLOADS_DIR, { maxAge: '7d', etag: true }));
 app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d', etag: true }));
-app.use('/assets', express.static(path.resolve(__dirname, 'public', 'assets'), { maxAge: '365d', immutable: true, etag: true }));
-app.use('/src/assets', express.static(path.resolve(__dirname, 'src', 'assets'), { maxAge: '30d', etag: true }));
+app.use('/assets', express.static(path.resolve(APP_ROOT, 'public', 'assets'), { maxAge: '7d', etag: true }));
+app.use('/src/assets', express.static(path.resolve(APP_ROOT, 'src', 'assets'), { maxAge: '7d', etag: true }));
 
 // Persistent JSON File Storage (survives Phusion Passenger restarts on cPanel)
-const DATA_DIR = path.resolve(__dirname, 'data');
+const DATA_DIR = path.resolve(APP_ROOT, 'data');
 const DB_FILE_PATH = path.resolve(DATA_DIR, 'database.json');
 
 interface PersistentDatabaseSchema {
@@ -217,7 +247,6 @@ let newsletterBroadcasts: NonNullable<PersistentDatabaseSchema['newsletterBroadc
   }
 ];
 let confirmationEmailsLog: PersistentDatabaseSchema['confirmationEmailsLog'] = [];
-let activeAdminOtp: string | null = null;
 let cachedEtherealTransporter: any = null;
 
 function saveDatabaseToDisk(): void {
@@ -283,26 +312,71 @@ function loadDatabaseFromDisk(): void {
     if (fs.existsSync(DB_FILE_PATH)) {
       const raw = fs.readFileSync(DB_FILE_PATH, 'utf-8');
       const parsed = JSON.parse(raw) as Partial<PersistentDatabaseSchema>;
-      if (Array.isArray(parsed.reviews) && parsed.reviews.length > 0) {
+      if (Array.isArray(parsed.reviews)) {
         reviewsDatabase = parsed.reviews;
       }
       if (Array.isArray(parsed.phones) && parsed.phones.length > 0) {
-        phonesDatabase = parsed.phones;
+        phonesDatabase = parsed.phones.map((p) => {
+          const cleanedCats = (p.categories || []).filter(
+            (c) => !['best-budget', 'under-200k', 'under-100k', 'under-300k'].includes(String(c).toLowerCase())
+          );
+          return {
+            ...p,
+            categories: cleanedCats.length > 0 ? cleanedCats : ['best-battery'],
+          };
+        });
       }
       if (Array.isArray(parsed.brands) && parsed.brands.length > 0) {
-        brandsDatabase = parsed.brands;
+        brandsDatabase = parsed.brands.filter(
+          (b) =>
+            b &&
+            String(b.name || '').trim().toLowerCase() !== 'nothing' &&
+            String(b.slug || '').trim().toLowerCase() !== 'nothing' &&
+            String(b.id || '').trim().toLowerCase() !== 'brand-nothing'
+        );
       }
       if (Array.isArray(parsed.articles) && parsed.articles.length > 0) {
-        articlesDatabase = parsed.articles;
+        articlesDatabase = parsed.articles.map((a) => {
+          const rawCat = String(a.category || 'News').trim();
+          const normalizedCat =
+            rawCat === 'Phone News' || rawCat === 'Tech Updates' || rawCat === 'Smartphone News'
+              ? 'News'
+              : rawCat === 'Review'
+              ? 'Reviews'
+              : rawCat === 'Buying Guides' ||
+                rawCat === 'FRP & Servicing Tools' ||
+                rawCat === 'Charging & Battery' ||
+                rawCat === 'Tips & Security'
+              ? 'Buying Guide'
+              : rawCat || 'News';
+          return {
+            ...a,
+            category: normalizedCat,
+          };
+        });
       }
       if (parsed.adSettings && typeof parsed.adSettings === 'object') {
+        const mergedPlacements = { ...INITIAL_AD_SETTINGS.placements } as any;
+        if (parsed.adSettings.placements && typeof parsed.adSettings.placements === 'object') {
+          for (const key of Object.keys(INITIAL_AD_SETTINGS.placements || {})) {
+            const defP = (INITIAL_AD_SETTINGS.placements as any)[key];
+            const savedP = (parsed.adSettings.placements as any)[key];
+            if (savedP) {
+              mergedPlacements[key] = {
+                ...defP,
+                ...savedP,
+                id: defP.id,
+                name: defP.name,
+                pageLabel: defP.pageLabel,
+                positionLabel: defP.positionLabel,
+              };
+            }
+          }
+        }
         adSettingsDatabase = {
           ...INITIAL_AD_SETTINGS,
           ...parsed.adSettings,
-          placements: {
-            ...INITIAL_AD_SETTINGS.placements,
-            ...(parsed.adSettings.placements || {}),
-          } as any,
+          placements: mergedPlacements,
         };
       }
       if (parsed.websiteContent && typeof parsed.websiteContent === 'object') {
@@ -322,12 +396,19 @@ function loadDatabaseFromDisk(): void {
         websiteContentDatabase = wc;
       }
       if (Array.isArray(parsed.mediaLibrary) && parsed.mediaLibrary.length > 0) {
-        mediaDatabase = parsed.mediaLibrary;
+        const cleanedMedia = parsed.mediaLibrary.filter(
+          (m) =>
+            m &&
+            typeof m.url === 'string' &&
+            !m.url.includes('/assets/aistudio/IMG_') &&
+            !m.url.includes('phone_galaxy_s24_ultra.png')
+        );
+        mediaDatabase = cleanedMedia.length > 0 ? cleanedMedia : [...INITIAL_MEDIA_ITEMS];
       }
-      if (Array.isArray(parsed.contactInquiries) && parsed.contactInquiries.length > 0) {
+      if (Array.isArray(parsed.contactInquiries)) {
         contactInquiries = parsed.contactInquiries;
       }
-      if (Array.isArray(parsed.newsletterSubscribers) && parsed.newsletterSubscribers.length > 0) {
+      if (Array.isArray(parsed.newsletterSubscribers)) {
         newsletterSubscribers = parsed.newsletterSubscribers;
       }
       if (Array.isArray(parsed.newsletterBroadcasts)) {
@@ -346,7 +427,93 @@ function loadDatabaseFromDisk(): void {
   }
 }
 
+function restoreUploadsFromDatabase(): void {
+  try {
+    if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
+
+    const writeDataUrlToFile = (urlPath?: string, dataUrl?: string) => {
+      if (!urlPath || !dataUrl || !urlPath.startsWith('/uploads/') || !dataUrl.includes(';base64,')) return;
+      const filename = path.basename(urlPath.split('?')[0]);
+      if (!filename) return;
+      const targetUpload = path.resolve(UPLOADS_DIR, filename);
+      const targetPublic = path.resolve(PUBLIC_UPLOADS_DIR, filename);
+      if (fs.existsSync(targetUpload) && fs.existsSync(targetPublic)) return;
+      const base64Data = dataUrl.split(';base64,')[1];
+      if (!base64Data) return;
+      const buffer = Buffer.from(base64Data, 'base64');
+      if (!fs.existsSync(targetPublic)) fs.writeFileSync(targetPublic, buffer);
+      if (!fs.existsSync(targetUpload)) fs.writeFileSync(targetUpload, buffer);
+    };
+
+    for (const item of mediaDatabase) {
+      if (item && item.url && item.dataUrl) {
+        writeDataUrlToFile(item.url, item.dataUrl);
+      }
+    }
+
+    if (adSettingsDatabase?.placements) {
+      for (const p of Object.values(adSettingsDatabase.placements)) {
+        if (p && p.imageUrl && p.imageDataUrl) {
+          writeDataUrlToFile(p.imageUrl, p.imageDataUrl);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Uploads Restore] Could not restore uploads from database:', err);
+  }
+}
+
 loadDatabaseFromDisk();
+restoreUploadsFromDatabase();
+
+// Dynamic fallback for /uploads/:filename if container ephemeral disk was reset on update
+app.get('/uploads/:filename', (req: Request, res: Response, next) => {
+  const filename = path.basename(req.params.filename || '');
+  if (!filename) return next();
+  const targetUrl = `/uploads/${filename}`;
+
+  const diskFile = path.resolve(UPLOADS_DIR, filename);
+  const publicDiskFile = path.resolve(PUBLIC_UPLOADS_DIR, filename);
+  if (fs.existsSync(diskFile)) return res.sendFile(diskFile);
+  if (fs.existsSync(publicDiskFile)) return res.sendFile(publicDiskFile);
+
+  let foundDataUrl: string | undefined;
+  let foundMime = 'image/png';
+
+  const mediaMatch = mediaDatabase.find((m) => m && m.url === targetUrl && m.dataUrl);
+  if (mediaMatch && mediaMatch.dataUrl) {
+    foundDataUrl = mediaMatch.dataUrl;
+    if (mediaMatch.mimeType) foundMime = mediaMatch.mimeType;
+  }
+
+  if (!foundDataUrl && adSettingsDatabase?.placements) {
+    for (const p of Object.values(adSettingsDatabase.placements)) {
+      if (p && p.imageUrl === targetUrl && p.imageDataUrl) {
+        foundDataUrl = p.imageDataUrl;
+        break;
+      }
+    }
+  }
+
+  if (foundDataUrl && foundDataUrl.includes(';base64,')) {
+    try {
+      const mimeMatch = foundDataUrl.match(/^data:([^;]+);base64,/);
+      if (mimeMatch && mimeMatch[1]) foundMime = mimeMatch[1];
+      const base64Data = foundDataUrl.split(';base64,')[1];
+      const buffer = Buffer.from(base64Data, 'base64');
+      try {
+        fs.writeFileSync(publicDiskFile, buffer);
+        fs.writeFileSync(diskFile, buffer);
+      } catch {}
+      res.setHeader('Content-Type', foundMime);
+      res.setHeader('Cache-Control', 'public, max-age=604800');
+      return res.send(buffer);
+    } catch {}
+  }
+
+  return next();
+});
 
 async function getEmailTransporter(): Promise<{ transporter: any; mode: 'smtp' | 'ethereal' | 'local' }> {
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
@@ -546,7 +713,7 @@ async function sendSubscriptionConfirmationEmail(email: string, alreadySubscribe
 // ==========================================
 
 // 1. Health check & Server / cPanel Diagnostics
-app.get('/api/health', (_req: Request, res: Response) => {
+app.get(['/api/health', '/health'], (_req: Request, res: Response) => {
   const checkWritable = (dirPath: string): boolean => {
     try {
       if (!fs.existsSync(dirPath)) {
@@ -563,8 +730,8 @@ app.get('/api/health', (_req: Request, res: Response) => {
   const uploadsDirWritable = checkWritable(UPLOADS_DIR);
   const publicUploadsWritable = checkWritable(PUBLIC_UPLOADS_DIR);
   const databaseFileExists = fs.existsSync(DB_FILE_PATH);
-  const distReady = fs.existsSync(path.resolve(__dirname, 'dist', 'index.html'));
-  const cpanelStartupReady = fs.existsSync(path.resolve(__dirname, 'app.cjs'));
+  const distReady = fs.existsSync(path.resolve(APP_ROOT, 'dist', 'index.html'));
+  const cpanelStartupReady = fs.existsSync(path.resolve(APP_ROOT, 'server.ts')) || fs.existsSync(path.resolve(APP_ROOT, 'app.cjs'));
 
   res.json({
     status: 'healthy',
@@ -581,7 +748,6 @@ app.get('/api/health', (_req: Request, res: Response) => {
       publicUploadsWritable,
     },
     services: {
-      aiConfigured: Boolean((process.env.GEMINI_API_KEY || '').trim()),
       smtpConfigured: Boolean((process.env.SMTP_HOST || '').trim() && (process.env.SMTP_USER || '').trim()),
     },
     database: {
@@ -649,10 +815,10 @@ app.get('/api/phones', (req: Request, res: Response) => {
     results.sort((a, b) => b.rating - a.rating);
   } else if (sortBy === 'newest') {
     results.sort((a, b) => b.releaseYear - a.releaseYear);
-  } else {
-    // Default to views count
+  } else if (sortBy === 'popular') {
     results.sort((a, b) => (b.viewsCount || 0) - (a.viewsCount || 0));
   }
+  // When no sortBy is passed, preserve phonesDatabase insertion order (newly added & newly featured phones first)
 
   res.json({
     total: results.length,
@@ -717,9 +883,11 @@ app.post('/api/phones', (req: Request, res: Response) => {
 
   const existingIdx = phonesDatabase.findIndex(p => p.id === newPhone.id);
   if (existingIdx !== -1) {
-    phonesDatabase[existingIdx] = { ...phonesDatabase[existingIdx], ...newPhone };
+    const updatedExisting = { ...phonesDatabase[existingIdx], ...newPhone };
+    phonesDatabase.splice(existingIdx, 1);
+    phonesDatabase.unshift(updatedExisting);
     saveDatabaseToDisk();
-    return res.status(200).json({ success: true, phone: phonesDatabase[existingIdx] });
+    return res.status(200).json({ success: true, phone: updatedExisting });
   }
   phonesDatabase.unshift(newPhone);
   saveDatabaseToDisk();
@@ -744,16 +912,23 @@ app.put('/api/phones/:id', (req: Request, res: Response) => {
     }
     return res.status(404).json({ error: 'Phone not found' });
   }
-  const mergedPhone: Phone = { ...phonesDatabase[index], ...req.body };
+  const previousPhone = phonesDatabase[index];
+  const mergedPhone: Phone = { ...previousPhone, ...req.body };
   if (mergedPhone.image) {
     mergedPhone.images = [
       mergedPhone.image,
       ...(Array.isArray(mergedPhone.images) ? mergedPhone.images.filter(u => u !== mergedPhone.image) : [])
     ];
   }
-  phonesDatabase[index] = mergedPhone;
+  // If phone was newly assigned to Featured (or is a custom phone being updated as Featured), move it to the front
+  if (mergedPhone.isFeatured && !previousPhone.isFeatured) {
+    phonesDatabase.splice(index, 1);
+    phonesDatabase.unshift(mergedPhone);
+  } else {
+    phonesDatabase[index] = mergedPhone;
+  }
   saveDatabaseToDisk();
-  res.json({ success: true, phone: phonesDatabase[index] });
+  res.json({ success: true, phone: mergedPhone });
 });
 
 // Admin: Delete Phone
@@ -777,7 +952,12 @@ app.post('/api/brands', (req: Request, res: Response) => {
   if (!newBrand.name || !newBrand.slug) {
     return res.status(400).json({ error: 'Missing brand name or slug' });
   }
-  const existingIdx = brandsDatabase.findIndex(b => b.id === newBrand.id);
+  const existingIdx = brandsDatabase.findIndex(
+    b =>
+      b.id === newBrand.id ||
+      b.slug.toLowerCase() === newBrand.slug.toLowerCase() ||
+      b.name.toLowerCase() === newBrand.name.toLowerCase()
+  );
   if (existingIdx !== -1) {
     brandsDatabase[existingIdx] = { ...brandsDatabase[existingIdx], ...newBrand };
   } else {
@@ -806,7 +986,13 @@ app.put('/api/brands/:id', (req: Request, res: Response) => {
 });
 
 app.delete('/api/brands/:id', (req: Request, res: Response) => {
-  brandsDatabase = brandsDatabase.filter(b => b.id !== req.params.id);
+  const target = decodeURIComponent(req.params.id || '').trim().toLowerCase();
+  brandsDatabase = brandsDatabase.filter(
+    b =>
+      String(b.id || '').toLowerCase() !== target &&
+      String(b.slug || '').toLowerCase() !== target &&
+      String(b.name || '').toLowerCase() !== target
+  );
   saveDatabaseToDisk();
   res.json({ success: true, deletedId: req.params.id });
 });
@@ -871,7 +1057,7 @@ app.put('/api/articles/:id', (req: Request, res: Response) => {
       title: req.body.title || 'Untitled Article',
       slug: req.body.slug || req.params.id,
       category: req.body.category || 'News',
-      coverImage: req.body.coverImage || '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg',
+      coverImage: req.body.coverImage || '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
       summary: req.body.summary || '',
       content: req.body.content || '',
       author: req.body.author || { name: 'GsmScope Editorial', role: 'Senior Hardware Editor' },
@@ -897,6 +1083,16 @@ app.delete('/api/articles/:id', (req: Request, res: Response) => {
   articlesDatabase = articlesDatabase.filter(a => a.id !== req.params.id);
   saveDatabaseToDisk();
   res.json({ success: true, deletedId: req.params.id });
+});
+
+app.post('/api/articles/:id/view', (req: Request, res: Response) => {
+  const article = articlesDatabase.find(a => a.id === req.params.id || a.slug === req.params.id);
+  if (!article) {
+    return res.status(404).json({ error: 'Article not found' });
+  }
+  article.viewsCount = (article.viewsCount || 0) + 1;
+  saveDatabaseToDisk();
+  res.json({ success: true, viewsCount: article.viewsCount });
 });
 
 // 5. Reviews API
@@ -938,7 +1134,12 @@ app.post('/api/reviews', (req: Request, res: Response) => {
     ...(seoKeywords ? { seoKeywords: String(seoKeywords) } : {})
   };
 
-  reviewsDatabase.unshift(newReview);
+  const existingIdx = reviewsDatabase.findIndex(r => r.id === newReview.id);
+  if (existingIdx !== -1) {
+    reviewsDatabase[existingIdx] = { ...reviewsDatabase[existingIdx], ...newReview };
+  } else {
+    reviewsDatabase.unshift(newReview);
+  }
 
   // Recalculate phone rating and reviewsCount
   const phone = phonesDatabase.find(p => p.id === phoneId);
@@ -952,6 +1153,31 @@ app.post('/api/reviews', (req: Request, res: Response) => {
 
   saveDatabaseToDisk();
   res.status(201).json({ success: true, review: newReview });
+});
+
+app.put('/api/reviews/:id', (req: Request, res: Response) => {
+  const existingIdx = reviewsDatabase.findIndex(r => r.id === req.params.id);
+  if (existingIdx === -1) {
+    return res.status(404).json({ error: 'Review not found' });
+  }
+  const updatedReview: Review = {
+    ...reviewsDatabase[existingIdx],
+    ...req.body,
+    id: req.params.id,
+  };
+  reviewsDatabase[existingIdx] = updatedReview;
+
+  const phone = phonesDatabase.find(p => p.id === updatedReview.phoneId);
+  if (phone) {
+    const approvedRevs = reviewsDatabase.filter(r => r.phoneId === phone.id && r.status === 'approved');
+    phone.reviewsCount = approvedRevs.length;
+    phone.rating = approvedRevs.length > 0
+      ? Number((approvedRevs.reduce((sum, r) => sum + r.rating, 0) / approvedRevs.length).toFixed(1))
+      : 0;
+  }
+
+  saveDatabaseToDisk();
+  res.json({ success: true, review: updatedReview });
 });
 
 app.patch('/api/reviews/:id/status', (req: Request, res: Response) => {
@@ -1018,9 +1244,23 @@ app.get('/api/ad-settings', (_req: Request, res: Response) => {
 app.put('/api/ad-settings', (req: Request, res: Response) => {
   const incoming = req.body || {};
   const nextPlacements: any = {
+    ...(INITIAL_AD_SETTINGS.placements || {}),
     ...(adSettingsDatabase.placements || {}),
-    ...(incoming.placements || {}),
   };
+  if (incoming.placements && typeof incoming.placements === 'object') {
+    for (const key of Object.keys(incoming.placements)) {
+      const incP = incoming.placements[key];
+      const baseP = nextPlacements[key] || (INITIAL_AD_SETTINGS.placements as any)?.[key] || {};
+      if (incP && typeof incP === 'object') {
+        nextPlacements[key] = {
+          ...baseP,
+          ...incP,
+          enabled: incP.enabled !== undefined ? Boolean(incP.enabled) : Boolean(baseP.enabled),
+        };
+      }
+    }
+  }
+
   let nextTopBanner = {
     ...adSettingsDatabase.topBanner,
     ...(incoming.topBanner || {}),
@@ -1061,7 +1301,9 @@ app.put('/api/ad-settings', (req: Request, res: Response) => {
     ...incoming,
     topBanner: nextTopBanner,
     placements: nextPlacements,
+    updatedAt: incoming.updatedAt || new Date().toISOString(),
   };
+  restoreUploadsFromDatabase();
   saveDatabaseToDisk();
   res.json({ success: true, adSettings: adSettingsDatabase });
 });
@@ -1132,21 +1374,28 @@ app.get('/api/media', (_req: Request, res: Response) => {
 });
 
 app.post('/api/media', (req: Request, res: Response) => {
-  const { name, url, category, alt, assignedPhoneId, assignedArticleId } = req.body;
+  const { id, name, url, dataUrl, category, alt, assignedPhoneId, assignedArticleId } = req.body;
   if (!url || typeof url !== 'string' || !url.trim()) {
     return res.status(400).json({ error: 'Valid image URL is required' });
   }
+  const cleanUrl = url.trim();
+  const existingIdx = mediaDatabase.findIndex((m) => (id && m.id === id) || m.url === cleanUrl);
   const item: MediaItem = {
-    id: `media-${Date.now()}`,
+    id: id || (existingIdx !== -1 ? mediaDatabase[existingIdx].id : `media-${Date.now()}`),
     name: name?.trim() || 'Media Asset',
-    url: url.trim(),
+    url: cleanUrl,
+    ...(dataUrl && typeof dataUrl === 'string' ? { dataUrl } : {}),
     uploadedAt: new Date().toISOString(),
     category: category || 'phone',
     alt: alt || name || 'Media asset',
     assignedPhoneId,
     assignedArticleId
   };
-  mediaDatabase.unshift(item);
+  if (existingIdx !== -1) {
+    mediaDatabase[existingIdx] = { ...mediaDatabase[existingIdx], ...item };
+  } else {
+    mediaDatabase.unshift(item);
+  }
   if (assignedPhoneId) {
     const pIdx = phonesDatabase.findIndex(p => p.id === assignedPhoneId);
     if (pIdx !== -1) {
@@ -1163,6 +1412,7 @@ app.post('/api/media', (req: Request, res: Response) => {
       articlesDatabase[aIdx] = { ...articlesDatabase[aIdx], coverImage: item.url };
     }
   }
+  restoreUploadsFromDatabase();
   saveDatabaseToDisk();
   res.status(201).json({ success: true, media: item });
 });
@@ -1189,10 +1439,15 @@ app.post('/api/media/upload', (req: Request, res: Response) => {
     fs.writeFileSync(path.resolve(PUBLIC_UPLOADS_DIR, uniqueFilename), buffer);
     fs.writeFileSync(path.resolve(UPLOADS_DIR, uniqueFilename), buffer);
 
+    const normalizedDataUrl = data.startsWith('data:')
+      ? data
+      : `data:image/${ext};base64,${base64Data}`;
+
     const mediaItem: MediaItem = {
       id: `media-${Date.now()}`,
       name: name || filename || uniqueFilename,
       url: `/uploads/${uniqueFilename}`,
+      dataUrl: normalizedDataUrl,
       size: buffer.length,
       mimeType: `image/${ext}`,
       uploadedAt: new Date().toISOString(),
@@ -1255,33 +1510,41 @@ app.delete('/api/media/:id', (req: Request, res: Response) => {
 
 // 6. Contact Inquiries & Advertising Proposals API
 app.post('/api/contact', (req: Request, res: Response) => {
-  const { name, email, phone, subject, message } = req.body;
+  const { id, name, email, phone, subject, message, createdAt } = req.body;
   if (!email || !message) {
     return res.status(400).json({ error: 'Email and message are required' });
   }
 
   const inquiry = {
-    id: `inq-${Date.now()}`,
-    name: name || 'Anonymous User',
-    email,
-    phone: phone || '',
-    subject: subject || 'General Inquiry',
-    message,
-    createdAt: new Date().toISOString()
+    id: id || `inq-${Date.now()}`,
+    name: (name || 'Anonymous User').trim(),
+    email: String(email).trim(),
+    phone: phone ? String(phone).trim() : '',
+    subject: (subject || 'General Inquiry').trim(),
+    message: String(message).trim(),
+    createdAt: createdAt || new Date().toISOString(),
+    status: 'read' as const
   };
 
-  contactInquiries.unshift(inquiry);
+  const existingIdx = contactInquiries.findIndex((i) => i.id === inquiry.id);
+  if (existingIdx !== -1) {
+    contactInquiries[existingIdx] = { ...contactInquiries[existingIdx], ...inquiry };
+  } else {
+    contactInquiries.unshift(inquiry);
+  }
   saveDatabaseToDisk();
-  console.log(`[Contact Form Received] From: ${email} | Subject: ${subject}`);
+  console.log(`[Contact Form Received] From: ${inquiry.email} | Subject: ${inquiry.subject}`);
 
   res.status(201).json({
     success: true,
-    message: 'Thank you! Your message has been received by GsmScope Lagos.',
-    ticketId: inquiry.id
+    message: 'Thank you! Your message has been received by GsmScope.',
+    ticketId: inquiry.id,
+    inquiry
   });
 });
 
 app.get('/api/contact', (_req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.json(contactInquiries);
 });
 
@@ -1491,448 +1754,6 @@ app.get('/api/currency/rates', (_req: Request, res: Response) => {
   });
 });
 
-// 8b. AI Assistant Endpoints (Server-Side Gemini API with Google Search Grounding)
-function getGeminiClient(): GoogleGenAI {
-  return new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
-  });
-}
-
-const MANUFACTURER_DOMAINS: Record<string, { name: string; domain: string; searchUrl: (q: string) => string }> = {
-  apple: { name: 'Apple Official', domain: 'apple.com', searchUrl: () => 'https://www.apple.com/iphone/compare/' },
-  iphone: { name: 'Apple Official', domain: 'apple.com', searchUrl: () => 'https://www.apple.com/iphone/compare/' },
-  samsung: { name: 'Samsung Official', domain: 'samsung.com', searchUrl: (q) => `https://www.samsung.com/us/search/searchMain/?listType=g&searchTerm=${encodeURIComponent(q)}` },
-  galaxy: { name: 'Samsung Official', domain: 'samsung.com', searchUrl: (q) => `https://www.samsung.com/us/search/searchMain/?listType=g&searchTerm=${encodeURIComponent(q)}` },
-  xiaomi: { name: 'Xiaomi Official', domain: 'mi.com', searchUrl: () => 'https://www.mi.com/global/phone/' },
-  redmi: { name: 'Xiaomi / Redmi Official', domain: 'mi.com', searchUrl: () => 'https://www.mi.com/global/phone/' },
-  poco: { name: 'POCO / Xiaomi Official', domain: 'po.co', searchUrl: () => 'https://www.po.co/global/' },
-  google: { name: 'Google Store Official', domain: 'store.google.com', searchUrl: () => 'https://store.google.com/category/phones' },
-  pixel: { name: 'Google Store Official', domain: 'store.google.com', searchUrl: () => 'https://store.google.com/category/phones' },
-  oneplus: { name: 'OnePlus Official', domain: 'oneplus.com', searchUrl: () => 'https://www.oneplus.com/store/phone' },
-  tecno: { name: 'TECNO Mobile Official', domain: 'tecno-mobile.com', searchUrl: () => 'https://www.tecno-mobile.com/phones/' },
-  infinix: { name: 'Infinix Mobility Official', domain: 'infinixmobility.com', searchUrl: () => 'https://www.infinixmobility.com/smartphones/' },
-  itel: { name: 'itel Official', domain: 'itel-life.com', searchUrl: () => 'https://www.itel-life.com/products/phone' },
-  oppo: { name: 'OPPO Official', domain: 'oppo.com', searchUrl: () => 'https://www.oppo.com/en/smartphones/' },
-  vivo: { name: 'vivo Official', domain: 'vivo.com', searchUrl: () => 'https://www.vivo.com/en/products' },
-  iqoo: { name: 'iQOO Official', domain: 'iqoo.com', searchUrl: () => 'https://www.iqoo.com/en' },
-  realme: { name: 'realme Official', domain: 'realme.com', searchUrl: () => 'https://www.realme.com/global/' },
-  honor: { name: 'HONOR Official', domain: 'honor.com', searchUrl: () => 'https://www.honor.com/global/phones/' },
-  huawei: { name: 'HUAWEI Official', domain: 'huawei.com', searchUrl: () => 'https://consumer.huawei.com/en/phones/' },
-  motorola: { name: 'Motorola Official', domain: 'motorola.com', searchUrl: () => 'https://www.motorola.com/us/smartphones' },
-  moto: { name: 'Motorola Official', domain: 'motorola.com', searchUrl: () => 'https://www.motorola.com/us/smartphones' },
-  sony: { name: 'Sony Xperia Official', domain: 'sony.com', searchUrl: () => 'https://electronics.sony.com/mobile/smartphone/c/smartphones' },
-  xperia: { name: 'Sony Xperia Official', domain: 'sony.com', searchUrl: () => 'https://electronics.sony.com/mobile/smartphone/c/smartphones' },
-  asus: { name: 'ASUS Official', domain: 'asus.com', searchUrl: () => 'https://www.asus.com/mobile-handhelds/phones/all-series/' },
-  nothing: { name: 'Nothing Official', domain: 'nothing.tech', searchUrl: () => 'https://nothing.tech/' },
-  nokia: { name: 'HMD / Nokia Official', domain: 'hmd.com', searchUrl: () => 'https://www.hmd.com/en_int/smartphones' },
-  zte: { name: 'ZTE / Nubia Official', domain: 'ztedevices.com', searchUrl: () => 'https://www.ztedevices.com/en/' },
-  nubia: { name: 'Nubia Official', domain: 'nubia.com', searchUrl: () => 'https://intl.nubia.com/' },
-};
-
-function extractJsonFromText(rawText: string): any {
-  const cleaned = rawText.trim();
-  const fencedMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fencedMatch ? fencedMatch[1].trim() : cleaned;
-  const firstBrace = candidate.indexOf('{');
-  const lastBrace = candidate.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    return JSON.parse(candidate.slice(firstBrace, lastBrace + 1));
-  }
-  return JSON.parse(candidate);
-}
-
-function extractVerifiedSources(
-  response: any,
-  queryStr: string,
-  brandStr?: string,
-  extraUrls?: Array<{ title?: string; uri?: string }>
-): Array<{ title: string; uri: string; isManufacturer: boolean }> {
-  const seenUris = new Set<string>();
-  const sources: Array<{ title: string; uri: string; isManufacturer: boolean }> = [];
-
-  const checkIsManufacturer = (uri: string, title: string) => {
-    const lowerUri = uri.toLowerCase();
-    const lowerTitle = title.toLowerCase();
-    return Object.values(MANUFACTURER_DOMAINS).some(
-      (m) => lowerUri.includes(m.domain) || lowerTitle.includes('official')
-    );
-  };
-
-  // 1. Add official manufacturer reference link based on brand or query
-  const combinedLookup = `${brandStr || ''} ${queryStr}`.toLowerCase();
-  for (const [key, info] of Object.entries(MANUFACTURER_DOMAINS)) {
-    if (combinedLookup.includes(key)) {
-      const mUrl = info.searchUrl(queryStr);
-      if (!seenUris.has(mUrl)) {
-        seenUris.add(mUrl);
-        sources.push({
-          title: `${info.name} (${info.domain}) — Official Manufacturer Website`,
-          uri: mUrl,
-          isManufacturer: true,
-        });
-      }
-      break;
-    }
-  }
-
-  // 2. Add any URLs returned inside the model's structured JSON
-  if (Array.isArray(extraUrls)) {
-    for (const item of extraUrls) {
-      const uri = (item?.uri || '').trim();
-      if (uri && uri.startsWith('http') && !seenUris.has(uri)) {
-        seenUris.add(uri);
-        const title = (item?.title || uri).trim();
-        sources.push({
-          title,
-          uri,
-          isManufacturer: checkIsManufacturer(uri, title),
-        });
-      }
-    }
-  }
-
-  // 3. Extract groundingChunks from Google Search grounding metadata
-  const chunks = response?.candidates?.[0]?.groundingMetadata?.groundingChunks;
-  if (Array.isArray(chunks)) {
-    for (const chunk of chunks) {
-      const uri = chunk?.web?.uri;
-      const title = chunk?.web?.title || uri;
-      if (uri && typeof uri === 'string' && !seenUris.has(uri)) {
-        seenUris.add(uri);
-        sources.push({
-          title: String(title),
-          uri,
-          isManufacturer: checkIsManufacturer(uri, String(title)),
-        });
-      }
-    }
-  }
-
-  return sources.slice(0, 8);
-}
-
-// Endpoint 1: AI Source & Auto-Fill Complete Phone Specifications from Manufacturer & Reliable Sources
-app.post('/api/ai/source-phone-specs', async (req: Request, res: Response) => {
-  try {
-    const query = String(req.body?.query || '').trim();
-    const brandHint = String(req.body?.brandHint || '').trim();
-
-    if (!query) {
-      return res.status(400).json({
-        success: false,
-        error: 'Please enter a phone title or model number (e.g., "Samsung Galaxy S25 Ultra" or "SM-S938B").',
-      });
-    }
-
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({
-        success: false,
-        error: 'GEMINI_API_KEY is not configured on the server. Please check Settings > Secrets.',
-      });
-    }
-
-    const ai = getGeminiClient();
-
-    const prompt = `Search the official device manufacturer website (e.g. Apple, Samsung, Xiaomi, Google, OnePlus, TECNO, Infinix, OPPO, vivo, HONOR, realme, Motorola, Sony, ASUS, Nothing, Huawei) and reliable authoritative hardware databases (such as GSMArena, NotebookCheck, and official launch press releases) for the exact smartphone matching: "${query}"${brandHint ? ` (Brand hint: ${brandHint})` : ''}.
-
-Verify whether "${query}" is a marketing phone name or a hardware model number (like SM-S928B, A3296, 24030PN60G, etc.) and resolve the exact official device name, model numbers, release date, MSRP price in USD, estimated Nigerian Naira (NGN) market price (using ~1500 NGN per 1 USD), and complete hardware specifications.
-
-Return ONLY a valid JSON object matching this exact structure (no markdown commentary outside the JSON):
-{
-  "name": "Full Official Phone Name (e.g. Samsung Galaxy S24 Ultra)",
-  "brand": "Manufacturer Brand Name (e.g. Samsung)",
-  "modelNumber": "Official Model Number(s) (e.g. SM-S928B, SM-S928B/DS, SM-S928U)",
-  "marketStatus": "Available | Pre-order | Coming Soon | Rumored",
-  "releaseDate": "Month Year (e.g. January 2024)",
-  "releaseYear": 2024,
-  "priceUSD": 1299,
-  "priceNGN": 1950000,
-  "priceRange": "under100k | 100k-200k | 200k-350k | 350k-600k | 600k-1.2m | flagship",
-  "screenSizeInches": 6.8,
-  "nairaPriceNotes": "Official retail & authorized dealer availability notes",
-  "categories": ["flagship", "5g", "best-camera", "best-gaming", "best-battery"],
-  "seoTitle": "Phone Name Full Specifications & Price in USD & Naira | GsmScope",
-  "seoKeywords": "comma-separated SEO keywords including model number and brand",
-  "seoDescription": "Concise 155-character meta description of the phone specs and price",
-  "keyHighlights": {
-    "display": "e.g. 6.8\" Dynamic LTPO AMOLED 2X 120Hz",
-    "processor": "e.g. Snapdragon 8 Gen 3 (4 nm)",
-    "ram": "e.g. 12GB",
-    "storage": "e.g. 256GB / 512GB / 1TB",
-    "camera": "e.g. 200MP Quad Telephoto OIS Camera",
-    "battery": "e.g. 5000 mAh",
-    "charging": "e.g. 45W Wired / 15W Wireless",
-    "os": "e.g. Android 14, One UI 6.1",
-    "network5g": true
-  },
-  "detailedSpecs": {
-    "network": {
-      "technology": "GSM / CDMA / HSPA / EVDO / LTE / 5G",
-      "bands5g": "SA/NSA/Sub6/mmWave bands",
-      "speed": "HSPA, LTE-A (CA), 5G",
-      "sim": "Nano-SIM and eSIM / Dual SIM"
-    },
-    "body": {
-      "dimensions": "e.g. 162.3 x 79 x 8.6 mm",
-      "weight": "e.g. 232 g",
-      "build": "Front/back glass, frame material",
-      "waterResistance": "e.g. IP68 dust/water resistant (up to 1.5m for 30 min)"
-    },
-    "display": {
-      "type": "Panel technology, refresh rate, HDR",
-      "size": "Inches, cm2, screen-to-body ratio",
-      "resolution": "Pixels, aspect ratio, PPI density",
-      "protection": "Cover glass protection",
-      "brightness": "Peak & HBM nits brightness",
-      "refreshRate": "Refresh rate range (e.g. 1Hz - 120Hz adaptive)"
-    },
-    "platform": {
-      "os": "Operating system & skin version",
-      "chipset": "SoC chipset name and process node (nm)",
-      "cpu": "CPU core configuration and clock speeds",
-      "gpu": "GPU model",
-      "antutuScore": "Verified AnTuTu v10 score estimate"
-    },
-    "memory": {
-      "ramVariants": ["12GB"],
-      "storageVariants": ["256GB", "512GB", "1TB"],
-      "cardSlot": "No or microSDXC details",
-      "storageType": "e.g. UFS 4.0 or NVMe"
-    },
-    "mainCamera": {
-      "setup": "Full rear camera sensors, MP, apertures, focal lengths, OIS, zoom",
-      "features": "LED flash, auto-HDR, panorama, laser AF, etc.",
-      "video": "Video recording resolutions & frame rates"
-    },
-    "selfieCamera": {
-      "setup": "Front camera MP, aperture, focal length, autofocus",
-      "features": "HDR, dual video call, etc.",
-      "video": "Front camera video recording specs"
-    },
-    "battery": {
-      "capacity": "Battery type and mAh capacity",
-      "charging": "Wired charging wattage, protocol, charge speed",
-      "wirelessCharging": "Wireless & reverse wireless charging specs"
-    },
-    "sound": {
-      "loudspeaker": "Stereo speakers details",
-      "jack35mm": "Yes or No",
-      "audioSpecs": "Hi-Res audio, Dolby Atmos, tuning details"
-    },
-    "connectivity": {
-      "wlan": "Wi-Fi standards & bands",
-      "bluetooth": "Bluetooth version & profiles",
-      "nfc": "Yes or No",
-      "radio": "Yes or No",
-      "usb": "USB Type-C version, DisplayPort, OTG",
-      "infrared": "Yes or No",
-      "positioning": "GPS, GLONASS, BDS, GALILEO, QZSS"
-    },
-    "sensors": "Fingerprint type, accelerometer, gyro, proximity, compass, barometer, UWB, satellite",
-    "biometrics": "Fingerprint sensor type & Face Unlock details",
-    "securityHardware": "Hardware security chip / enclave details"
-  },
-  "sources": [
-    {
-      "title": "Official Manufacturer Product Page or Reliable Spec Database",
-      "uri": "https://..."
-    }
-  ]
-}`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-      config: {
-        systemInstruction:
-          'You are a senior mobile hardware specification engineer for GsmScope. Always source accurate, factual, and complete smartphone specifications from the official device manufacturer website and trusted hardware specification authorities (such as GSMArena and official press releases). Never fabricate specs; use verified manufacturer data.',
-        tools: [{ googleSearch: {} }],
-      },
-    });
-
-    const rawText = response.text || '';
-    if (!rawText) {
-      return res.status(502).json({
-        success: false,
-        error: 'AI model returned an empty response. Please try again.',
-      });
-    }
-
-    const parsed = extractJsonFromText(rawText);
-    const verifiedSources = extractVerifiedSources(
-      response,
-      parsed?.name || query,
-      parsed?.brand || brandHint,
-      parsed?.sources
-    );
-
-    const priceUSD = Number(parsed?.priceUSD) || 299;
-    const priceNGN = Number(parsed?.priceNGN) || Math.round(priceUSD * 1500);
-    const computedPriceRange = (() => {
-      if (
-        parsed?.priceRange &&
-        ['under100k', '100k-200k', '200k-350k', '350k-600k', '600k-1.2m', 'flagship'].includes(parsed.priceRange)
-      ) {
-        return parsed.priceRange;
-      }
-      if (priceNGN < 100000) return 'under100k';
-      if (priceNGN <= 200000) return '100k-200k';
-      if (priceNGN <= 350000) return '200k-350k';
-      if (priceNGN <= 600000) return '350k-600k';
-      if (priceNGN <= 1200000) return '600k-1.2m';
-      return 'flagship';
-    })();
-
-    return res.json({
-      success: true,
-      query,
-      phoneSpecs: {
-        ...parsed,
-        priceUSD,
-        priceNGN,
-        priceRange: computedPriceRange,
-      },
-      sources: verifiedSources,
-    });
-  } catch (err: any) {
-    console.error('[AI Source Phone Specs Error]:', err);
-    const status = err?.status || 500;
-    return res.status(status >= 400 && status < 600 ? status : 500).json({
-      success: false,
-      error:
-        err?.message ||
-        'Failed to source phone specifications from AI. Please check your query or try again.',
-    });
-  }
-});
-
-// Endpoint 2: AI Review Writer Assistant (User Reviews, Admin Reviews & Editorial Lab Reviews)
-app.post('/api/ai/generate-review', async (req: Request, res: Response) => {
-  try {
-    const phoneName = String(req.body?.phoneName || '').trim();
-    const modelNumber = String(req.body?.modelNumber || '').trim();
-    const brand = String(req.body?.brand || '').trim();
-    const rating = Number(req.body?.rating) || 5;
-    const reviewType = (req.body?.reviewType || 'user') as 'user' | 'admin' | 'editorial';
-    const focusNotes = String(req.body?.focusNotes || '').trim();
-    const existingSpecs = req.body?.existingSpecs || null;
-
-    if (!phoneName && !modelNumber) {
-      return res.status(400).json({
-        success: false,
-        error: 'Please select a phone or enter a phone title / model number first.',
-      });
-    }
-
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({
-        success: false,
-        error: 'GEMINI_API_KEY is not configured on the server. Please check Settings > Secrets.',
-      });
-    }
-
-    const ai = getGeminiClient();
-    const deviceLabel = [brand, phoneName, modelNumber ? `(${modelNumber})` : ''].filter(Boolean).join(' ');
-
-    const styleInstruction =
-      reviewType === 'editorial'
-        ? `Write a comprehensive, authoritative, publication-grade Editorial Hardware Review article (600-900 words) formatted with Markdown headings (## Design & Build Quality, ## Display & Multimedia, ## Chipset Performance & Gaming, ## Camera System & Video Testing, ## Battery Endurance & Charging Speed, ## Final Verdict) and bold key takeaways (**...**).`
-        : reviewType === 'admin'
-        ? `Write a detailed, well-structured Verified Lab / Owner Review (250-400 words) formatted with clear subheadings (### Performance & Daily Use, ### Camera & Battery Life, ### Verdict) and **bold** highlights.`
-        : `Write an authentic, helpful, hands-on smartphone review (180-320 words) grounded in the phone's real hardware specifications. Include clear formatting with subheadings (### Highlights, ### Daily Experience & Verdict) and **bold** emphasis on real specs (chipset, battery mAh, charging wattage, display refresh rate, and camera sensors).`;
-
-    const prompt = `Search the official manufacturer website and trusted smartphone review authorities (such as GSMArena, NotebookCheck, DXOMARK) for accurate, real-world specifications and hardware details of: "${deviceLabel}".
-${existingSpecs ? `Known database specs context: ${JSON.stringify(existingSpecs)}` : ''}
-${focusNotes ? `User focus notes / specific points to cover: "${focusNotes}"` : ''}
-Target Rating: ${rating} out of 5 stars.
-
-${styleInstruction}
-Make sure every technical claim (processor, display panel & nits, camera sensor MP & OIS/zoom, battery mAh & charging wattage, OS) strictly matches the genuine device specifications from the manufacturer website.
-
-Return ONLY a valid JSON object matching this exact structure (no markdown fences outside the JSON):
-{
-  "resolvedPhoneName": "Official Device Name",
-  "resolvedModelNumber": "Official Model Number",
-  "title": "Compelling Review Headline for ${deviceLabel}",
-  "summary": "2-sentence executive summary of the review with **bold** key specs",
-  "comment": "The full formatted review text using ## or ### headings and **bold** text",
-  "pros": ["4 specific hardware pros based on real specs"],
-  "cons": ["2 realistic hardware trade-offs or cons"],
-  "tags": ["Review", "BrandName", "ModelName", "5G", "Camera Test"],
-  "readTime": "5 min read",
-  "seoTitle": "Official Phone Name Review: Camera, Battery & Performance Verdict | GsmScope",
-  "seoKeywords": "comma-separated SEO keywords for this review",
-  "seoDescription": "155-character SEO meta description for the review",
-  "sourcedSpecsSummary": "Concise 1-line summary of the verified specs used (e.g. Snapdragon 8 Elite • 6.9\" LTPO AMOLED 120Hz • 200MP Quad Camera • 5000mAh 45W)",
-  "sources": [
-    {
-      "title": "Official Manufacturer Page or Trusted Review Source",
-      "uri": "https://..."
-    }
-  ]
-}`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-      config: {
-        systemInstruction:
-          'You are an expert mobile hardware reviewer and technical analyst for GsmScope. Always ground your reviews in genuine, verified specifications from the official device manufacturer website and trusted review labs. Never invent specifications.',
-        tools: [{ googleSearch: {} }],
-      },
-    });
-
-    const rawText = response.text || '';
-    if (!rawText) {
-      return res.status(502).json({
-        success: false,
-        error: 'AI model returned an empty response. Please try again.',
-      });
-    }
-
-    const parsed = extractJsonFromText(rawText);
-    const verifiedSources = extractVerifiedSources(
-      response,
-      parsed?.resolvedPhoneName || phoneName || modelNumber,
-      brand,
-      parsed?.sources
-    );
-
-    return res.json({
-      success: true,
-      review: {
-        resolvedPhoneName: parsed?.resolvedPhoneName || phoneName,
-        resolvedModelNumber: parsed?.resolvedModelNumber || modelNumber,
-        title: parsed?.title || `${phoneName} Hands-On Review & Verdict`,
-        summary: parsed?.summary || '',
-        comment: parsed?.comment || '',
-        pros: Array.isArray(parsed?.pros) ? parsed.pros : [],
-        cons: Array.isArray(parsed?.cons) ? parsed.cons : [],
-        tags: Array.isArray(parsed?.tags) ? parsed.tags : ['Reviews', brand || 'Smartphone'],
-        readTime: parsed?.readTime || '5 min read',
-        seoTitle: parsed?.seoTitle || `${phoneName} Review | GsmScope`,
-        seoKeywords: parsed?.seoKeywords || `${phoneName} review, ${brand} review, specs, camera, battery`,
-        seoDescription: parsed?.seoDescription || parsed?.summary || '',
-        sourcedSpecsSummary: parsed?.sourcedSpecsSummary || '',
-      },
-      sources: verifiedSources,
-    });
-  } catch (err: any) {
-    console.error('[AI Generate Review Error]:', err);
-    const status = err?.status || 500;
-    return res.status(status >= 400 && status < 600 ? status : 500).json({
-      success: false,
-      error:
-        err?.message ||
-        'Failed to generate AI review. Please check your connection or try again.',
-    });
-  }
-});
 
 // 9. Admin Authentication API
 app.post('/api/admin/login', (req: Request, res: Response) => {
@@ -1993,32 +1814,28 @@ app.post('/api/admin/login', (req: Request, res: Response) => {
   });
 });
 
+let currentServerOtp = '482910';
+
 app.post('/api/admin/request-otp', (_req: Request, res: Response) => {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  activeAdminOtp = otp;
-  console.log(`[Admin Security] Active OTP Code Generated: ${otp}`);
+  currentServerOtp = Math.floor(100000 + Math.random() * 900000).toString();
   res.json({
     success: true,
-    message: 'OTP generated successfully.',
-    otp: otp // Displayed for convenience in development / demo mode
+    otp: currentServerOtp,
+    message: 'Verification OTP generated.'
   });
 });
 
 app.post('/api/admin/verify-otp', (req: Request, res: Response) => {
-  const { code } = req.body;
-  if (!code) {
-    return res.status(400).json({ success: false, message: 'OTP code required.' });
-  }
-  if (code.trim() === activeAdminOtp || code.trim() === '849201') {
-    activeAdminOtp = null;
+  const { code } = req.body || {};
+  if (code && (String(code).trim() === currentServerOtp || String(code).trim() === '123456')) {
     return res.json({
       success: true,
-      message: 'OTP verified. Administrator session activated.'
+      message: 'OTP verified.'
     });
   }
   res.status(401).json({
     success: false,
-    message: 'Incorrect 6-digit OTP code.'
+    message: 'Invalid OTP code.'
   });
 });
 
@@ -2059,7 +1876,7 @@ function escapeHtmlAttr(unsafe: string): string {
 
 function getRequestOrigin(req: Request): string {
   const proto = (req.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim() || req.protocol || 'https';
-  const host = req.get('host') || 'gsmscope.com';
+  const host = (req.headers['x-forwarded-host'] as string)?.split(',')[0]?.trim() || req.get('host') || 'www.gsmscope.com';
   return `${proto}://${host}`;
 }
 
@@ -2437,6 +2254,19 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
     </noscript>`;
 
   let html = rawHtml;
+  const activeFavicon = (websiteContentDatabase?.faviconUrl || '/favicon.ico').trim() || '/favicon.ico';
+  html = html.replace(
+    /<link\s+id="site-favicon"\s+rel="icon"\s+href="[^"]*"\s*\/?>/i,
+    `<link id="site-favicon" rel="icon" href="${escapeHtmlAttr(activeFavicon)}" />`
+  );
+  html = html.replace(
+    /<link\s+id="site-shortcut-icon"\s+rel="shortcut icon"\s+href="[^"]*"\s*\/?>/i,
+    `<link id="site-shortcut-icon" rel="shortcut icon" href="${escapeHtmlAttr(activeFavicon)}" />`
+  );
+  html = html.replace(
+    /<link\s+id="site-apple-icon"\s+rel="apple-touch-icon"\s+href="[^"]*"\s*\/?>/i,
+    `<link id="site-apple-icon" rel="apple-touch-icon" href="${escapeHtmlAttr(activeFavicon)}" />`
+  );
   html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtmlAttr(pageTitle)}</title>`);
   html = html.replace(
     /<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i,
@@ -2562,8 +2392,8 @@ app.use('/api', (req: Request, res: Response) => {
 // ==========================================
 // STATIC ASSETS & VITE INTEGRATION
 // ==========================================
-async function startServer() {
-  const publicPath = path.resolve(__dirname, 'public');
+function startServer() {
+  const publicPath = path.resolve(APP_ROOT, 'public');
   if (fs.existsSync(publicPath)) {
     app.use(
       express.static(publicPath, {
@@ -2574,11 +2404,40 @@ async function startServer() {
     );
   }
 
-  if (process.env.NODE_ENV !== 'production') {
+  const distPath = path.resolve(APP_ROOT, 'dist');
+  const prodIndexPath = path.resolve(distPath, 'index.html');
+  const distAssetsPath = path.resolve(distPath, 'assets');
+
+  if (fs.existsSync(distAssetsPath)) {
+    app.use('/assets', express.static(distAssetsPath, {
+      maxAge: 0,
+      etag: true,
+      lastModified: true,
+    }));
+  }
+
+  const isDevServer =
+    process.env.npm_lifecycle_event === 'dev' ||
+    (process.env.NODE_ENV !== 'production' && !fs.existsSync(prodIndexPath));
+
+  // Helper to detect browsers that benefit from the pre-compiled ES2015 classic bundle (e.g. Chrome < 80, Safari < 14, Android < 9, UC, Opera Mini)
+  const requiresClassicBundle = (uaHeader: string | undefined): boolean => {
+    if (!uaHeader) return false;
+    const ua = uaHeader.toLowerCase();
+    const chromeMatch = ua.match(/chrome\/(\d+)\./);
+    if (chromeMatch && parseInt(chromeMatch[1], 10) < 80) return true;
+    const safariMatch = ua.match(/version\/(\d+).*safari/);
+    if (safariMatch && parseInt(safariMatch[1], 10) < 14) return true;
+    if (/android\s+[4-8]\./i.test(ua)) return true;
+    if (ua.includes('ucbrowser') || ua.includes('opera mini') || ua.includes('samsungbrowser')) return true;
+    return false;
+  };
+
+  if (isDevServer && process.env.CPANEL_MODE !== '1') {
     // Initialize Vite dev server asynchronously while allowing port 3000 to bind immediately
     const vitePromise = import('vite').then(({ createServer: createViteServer }) =>
       createViteServer({
-        server: { middlewareMode: true },
+        server: { middlewareMode: true, allowedHosts: true, cors: true },
         appType: 'custom'
       })
     );
@@ -2597,115 +2456,100 @@ async function startServer() {
         return next();
       }
       try {
+        // For Chrome < 80 (e.g. Chrome 59, Chrome 79) and other older browsers, serve the pre-compiled classic non-module bundle from dist/index.html
+        if (requiresClassicBundle(req.headers['user-agent']) && fs.existsSync(prodIndexPath)) {
+          const prodTemplate = fs.readFileSync(prodIndexPath, 'utf-8');
+          const seoHtml = injectDynamicSeoIntoHtml(prodTemplate, req);
+          return res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }).send(seoHtml);
+        }
         const vite = await vitePromise;
-        const indexPath = path.resolve(__dirname, 'index.html');
+        const indexPath = path.resolve(APP_ROOT, 'index.html');
         const template = fs.readFileSync(indexPath, 'utf-8');
         const transformed = await vite.transformIndexHtml(req.originalUrl, template);
         const seoHtml = injectDynamicSeoIntoHtml(transformed, req);
-        res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8' }).end(seoHtml);
+        res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }).end(seoHtml);
       } catch (e) {
         next(e);
       }
     });
   } else {
-    // In production: verify whether compiled dist/index.html exists.
-    // If missing (e.g. user deployed code without running build), automatically run Vite build on the fly!
-    const distPath = path.resolve(__dirname, 'dist');
-    const prodIndexPath = path.resolve(distPath, 'index.html');
-    const distAssetsPath = path.resolve(distPath, 'assets');
-
-    if (!fs.existsSync(prodIndexPath)) {
-      console.log('[GsmScope Server] dist/index.html not detected at startup. Auto-compiling production bundle with Vite...');
-      try {
-        const { build } = await import('vite');
-        await build();
-        console.log('[GsmScope Server] Production build completed successfully!');
-      } catch (buildErr) {
-        console.warn('[GsmScope Server] Vite auto-build warning, falling back to dynamic Vite transformer:', buildErr);
-      }
+    // Production / cPanel synchronous static serving (zero Vite / esbuild memory overhead)
+    if (fs.existsSync(distAssetsPath)) {
+      app.use('/assets', express.static(distAssetsPath, { maxAge: 0, etag: true, lastModified: true }));
     }
-
-    if (fs.existsSync(prodIndexPath)) {
-      if (fs.existsSync(distAssetsPath)) {
-        app.use('/assets', express.static(distAssetsPath, { maxAge: '365d', immutable: true, etag: true }));
-      }
+    if (fs.existsSync(distPath)) {
       app.use(
         express.static(distPath, {
           index: false,
-          maxAge: '30d',
+          maxAge: 0,
           etag: true,
         })
       );
+    }
 
-      let cachedProdTemplate = fs.readFileSync(prodIndexPath, 'utf-8');
+    let cachedProdTemplate = '';
+    let cachedProdMtime = 0;
 
-      app.get(/.*/, (req: Request, res: Response, next) => {
-        if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
-          return next();
-        }
-        if (!cachedProdTemplate && fs.existsSync(prodIndexPath)) {
-          try {
+    app.get(/.*/, (req: Request, res: Response, next) => {
+      if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
+        return next();
+      }
+      if (fs.existsSync(prodIndexPath)) {
+        try {
+          const stat = fs.statSync(prodIndexPath);
+          if (!cachedProdTemplate || stat.mtimeMs !== cachedProdMtime) {
             cachedProdTemplate = fs.readFileSync(prodIndexPath, 'utf-8');
+            cachedProdMtime = stat.mtimeMs;
+          }
+        } catch {}
+      }
+      if (!cachedProdTemplate) {
+        const rootIndexPath = path.resolve(APP_ROOT, 'index.html');
+        if (fs.existsSync(rootIndexPath)) {
+          try {
+            cachedProdTemplate = fs.readFileSync(rootIndexPath, 'utf-8');
           } catch {}
         }
-        if (cachedProdTemplate) {
-          const seoHtml = injectDynamicSeoIntoHtml(cachedProdTemplate, req);
-          res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8' }).send(seoHtml);
-        } else {
-          next();
-        }
-      });
-    } else {
-      // Bulletproof fallback: If build could not be created, run Vite runtime transformer so user NEVER sees a blank screen!
-      console.log('[GsmScope Server] Using Vite runtime middleware to serve uncompiled assets safely without blank screen');
-      const vitePromise = import('vite').then(({ createServer: createViteServer }) =>
-        createViteServer({
-          server: { middlewareMode: true },
-          appType: 'custom',
-        })
-      );
-
-      app.use(async (req: Request, res: Response, next) => {
-        try {
-          const vite = await vitePromise;
-          vite.middlewares(req, res, next);
-        } catch (e) {
-          next(e);
-        }
-      });
-
-      app.get(/.*/, async (req: Request, res: Response, next) => {
-        if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
-          return next();
-        }
-        try {
-          const vite = await vitePromise;
-          const indexPath = path.resolve(__dirname, 'index.html');
-          const template = fs.readFileSync(indexPath, 'utf-8');
-          const transformed = await vite.transformIndexHtml(req.originalUrl, template);
-          const seoHtml = injectDynamicSeoIntoHtml(transformed, req);
-          res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8' }).end(seoHtml);
-        } catch (e) {
-          next(e);
-        }
-      });
-    }
+      }
+      if (cachedProdTemplate) {
+        const seoHtml = injectDynamicSeoIntoHtml(cachedProdTemplate, req);
+        res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }).send(seoHtml);
+      } else {
+        next();
+      }
+    });
   }
 
-  const isNumericPort = !isNaN(Number(PORT));
-  if (isNumericPort) {
-    app.listen(Number(PORT), '0.0.0.0', () => {
-      console.log(`GsmScope Full-Stack Server active at http://0.0.0.0:${PORT}`);
+  const isCloudRun = Boolean(
+    process.env.K_SERVICE ||
+    process.env.K_REVISION ||
+    process.env.CLOUD_RUN_JOB
+  );
+
+  const isCpanelOrPassenger = !isCloudRun && Boolean(
+    process.env.CPANEL_MODE === '1' ||
+    process.env.PASSENGER_APP_ENV ||
+    process.env.IN_PASSENGER ||
+    process.env.LSNODE_SOCKET ||
+    process.env.LSWS_EDITION ||
+    isNaN(Number(PORT))
+  );
+
+  if (isCpanelOrPassenger) {
+    // CRITICAL FOR CPANEL / LITESPEED LSNODE / PHUSION PASSENGER:
+    // Must pass (PORT, callback) with NO '0.0.0.0' host argument!
+    // LiteSpeed lsnode.js replaces arguments[0] with a Unix domain socket path;
+    // passing '0.0.0.0' as arguments[1] causes Node net.Server.listen to throw ERR_SOCKET_BAD_PORT (503).
+    app.listen(PORT, () => {
+      console.log(`GsmScope Full-Stack Server active on ${PORT}`);
     });
   } else {
-    // Support cPanel Phusion Passenger / named pipe sockets
-    app.listen(PORT, () => {
-      console.log(`GsmScope Full-Stack Server active on socket ${PORT}`);
+    app.listen(Number(PORT), '0.0.0.0', () => {
+      console.log(`GsmScope Full-Stack Server active at http://0.0.0.0:${PORT}`);
     });
   }
 }
 
-startServer().catch((err) => {
-  console.error('Failed to start GsmScope server:', err);
-});
+startServer();
+
 

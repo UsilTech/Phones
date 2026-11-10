@@ -35,8 +35,7 @@ export default function Header() {
     { tab: 'best-phones', label: 'Best Phones' },
     { tab: 'compare', label: 'Compare' },
     { tab: 'reviews', label: 'Reviews' },
-    { tab: 'news', label: 'News' },
-    { tab: 'guides', label: 'Guides' },
+    { tab: 'news', label: 'Articles' },
     { tab: 'brands', label: 'Brands' },
   ];
 
@@ -78,7 +77,7 @@ export default function Header() {
   const headerLogoSrc = websiteContent?.headerLogoDarkUrl || websiteContent?.headerLogoUrl || '/assets/aistudio/GsmScope_header_logo_dark.webp';
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-[#061a11]/95 backdrop-blur-md border-b border-emerald-950/80 shadow-md">
+    <header className="w-full bg-[#061a11] border-b border-[#032215] shadow-md">
       {/* Top Header Ad Placement (Dynamic & synced from Admin Dashboard) */}
       <AdPlacementSlot placementId="header_top" />
 

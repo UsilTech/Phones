@@ -1,4 +1,4 @@
-import { Phone, Brand, Article, Review, AdSettings, AdPlacementId, AdPlacementConfig, WebsiteContent, MediaItem } from '../types';
+import type { Phone, Brand, Article, Review, AdSettings, AdPlacementId, AdPlacementConfig, WebsiteContent, MediaItem } from '../types/index.ts';
 
 export const INITIAL_BRANDS: Brand[] = [
   {
@@ -299,7 +299,7 @@ export const INITIAL_PHONES: Phone[] = [
     rating: 4.0,
     reviewsCount: 1,
     viewsCount: 0,
-    categories: ['best-budget', 'under-200k', 'under-100k'],
+    categories: ['best-battery'],
     isFeatured: true,
     isPopular: true,
     keyHighlights: {
@@ -590,7 +590,7 @@ export const INITIAL_PHONES: Phone[] = [
     rating: 4.0,
     reviewsCount: 1,
     viewsCount: 0,
-    categories: ['best-budget', 'under-200k'],
+    categories: ['best-battery'],
     isFeatured: false,
     isPopular: true,
     keyHighlights: {
@@ -687,7 +687,7 @@ export const INITIAL_PHONES: Phone[] = [
     rating: 0,
     reviewsCount: 0,
     viewsCount: 0,
-    categories: ['best-camera', 'best-5g', 'best-budget'],
+    categories: ['best-camera', 'best-5g'],
     isFeatured: false,
     isPopular: true,
     keyHighlights: {
@@ -1075,7 +1075,7 @@ export const INITIAL_PHONES: Phone[] = [
     rating: 0,
     reviewsCount: 0,
     viewsCount: 0,
-    categories: ['best-battery', 'best-budget', 'under-200k'],
+    categories: ['best-battery'],
     isFeatured: false,
     isPopular: false,
     keyHighlights: {
@@ -1160,7 +1160,7 @@ export const INITIAL_ARTICLES: Article[] = [
     id: 'art-iphone-16-buyers-guide',
     title: 'iPhone 16 series: what global buyers should know',
     slug: 'iphone-16-series-what-buyers-should-know',
-    category: 'Phone News',
+    category: 'News',
     coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     summary: 'Global pricing, camera enhancements, and the architectural upgrades that matter most when upgrading from previous generations.',
     content: `Apple has refreshed the iPhone line up, and the headline changes are immediately noticeable: slimmer uniform bezels, Grade 5 titanium builds, the dedicated Camera Control button on all models, and second-generation 3nm Apple Intelligence silicon. But when deciding whether to upgrade, the core question is simple: which changes actually matter in daily life, and which model gives the best return on your investment?
@@ -1227,7 +1227,7 @@ If your priority is 100W wired charging speed and convenient wireless magnetic a
     id: 'art-budget-under-200k',
     title: 'Best budget smartphones under $150 (₦200,000): complete comparison',
     slug: 'best-budget-phones-under-150-dollars-complete-guide',
-    category: 'Buying Guides',
+    category: 'Buying Guide',
     coverImage: '/src/assets/images/news_nigeria_tech_1792578846595.jpg',
     summary: 'Five smartphones that stretch entry-level budgets the furthest, covering battery life, screen quality, and camera essentials.',
     content: `A modest budget doesn't mean compromising on core smartphone essentials. In today's competitive landscape, the sub-$150 price category offers vibrant high refresh-rate displays, multi-day battery capacities, and capable daily performance.
@@ -1259,7 +1259,7 @@ The sub-$70 value benchmark. Includes an 90Hz punch-hole display, stereo speaker
     id: 'art-5g-worth-it-2026',
     title: 'Is 5G worth it in 2026? Global carrier speeds & device compatibility',
     slug: 'is-5g-worth-it-in-2026-carrier-speeds-and-compatibility',
-    category: 'Tech Updates',
+    category: 'News',
     coverImage: '/src/assets/images/news_mobile_processor_1792578846003.jpg',
     summary: 'Global 5G network expansion: when high-speed Sub-6 and mmWave bands make a difference for your workflow.',
     content: `5G deployment continues to accelerate globally, with Sub-6 GHz and mmWave infrastructure covering metropolitan centers and expanding rapidly across suburban corridors.
@@ -1368,7 +1368,7 @@ For anyone wanting near-flagship performance, class-leading battery endurance, a
     id: 'art-samsung-oneui7',
     title: 'Samsung One UI 7 global rollout: new fluid animations and Galaxy AI updates',
     slug: 'samsung-one-ui-7-global-rollout-galaxy-ai-updates',
-    category: 'Tech Updates',
+    category: 'News',
     coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     summary: 'Samsung begins phased rollout of Android 15-based One UI 7 featuring redesigned notification center and expanded Galaxy AI tools.',
     content: `Samsung has kicked off the wider international release of One UI 7. Built atop Android 15, the new update delivers the most substantial visual overhaul to Galaxy devices in several generations.
@@ -1388,7 +1388,7 @@ Key improvements include decoupled Quick Settings and notifications, smoother sp
     id: 'art-samsung-s25-benchmarks',
     title: 'Samsung Galaxy S25 Ultra benchmarks surface with Snapdragon 8 Elite',
     slug: 'samsung-galaxy-s25-ultra-benchmarks-snapdragon-8-elite',
-    category: 'Phone News',
+    category: 'News',
     coverImage: '/src/assets/images/news_mobile_processor_1792578846003.jpg',
     summary: 'Leaked Geekbench 6 scores indicate massive multi-core gains and improved thermal dissipation for next-generation Galaxy flagship.',
     content: `Preliminary Geekbench runs for Samsung's upcoming flagship indicate single-core performance exceeding 3,100 points and multi-core results topping 10,000 points, powered by Qualcomm's custom Oryon CPU cores.`,
@@ -1406,7 +1406,7 @@ Key improvements include decoupled Quick Settings and notifications, smoother sp
     id: 'art-apple-intelligence-features',
     title: 'Apple Intelligence features expanded in new iOS release for iPhone 16',
     slug: 'apple-intelligence-expanded-features-iphone-16',
-    category: 'Tech Updates',
+    category: 'News',
     coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     summary: 'Visual Intelligence with Camera Control, priority notifications, and Clean Up photo editing arrive for global iPhone users.',
     content: `Apple continues rolling out core Apple Intelligence tools across European, African, and Asian markets. The integration with the tactile Camera Control button allows immediate object identification and instant summary generation.`,
@@ -1442,7 +1442,7 @@ Key improvements include decoupled Quick Settings and notifications, smoother sp
     id: 'art-tecno-camon-30-imaging',
     title: 'Tecno Camon 30 Premier camera deep dive: Sony PolarNick quad imaging tested',
     slug: 'tecno-camon-30-premier-camera-deep-dive-sony-imaging',
-    category: 'Phone News',
+    category: 'News',
     coverImage: '/src/assets/images/news_camera_sensor_1792578845370.jpg',
     summary: 'Dual imaging chips and periscope telephoto zoom bring flagship photo credentials to Tecno’s high-value mid-ranger.',
     content: `Tecno has positioned the Camon 30 Premier as an imaging powerhouse, featuring a custom Sony imaging co-processor that handles 4K Ultra Night video and real-time portrait tone mapping with exceptional color fidelity.`,
@@ -1514,7 +1514,7 @@ Key improvements include decoupled Quick Settings and notifications, smoother sp
     id: 'art-xiaomi-14-ultra-lens',
     title: 'Xiaomi 14 Ultra Leica Summilux lens shootout: variable aperture in action',
     slug: 'xiaomi-14-ultra-leica-summilux-variable-aperture-shootout',
-    category: 'Phone News',
+    category: 'News',
     coverImage: '/src/assets/images/news_camera_sensor_1792578845370.jpg',
     summary: 'Testing the 1-inch Sony LYT-900 sensor and stepless f/1.63-f/4.0 aperture in low light and portrait situations.',
     content: `Xiaomi continues its partnership with Leica, delivering a quad-50MP camera setup on the 14 Ultra that offers physical diaphragm control, creamy natural bokeh, and outstanding dynamic range.`,
@@ -1550,7 +1550,7 @@ Key improvements include decoupled Quick Settings and notifications, smoother sp
     id: 'art-google-pixel-9-ai-update',
     title: 'Google Pixel 9 receives new Gemini Live camera integration and call notes',
     slug: 'google-pixel-9-gemini-live-camera-call-notes',
-    category: 'Phone News',
+    category: 'News',
     coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     summary: 'Google rolls out real-time multimodal assistant capabilities directly to Pixel 9 and Pixel 9 Pro camera viewfinders.',
     content: `Google has begun distributing the latest feature drop to Pixel 9 devices, introducing live camera scene interpretation and on-device transcription summaries for phone calls.`,
@@ -1568,7 +1568,7 @@ Key improvements include decoupled Quick Settings and notifications, smoother sp
     id: 'art-oneplus-13-announcement',
     title: 'OnePlus 13 confirmed with BOE X2 Oriental screen and 6,000mAh Glacier battery',
     slug: 'oneplus-13-confirmed-boe-x2-oriental-screen-glacier-battery',
-    category: 'Phone News',
+    category: 'News',
     coverImage: '/src/assets/images/news_mobile_processor_1792578846003.jpg',
     summary: 'OnePlus details its flagship upgrade featuring silicon-carbon battery density, IP69 dust and water resistance, and Snapdragon 8 Elite.',
     content: `OnePlus has unveiled the technical specifications for its next generation flagship, highlighting high-density silicon battery chemistry and an ultra-bright BOE display panel.`,
@@ -1641,7 +1641,7 @@ For budget-conscious shoppers looking for balanced everyday usability, the Xiaom
     id: 'guide-2',
     title: 'How to Enable ADB on Samsung Using Quick Share (FRP Bypass & Servicing)',
     slug: 'how-to-enable-adb-on-samsung-using-quick-share',
-    category: 'FRP & Servicing Tools',
+    category: 'Buying Guide',
     coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     summary: 'A step-by-step technical guide to enabling Android Debug Bridge (ADB) on modern Samsung One UI devices using TalkBack, Quick Share, and official diagnostic tools.',
     content: `Android Debug Bridge (ADB) is the primary diagnostic protocol used by phone technicians worldwide to troubleshoot system issues, remove forgotten lock credentials with proof of ownership, and flash carrier binaries.\n\nThis tutorial outlines the modern Quick Share protocol pathway on One UI 6 and One UI 7, explaining how accessibility shortcuts can be utilized legitimately by repair shops to establish a trusted handshake with a technician PC.\n\nAlways ensure device ownership is validated before performing any bypass or servicing operations.`,
@@ -1651,7 +1651,7 @@ For budget-conscious shoppers looking for balanced everyday usability, the Xiaom
     },
     date: '4 Sept 2026',
     readTime: '8 min read',
-    tags: ['Samsung', 'FRP & Servicing Tools', 'ADB'],
+    tags: ['Samsung', 'Buying Guide', 'ADB'],
     featured: false,
     relatedPhoneIds: ['samsung-galaxy-s24-ultra']
   },
@@ -1659,7 +1659,7 @@ For budget-conscious shoppers looking for balanced everyday usability, the Xiaom
     id: 'guide-3',
     title: 'BFT Tool: Free Android Tool for FRP Bypass & Factory Reset',
     slug: 'bft-tool-free-android-tool-frp-bypass-factory-reset',
-    category: 'FRP & Servicing Tools',
+    category: 'Buying Guide',
     coverImage: '/src/assets/images/news_mobile_processor_1792578846003.jpg',
     summary: 'A comprehensive guide to BFT Tool, a Windows-based Android servicing utility supporting FRP removal, factory reset, and account servicing for Samsung, Xiaomi, and other Android devices.',
     content: `BFT Tool has become one of the most widely used diagnostic toolkits in repair centers worldwide. It supports direct MTP mode operations, ADB shell commands, and emergency EDL flashing on Qualcomm chipsets.\n\nKey features include one-click FRP reset on Samsung Exynos and Snapdragon hardware, Xiaomi Mi Account temporary bypass, and Fastboot to EDL reboot commands.\n\nWe cover driver installation (SAMSUNG USB Mobile Drivers, MTK VCOM, and Qualcomm 9008 drivers) to ensure clean communication without boot loops.`,
@@ -1669,7 +1669,7 @@ For budget-conscious shoppers looking for balanced everyday usability, the Xiaom
     },
     date: '2 Sept 2026',
     readTime: '7 min read',
-    tags: ['Universal Android', 'FRP & Servicing Tools', 'BFT Tool'],
+    tags: ['Universal Android', 'Buying Guide', 'BFT Tool'],
     featured: false,
     relatedPhoneIds: []
   },
@@ -1677,7 +1677,7 @@ For budget-conscious shoppers looking for balanced everyday usability, the Xiaom
     id: 'guide-4',
     title: 'SamFw Tool: Free Android Tool for FRP Bypass & Mi Account',
     slug: 'samfw-tool-free-android-tool-frp-bypass-mi-account',
-    category: 'FRP & Servicing Tools',
+    category: 'Buying Guide',
     coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     summary: 'A comprehensive walkthrough of SamFw FRP Tool, a trusted servicing utility supporting Samsung test mode (*#0*#), Knox diagnostics, and Xiaomi sideload operations.',
     content: `SamFw Tool remains the benchmark free servicing software for smartphone technicians worldwide. Its ability to send test mode exploits (*#0*# or *#*#88#*#*) allows ADB authorization in seconds on supported security patch levels.\n\nThe guide details how to execute CSC change commands without wiping data, enabling native call recording and regional carrier network optimizations on imported US, European, and Asian Galaxy variants.`,
@@ -1687,7 +1687,7 @@ For budget-conscious shoppers looking for balanced everyday usability, the Xiaom
     },
     date: '1 Sept 2026',
     readTime: '9 min read',
-    tags: ['Samsung & Xiaomi', 'FRP & Servicing Tools', 'SamFw'],
+    tags: ['Samsung & Xiaomi', 'Buying Guide', 'SamFw'],
     featured: false,
     relatedPhoneIds: ['samsung-galaxy-s24-ultra']
   },
@@ -1695,7 +1695,7 @@ For budget-conscious shoppers looking for balanced everyday usability, the Xiaom
     id: 'guide-5',
     title: 'Fast charging explained: what 45W, 90W and 120W really mean',
     slug: 'fast-charging-explained-45w-90w-120w',
-    category: 'Charging & Battery',
+    category: 'Buying Guide',
     coverImage: '/src/assets/images/news_nigeria_tech_1792578846595.jpg',
     summary: 'Bigger numbers charge faster, but only with the right charger, cable and temperature control. Here is how thermal conditions affect fast charging longevity.',
     content: `Proprietary fast charging protocols like Infinix All-Round FastCharge (70W–100W), Tecno Ultra Charge (70W), and Xiaomi HyperCharge (120W) require specialized charge pumps and dual-cell battery designs.\n\nWhen ambient temperatures exceed 32°C, charging silicon automatically throttles wattage to protect battery health. Charging in a ventilated room or utilizing Bypass Charging during gaming preserves your battery cell capacity over 3+ years.`,
@@ -1705,7 +1705,7 @@ For budget-conscious shoppers looking for balanced everyday usability, the Xiaom
     },
     date: '29 Aug 2026',
     readTime: '5 min read',
-    tags: ['Battery & Power', 'Charging & Battery', 'Fast Charging'],
+    tags: ['Battery & Power', 'Buying Guide', 'Fast Charging'],
     featured: false,
     relatedPhoneIds: ['infinix-note-40-pro-plus', 'oneplus-12r']
   },
@@ -1713,7 +1713,7 @@ For budget-conscious shoppers looking for balanced everyday usability, the Xiaom
     id: 'guide-6',
     title: 'Free Samsung, Redmi, Tecno & Infinix FRP Bypass Servicing Tools',
     slug: 'free-samsung-redmi-tecno-infinix-frp-bypass-servicing-tools',
-    category: 'FRP & Servicing Tools',
+    category: 'Buying Guide',
     coverImage: '/src/assets/images/news_camera_sensor_1792578845370.jpg',
     summary: 'A curated list of verified free Android servicing tools including SAMFW Tool, BFT Tool, and MTK Client for diagnosing and restoring locked Android hardware.',
     content: `Mobile repair technicians worldwide rely on a stable suite of open-source and freeware tools. This guide compares MTK Client for MediaTek chipsets, Qualcomm QFIL for raw XML flashing, and dedicated Samsung MTP unlockers.\n\nWe also provide safety precautions against rogue trojans commonly bundled in unverified flash tool downloads.`,
@@ -1723,7 +1723,7 @@ For budget-conscious shoppers looking for balanced everyday usability, the Xiaom
     },
     date: '23 Aug 2026',
     readTime: '10 min read',
-    tags: ['Multi-Brand', 'FRP & Servicing Tools', 'MTK Client'],
+    tags: ['Multi-Brand', 'Buying Guide', 'MTK Client'],
     featured: false,
     relatedPhoneIds: []
   },
@@ -1731,7 +1731,7 @@ For budget-conscious shoppers looking for balanced everyday usability, the Xiaom
     id: 'guide-7',
     title: 'How to Enable ADB on Samsung KG Locked Phones',
     slug: 'how-to-enable-adb-on-samsung-kg-locked-phones',
-    category: 'FRP & Servicing Tools',
+    category: 'Buying Guide',
     coverImage: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     summary: 'A practical tutorial on how technicians analyze Knox Guard (KG) locked devices, verify carrier leasing status, and enable ADB for troubleshooting.',
     content: `Knox Guard (KG) status (Active, Completed, Checking) controls whether device bootloaders and debugging interfaces can be enabled. We explain how to identify genuine carrier contract status versus gray-market locked units before purchasing second-hand.`,
@@ -1741,7 +1741,7 @@ For budget-conscious shoppers looking for balanced everyday usability, the Xiaom
     },
     date: '22 Aug 2026',
     readTime: '8 min read',
-    tags: ['Samsung Knox Guard', 'FRP & Servicing Tools', 'Knox Guard'],
+    tags: ['Samsung Knox Guard', 'Buying Guide', 'Knox Guard'],
     featured: false,
     relatedPhoneIds: ['samsung-galaxy-s24-ultra']
   }
@@ -1910,9 +1910,9 @@ export const DEFAULT_AD_PLACEMENTS: Record<AdPlacementId, AdPlacementConfig> = {
   },
   home_above_trending: {
     id: 'home_above_trending',
-    name: 'Above Trending Phones Section',
+    name: 'Above Latest Phones Section',
     pageLabel: 'Homepage',
-    positionLabel: 'Homepage — Above Trending phones section',
+    positionLabel: 'Homepage — Above Latest phones section',
     enabled: false,
     adType: 'banner',
     badgeText: 'Sponsored',
@@ -2076,8 +2076,6 @@ export const INITIAL_WEBSITE_CONTENT: WebsiteContent = {
   defaultSeoDescription: 'Compare smartphones, explore full hardware specifications, camera sensors, battery benchmarks, and live prices in USD and NGN on GsmScope.',
   facebookUrl: 'https://www.facebook.com/share/1HKzhSt52c/',
   youtubeUrl: 'https://www.youtube.com/@gsm_scope',
-  twitterUrl: 'https://x.com/GsmScope',
-  instagramUrl: 'https://instagram.com/gsmscope',
   whatsappNumber: '+2349127408003'
 };
 
@@ -2099,73 +2097,35 @@ export const INITIAL_MEDIA_ITEMS: MediaItem[] = [
     alt: 'GsmScope Header Logo Light'
   },
   {
-    id: 'media-s25-ultra',
-    name: 'Samsung Galaxy S25 Ultra Render',
-    url: '/assets/aistudio/IMG_20261024_202541_f0e9668e.jpg',
+    id: 'media-flagship-phones',
+    name: 'Flagship Smartphones Studio Render',
+    url: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     uploadedAt: 'System Asset',
     category: 'phone',
-    assignedPhoneId: 'samsung-galaxy-s25-ultra',
-    alt: 'Samsung Galaxy S25 Ultra'
+    alt: 'Flagship Smartphones Studio Render'
   },
   {
-    id: 'media-iphone-16-pro',
-    name: 'Apple iPhone 16 Pro Max Desert Titanium',
-    url: '/assets/aistudio/IMG_20261024_204309_3bae298d.jpg',
-    uploadedAt: 'System Asset',
-    category: 'phone',
-    assignedPhoneId: 'apple-iphone-16-pro-max',
-    alt: 'Apple iPhone 16 Pro Max'
-  },
-  {
-    id: 'media-camon-30-premier',
-    name: 'Tecno Camon 30 Premier 5G',
-    url: '/assets/aistudio/IMG_20261020_020818_d22cfdee.jpg',
-    uploadedAt: 'System Asset',
-    category: 'phone',
-    assignedPhoneId: 'tecno-camon-30-premier',
-    alt: 'Tecno Camon 30 Premier 5G'
-  },
-  {
-    id: 'media-note-40-pro',
-    name: 'Infinix Note 40 Pro+ 5G Racing Edition',
-    url: '/assets/aistudio/IMG_20261013_014019_495f5519.jpg',
-    uploadedAt: 'System Asset',
-    category: 'phone',
-    assignedPhoneId: 'infinix-note-40-pro-plus',
-    alt: 'Infinix Note 40 Pro+ 5G'
-  },
-  {
-    id: 'media-oneplus-12r',
-    name: 'OnePlus 12R Cool Blue Edition',
-    url: '/assets/aistudio/IMG_20261025_090919_cbd32f7d.jpg',
-    uploadedAt: 'System Asset',
-    category: 'phone',
-    assignedPhoneId: 'oneplus-12r',
-    alt: 'OnePlus 12R'
-  },
-  {
-    id: 'media-xiaomi-14-ultra',
-    name: 'Xiaomi 14 Ultra Leica Optics',
-    url: '/assets/aistudio/IMG_20261025_090938_c0fa17e3.jpg',
-    uploadedAt: 'System Asset',
-    category: 'phone',
-    assignedPhoneId: 'xiaomi-14-ultra',
-    alt: 'Xiaomi 14 Ultra'
-  },
-  {
-    id: 'media-tech-guide-cover',
-    name: 'Smartphone Buying Guide 2026 Cover',
-    url: '/assets/aistudio/IMG_20261025_134803_2ac984b0.jpg',
-    uploadedAt: 'System Asset',
-    category: 'guide',
-    alt: 'Smartphone Buying Guide 2026'
-  },
-  {
-    id: 'media-news-cover',
-    name: 'Global Smartphone Market Trends',
-    url: '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg',
+    id: 'media-camera-sensor',
+    name: 'Periscope Camera Sensor Optics',
+    url: '/src/assets/images/news_camera_sensor_1792578845370.jpg',
     uploadedAt: 'System Asset',
     category: 'article',
-    alt: 'Global Smartphone Market Trends'
+    alt: 'Periscope Camera Sensor Optics'
+  },
+  {
+    id: 'media-mobile-processor',
+    name: 'Mobile Silicon SoC Architecture',
+    url: '/src/assets/images/news_mobile_processor_1792578846003.jpg',
+    uploadedAt: 'System Asset',
+    category: 'article',
+    alt: 'Mobile Silicon SoC Architecture'
+  },
+  {
+    id: 'media-nigeria-tech',
+    name: 'Nigeria Smartphone Retail & Market Index',
+    url: '/src/assets/images/news_nigeria_tech_1792578846595.jpg',
+    uploadedAt: 'System Asset',
+    category: 'guide',
+    alt: 'Nigeria Smartphone Retail & Market Index'
   }
 ];

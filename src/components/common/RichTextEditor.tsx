@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import {
   Bold,
   Italic,
@@ -12,11 +12,8 @@ import {
   Quote,
   Link2,
   Minus,
-  Eye,
-  Edit3,
   Pilcrow,
 } from 'lucide-react';
-import FormattedContent from './FormattedContent';
 
 interface RichTextEditorProps {
   value: string;
@@ -27,6 +24,7 @@ interface RichTextEditorProps {
   label?: string;
   helperText?: string;
   compactToolbar?: boolean;
+  headingsAndBodyOnly?: boolean;
   className?: string;
 }
 
@@ -39,10 +37,10 @@ export default function RichTextEditor({
   label,
   helperText,
   compactToolbar = false,
+  headingsAndBodyOnly = false,
   className = '',
 }: RichTextEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [previewMode, setPreviewMode] = useState(false);
 
   const focusAndRestoreSelection = (start: number, end: number) => {
     requestAnimationFrame(() => {
@@ -323,7 +321,49 @@ export default function RichTextEditor({
       <div className="rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 overflow-hidden focus-within:border-emerald-500 transition-colors">
         {/* Rich Formatting Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-1 px-2 py-1.5 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex flex-wrap items-center gap-1">
+          {headingsAndBodyOnly ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <div className="inline-flex items-center bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => applyHeading(1)}
+                  title="Heading 1 (H1)"
+                  className="px-2.5 py-1 rounded text-xs font-black text-slate-800 dark:text-slate-100 hover:bg-emerald-600 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Heading1 className="w-3.5 h-3.5" />
+                  <span>H1</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyHeading(2)}
+                  title="Heading 2 (H2)"
+                  className="px-2.5 py-1 rounded text-xs font-black text-slate-800 dark:text-slate-100 hover:bg-emerald-600 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Heading2 className="w-3.5 h-3.5" />
+                  <span>H2</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyHeading(3)}
+                  title="Heading 3 (H3)"
+                  className="px-2.5 py-1 rounded text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-emerald-600 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Heading3 className="w-3.5 h-3.5" />
+                  <span>H3</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => wrapSelection('**', '**', 'bold text')}
+                  title="Make Selected Text Bold (Ctrl+B)"
+                  className="px-2.5 py-1 rounded text-xs font-black text-slate-800 dark:text-slate-100 hover:bg-emerald-600 hover:text-white flex items-center gap-1 cursor-pointer transition-colors border-l border-slate-200 dark:border-slate-800"
+                >
+                  <Bold className="w-3.5 h-3.5" />
+                  <span>Bold</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-1">
             {/* Heading Controls: H1, H2, H3, H4, Normal Paragraph */}
             <div className="inline-flex items-center bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 p-0.5">
               <button
@@ -461,52 +501,20 @@ export default function RichTextEditor({
               )}
             </div>
           </div>
-
-          {/* Write / Preview Toggle */}
-          <button
-            type="button"
-            onClick={() => setPreviewMode(!previewMode)}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors ${
-              previewMode
-                ? 'bg-emerald-600 text-white'
-                : 'bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:border-emerald-500'
-            }`}
-          >
-            {previewMode ? (
-              <>
-                <Edit3 className="w-3 h-3" />
-                <span>Edit</span>
-              </>
-            ) : (
-              <>
-                <Eye className="w-3 h-3" />
-                <span>Preview</span>
-              </>
-            )}
-          </button>
+          )}
         </div>
 
-        {/* Textarea or Live Formatted Preview */}
-        {previewMode ? (
-          <div className="p-3.5 min-h-[120px] bg-white dark:bg-slate-900 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
-            {value && value.trim() ? (
-              <FormattedContent content={value} />
-            ) : (
-              <span className="text-slate-400 italic">Nothing to preview yet. Switch to Edit to start writing.</span>
-            )}
-          </div>
-        ) : (
-          <textarea
-            ref={textareaRef}
-            rows={rows}
-            required={required}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            className="w-full px-3 py-2.5 bg-transparent text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none leading-relaxed"
-          />
-        )}
+        {/* Textarea */}
+        <textarea
+          ref={textareaRef}
+          rows={rows}
+          required={required}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className="w-full px-3 py-2.5 bg-transparent text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none leading-relaxed"
+        />
       </div>
     </div>
   );

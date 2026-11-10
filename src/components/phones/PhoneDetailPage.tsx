@@ -173,7 +173,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
   );
   const realRating = phoneReviews.length > 0
     ? (phoneReviews.reduce((sum, r) => sum + r.rating, 0) / phoneReviews.length).toFixed(1)
-    : '0.0';
+    : (phone.rating > 0 ? phone.rating.toFixed(1) : '0.0');
 
   const handleSwitchPhone = (newPhone: Phone) => {
     triggerNavigation(() => {
@@ -226,29 +226,36 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
   const phoneReviewArticle = articles.find((a) => {
     const isReview =
       a.category.toLowerCase().includes('review') ||
-      a.title.toLowerCase().includes('review');
+      /\breview\b/i.test(a.title);
     if (!isReview) return false;
 
-    const titleLower = a.title.toLowerCase();
-    const slugLower = (a.slug || '').toLowerCase();
+    const titleLower = a.title.toLowerCase().trim();
     const phoneNameLower = phone.name.toLowerCase().trim();
     const brandLower = phone.brand.toLowerCase().trim();
+    const fullBrandAndModel = phoneNameLower.startsWith(brandLower + ' ')
+      ? phoneNameLower
+      : `${brandLower} ${phoneNameLower}`.trim();
     const modelWithoutBrand = phoneNameLower.startsWith(brandLower + ' ')
       ? phoneNameLower.slice(brandLower.length + 1).trim()
       : phoneNameLower;
-    const phoneSlug = ((phone as any).slug || phone.id).toLowerCase();
 
-    const titleMatchesModel =
-      titleLower.includes(phoneNameLower) ||
-      (modelWithoutBrand.length >= 4 && titleLower.includes(modelWithoutBrand));
-    const slugMatchesModel = slugLower.includes(phoneSlug);
+    // Extract the device subject before "review" or subtitle punctuation
+    const subjectBeforeReview = titleLower
+      .split(/[:\-–—]|\bin-depth review\b|\bhands-on review\b|\breview\b/i)[0]
+      .trim();
+
+    const exactTitleSubjectMatch =
+      Boolean(subjectBeforeReview) &&
+      (subjectBeforeReview === phoneNameLower ||
+        subjectBeforeReview === fullBrandAndModel ||
+        (modelWithoutBrand.length >= 5 && subjectBeforeReview === modelWithoutBrand));
 
     const explicitlyLinkedToModel =
       Array.isArray(a.relatedPhoneIds) &&
       a.relatedPhoneIds.includes(phone.id) &&
-      (titleMatchesModel || slugMatchesModel || a.relatedPhoneIds.length === 1);
+      (exactTitleSubjectMatch || a.relatedPhoneIds.length === 1);
 
-    return titleMatchesModel || slugMatchesModel || explicitlyLinkedToModel;
+    return explicitlyLinkedToModel || exactTitleSubjectMatch;
   });
 
   const handleOpenPhoneReview = () => {
