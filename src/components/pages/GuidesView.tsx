@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useApp, SEED_ARTICLE_IDS, getRecordTimestamp } from '../../context/AppContext';
 import { useSeoMeta } from '../seo/SeoMeta';
 import SocialShareBar from '../common/SocialShareBar';
 import ScrollProgressBar from '../common/ScrollProgressBar';
@@ -264,8 +264,8 @@ export default function GuidesView() {
     }
   ];
 
-  // Include any articles published from Admin Dashboard under guide categories
-  const adminPublishedGuides: GuideItem[] = articles
+  // Include any articles published from Admin Dashboard under guide categories (sorted newest-first)
+  const adminPublishedGuides: GuideItem[] = [...articles
     .filter((a) => {
       const cat = (a.category || '').trim();
       return (
@@ -275,6 +275,18 @@ export default function GuidesView() {
         cat === 'Charging & Battery' ||
         cat === 'Tips & Security'
       );
+    })]
+    .sort((a, b) => {
+      const isCustomA = !SEED_ARTICLE_IDS.has(a.id);
+      const isCustomB = !SEED_ARTICLE_IDS.has(b.id);
+      if (isCustomA && !isCustomB) return -1;
+      if (!isCustomA && isCustomB) return 1;
+      if (isCustomA && isCustomB) {
+        const tsB = getRecordTimestamp(b);
+        const tsA = getRecordTimestamp(a);
+        if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+      }
+      return 0;
     })
     .map((a) => {
       const mappedCat: GuideItem['category'] = 'Buying Guide';

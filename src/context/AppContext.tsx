@@ -55,8 +55,19 @@ import {
   fetchMediaItemsApi,
   uploadMediaImageApi,
   addMediaItemApi,
-  deleteMediaItemApi
+  deleteMediaItemApi,
+  syncContactInquiriesWithServer,
+  syncVaultWithServerApi
 } from '../services/api';
+import {
+  safeSetLocalStorage,
+  saveVaultKeyToIndexedDB,
+  loadVaultFromIndexedDB,
+  clearIndexedDBVault,
+  registerUploadDataUrl,
+  getAllCachedUploadDataUrls,
+  optimizeImageDataUrl
+} from '../services/persistentVault';
 
 interface AppContextType {
   phones: Phone[];
@@ -187,7 +198,37 @@ const defaultFilterState: FilterState = {
   categoryPreset: undefined
 };
 
+export const SEED_PHONE_IDS = new Set<string>(
+  INITIAL_PHONES.map((p) => p.id)
+);
+
+export const SEED_ARTICLE_IDS = new Set<string>(
+  INITIAL_ARTICLES.map((a) => a.id)
+);
+
+export const SEED_REVIEW_IDS = new Set<string>(
+  INITIAL_REVIEWS.map((r) => r.id)
+);
+
 function normalizePhoneRecord(raw: any): Phone {
+  const id = raw?.id || `phone-${Date.now()}`;
+  const isSeedPhone = SEED_PHONE_IDS.has(id);
+
+  // Detect if a custom phone still carries the untouched legacy template placeholders ('SM-NEW2025')
+  const hasLegacyTemplatePlaceholder =
+    !isSeedPhone &&
+    String(raw?.modelNumber || '').trim() === 'SM-NEW2025' &&
+    String(raw?.detailedSpecs?.platform?.antutuScore || '').trim() === '1,680,000 (AnTuTu v10)';
+
+  const cleanTemplateStr = (val: any, legacyDefault: string, seedFallback: string): string => {
+    const str = typeof val === 'string' ? val.trim() : '';
+    if (hasLegacyTemplatePlaceholder && str === legacyDefault) {
+      return '';
+    }
+    if (str) return str;
+    return isSeedPhone ? seedFallback : '';
+  };
+
   const priceNGN = Number(raw?.priceNGN) || 350000;
   const priceUSD = Number(raw?.priceUSD) || Math.round(priceNGN / 1500);
   const priceRange =
@@ -204,17 +245,44 @@ function normalizePhoneRecord(raw: any): Phone {
       ? '600k-1.2m'
       : 'flagship');
 
-  const ramHighlight = raw?.keyHighlights?.ram || '8GB';
-  const storageHighlight = raw?.keyHighlights?.storage || '256GB';
-  const ramVariants = Array.isArray(raw?.detailedSpecs?.memory?.ramVariants) && raw.detailedSpecs.memory.ramVariants.length > 0
-    ? raw.detailedSpecs.memory.ramVariants
-    : String(ramHighlight).split(/[\/,]/).map((s: string) => s.trim()).filter(Boolean);
-  const storageVariants = Array.isArray(raw?.detailedSpecs?.memory?.storageVariants) && raw.detailedSpecs.memory.storageVariants.length > 0
-    ? raw.detailedSpecs.memory.storageVariants
-    : String(storageHighlight).split(/[\/,]/).map((s: string) => s.trim()).filter(Boolean);
+  const ramHighlight = cleanTemplateStr(
+    raw?.keyHighlights?.ram,
+    '8GB / 12GB',
+    '8GB'
+  );
+  const storageHighlight = cleanTemplateStr(
+    raw?.keyHighlights?.storage,
+    '256GB / 512GB',
+    '256GB'
+  );
+  const rawRamVariants = Array.isArray(raw?.detailedSpecs?.memory?.ramVariants)
+    ? raw.detailedSpecs.memory.ramVariants.filter(Boolean)
+    : [];
+  const ramVariants = hasLegacyTemplatePlaceholder && rawRamVariants.join(',') === '8GB,12GB'
+    ? []
+    : rawRamVariants.length > 0
+    ? rawRamVariants
+    : ramHighlight
+    ? String(ramHighlight).split(/[\/,]/).map((s: string) => s.trim()).filter(Boolean)
+    : isSeedPhone
+    ? ['8GB']
+    : [];
+
+  const rawStorageVariants = Array.isArray(raw?.detailedSpecs?.memory?.storageVariants)
+    ? raw.detailedSpecs.memory.storageVariants.filter(Boolean)
+    : [];
+  const storageVariants = hasLegacyTemplatePlaceholder && rawStorageVariants.join(',') === '256GB,512GB'
+    ? []
+    : rawStorageVariants.length > 0
+    ? rawStorageVariants
+    : storageHighlight
+    ? String(storageHighlight).split(/[\/,]/).map((s: string) => s.trim()).filter(Boolean)
+    : isSeedPhone
+    ? ['256GB']
+    : [];
 
   return {
-    id: raw?.id || `phone-${Date.now()}`,
+    id,
     name: raw?.name || 'Smartphone',
     brand: raw?.brand || 'Samsung',
     priceNGN,
@@ -225,7 +293,7 @@ function normalizePhoneRecord(raw: any): Phone {
     nairaPriceNotes: raw?.nairaPriceNotes || raw?.summary || 'Available at authorized retail stores.',
     releaseYear: Number(raw?.releaseYear) || new Date().getFullYear(),
     releaseDate: raw?.releaseDate || raw?.Release || `${raw?.releaseYear || new Date().getFullYear()}`,
-    modelNumber: raw?.modelNumber || '',
+    modelNumber: hasLegacyTemplatePlaceholder ? '' : (raw?.modelNumber || ''),
     image:
       (typeof raw?.image === 'string' && raw.image.trim()) ||
       (Array.isArray(raw?.images) && typeof raw.images[0] === 'string' && raw.images[0].trim()) ||
@@ -265,89 +333,257 @@ function normalizePhoneRecord(raw: any): Phone {
     seoKeywords: raw?.seoKeywords || undefined,
     seoDescription: raw?.seoDescription || undefined,
     keyHighlights: {
-      display: raw?.keyHighlights?.display || raw?.detailedSpecs?.display?.type || '6.7" AMOLED 120Hz',
-      processor: raw?.keyHighlights?.processor || raw?.detailedSpecs?.platform?.chipset || 'Octa-Core 5G Processor',
+      display: cleanTemplateStr(
+        raw?.keyHighlights?.display || raw?.detailedSpecs?.display?.type,
+        '6.7" AMOLED 120Hz',
+        '6.7" AMOLED 120Hz'
+      ),
+      processor: cleanTemplateStr(
+        raw?.keyHighlights?.processor || raw?.detailedSpecs?.platform?.chipset,
+        'Snapdragon 8 Gen 3 (4 nm)',
+        'Octa-Core 5G Processor'
+      ),
       ram: ramHighlight,
       storage: storageHighlight,
-      camera: raw?.keyHighlights?.camera || raw?.keyHighlights?.mainCamera || raw?.detailedSpecs?.mainCamera?.setup || raw?.detailedSpecs?.mainCamera?.modules || '50MP OIS Main Camera',
-      battery: raw?.keyHighlights?.battery || raw?.detailedSpecs?.battery?.capacity || '5000 mAh',
-      charging: raw?.keyHighlights?.charging || raw?.detailedSpecs?.battery?.charging || '45W Fast Charging',
-      os: raw?.keyHighlights?.os || raw?.detailedSpecs?.platform?.os || 'Android 15',
+      camera: cleanTemplateStr(
+        raw?.keyHighlights?.camera || raw?.keyHighlights?.mainCamera || raw?.detailedSpecs?.mainCamera?.setup || raw?.detailedSpecs?.mainCamera?.modules,
+        '50MP OIS Triple Camera',
+        '50MP OIS Main Camera'
+      ),
+      battery: cleanTemplateStr(
+        raw?.keyHighlights?.battery || raw?.detailedSpecs?.battery?.capacity,
+        '5000 mAh',
+        '5000 mAh'
+      ),
+      charging: cleanTemplateStr(
+        raw?.keyHighlights?.charging || raw?.detailedSpecs?.battery?.charging,
+        '45W Fast Charging',
+        '45W Fast Charging'
+      ),
+      os: cleanTemplateStr(
+        raw?.keyHighlights?.os || raw?.detailedSpecs?.platform?.os,
+        'Android 15',
+        'Android 15'
+      ),
       network5g: raw?.keyHighlights?.network5g !== undefined ? Boolean(raw.keyHighlights.network5g) : true,
     },
     detailedSpecs: {
       network: {
-        technology: raw?.detailedSpecs?.network?.technology || 'GSM / HSPA / LTE / 5G',
-        bands5g: raw?.detailedSpecs?.network?.bands5g || 'SA/NSA Sub6',
-        speed: raw?.detailedSpecs?.network?.speed || 'HSPA, LTE-A, 5G',
-        sim: raw?.detailedSpecs?.network?.sim || raw?.detailedSpecs?.body?.sim || 'Dual SIM (Nano-SIM, dual stand-by)',
+        technology: cleanTemplateStr(raw?.detailedSpecs?.network?.technology, 'GSM / HSPA / LTE / 5G', 'GSM / HSPA / LTE / 5G'),
+        bands5g: cleanTemplateStr(
+          raw?.detailedSpecs?.network?.bands5g,
+          'SA/NSA/Sub6, Bands n1, n3, n5, n7, n8, n20, n28, n38, n40, n41, n77, n78',
+          'SA/NSA Sub6'
+        ),
+        speed: cleanTemplateStr(raw?.detailedSpecs?.network?.speed, 'HSPA 42.2/5.76 Mbps, LTE-A, 5G', 'HSPA, LTE-A, 5G'),
+        sim: cleanTemplateStr(
+          raw?.detailedSpecs?.network?.sim || raw?.detailedSpecs?.body?.sim,
+          'Dual SIM (Nano-SIM, dual stand-by) + eSIM support',
+          'Dual SIM (Nano-SIM, dual stand-by)'
+        ),
       },
       body: {
-        dimensions: raw?.detailedSpecs?.body?.dimensions || '162.3 x 75.6 x 8.2 mm',
-        weight: raw?.detailedSpecs?.body?.weight || '195 g',
-        build: raw?.detailedSpecs?.body?.build || 'Glass front, aluminum frame',
-        waterResistance: raw?.detailedSpecs?.body?.waterResistance || 'IP68 dust/water resistant',
+        dimensions: cleanTemplateStr(raw?.detailedSpecs?.body?.dimensions, '162.3 x 75.6 x 8.2 mm', '162.3 x 75.6 x 8.2 mm'),
+        weight: cleanTemplateStr(raw?.detailedSpecs?.body?.weight, '195 g', '195 g'),
+        build: cleanTemplateStr(
+          raw?.detailedSpecs?.body?.build,
+          'Glass front (Gorilla Glass Victus 2), aluminum frame, glass back',
+          'Glass front, aluminum frame'
+        ),
+        waterResistance: cleanTemplateStr(
+          raw?.detailedSpecs?.body?.waterResistance,
+          'IP68 dust/water resistant (up to 1.5m for 30 min)',
+          'IP68 dust/water resistant'
+        ),
       },
       display: {
-        type: raw?.detailedSpecs?.display?.type || raw?.keyHighlights?.display || 'AMOLED, 120Hz, HDR10+',
-        size: raw?.detailedSpecs?.display?.size || '6.7 inches (~89.2% screen-to-body ratio)',
-        resolution: raw?.detailedSpecs?.display?.resolution || '1080 x 2400 pixels (~395 ppi density)',
-        protection: raw?.detailedSpecs?.display?.protection || 'Corning Gorilla Glass Victus',
-        brightness: raw?.detailedSpecs?.display?.brightness || '2000 nits (peak)',
-        refreshRate: raw?.detailedSpecs?.display?.refreshRate || '120Hz adaptive',
+        type: cleanTemplateStr(
+          raw?.detailedSpecs?.display?.type || raw?.keyHighlights?.display,
+          'Dynamic LTPO AMOLED 2X, 120Hz, HDR10+',
+          'AMOLED, 120Hz, HDR10+'
+        ),
+        size: cleanTemplateStr(
+          raw?.detailedSpecs?.display?.size,
+          '6.7 inches, 108.4 cm² (~89.2% screen-to-body ratio)',
+          '6.7 inches (~89.2% screen-to-body ratio)'
+        ),
+        resolution: cleanTemplateStr(
+          raw?.detailedSpecs?.display?.resolution,
+          '1080 x 2400 pixels, 20:9 ratio (~395 ppi density)',
+          '1080 x 2400 pixels (~395 ppi density)'
+        ),
+        protection: cleanTemplateStr(
+          raw?.detailedSpecs?.display?.protection,
+          'Corning Gorilla Glass Victus 2',
+          'Corning Gorilla Glass Victus'
+        ),
+        brightness: cleanTemplateStr(raw?.detailedSpecs?.display?.brightness, '2600 nits (peak)', '2000 nits (peak)'),
+        refreshRate: cleanTemplateStr(raw?.detailedSpecs?.display?.refreshRate, '1Hz - 120Hz adaptive', '120Hz adaptive'),
       },
       platform: {
-        os: raw?.detailedSpecs?.platform?.os || raw?.keyHighlights?.os || 'Android 15',
-        chipset: raw?.detailedSpecs?.platform?.chipset || raw?.keyHighlights?.processor || 'Snapdragon 8 Gen 3',
-        cpu: raw?.detailedSpecs?.platform?.cpu || 'Octa-core',
-        gpu: raw?.detailedSpecs?.platform?.gpu || 'Adreno GPU',
-        antutuScore: raw?.detailedSpecs?.platform?.antutuScore || '1,550,000 (AnTuTu v10)',
+        os: cleanTemplateStr(raw?.detailedSpecs?.platform?.os || raw?.keyHighlights?.os, 'Android 15', 'Android 15'),
+        chipset: cleanTemplateStr(
+          raw?.detailedSpecs?.platform?.chipset || raw?.keyHighlights?.processor,
+          'Qualcomm Snapdragon 8 Gen 3 (4 nm)',
+          'Snapdragon 8 Gen 3'
+        ),
+        cpu: cleanTemplateStr(
+          raw?.detailedSpecs?.platform?.cpu,
+          'Octa-core (1x3.3 GHz Cortex-X4 & 3x3.1 GHz Cortex-A720 & 2x2.9 GHz Cortex-A720 & 2x2.2 GHz Cortex-A520)',
+          'Octa-core'
+        ),
+        gpu: cleanTemplateStr(raw?.detailedSpecs?.platform?.gpu, 'Adreno 750', 'Adreno GPU'),
+        antutuScore: cleanTemplateStr(raw?.detailedSpecs?.platform?.antutuScore, '1,680,000 (AnTuTu v10)', '1,550,000 (AnTuTu v10)'),
       },
       memory: {
-        ramVariants: ramVariants.length > 0 ? ramVariants : ['8GB', '12GB'],
-        storageVariants: storageVariants.length > 0 ? storageVariants : ['256GB', '512GB'],
-        cardSlot: raw?.detailedSpecs?.memory?.cardSlot || 'No',
-        storageType: raw?.detailedSpecs?.memory?.storageType || 'UFS 4.0',
+        ramVariants,
+        storageVariants,
+        cardSlot: cleanTemplateStr(raw?.detailedSpecs?.memory?.cardSlot, 'No', 'No'),
+        storageType: cleanTemplateStr(raw?.detailedSpecs?.memory?.storageType, 'UFS 4.0', 'UFS 4.0'),
       },
       mainCamera: {
-        setup: raw?.detailedSpecs?.mainCamera?.setup || raw?.detailedSpecs?.mainCamera?.modules || raw?.keyHighlights?.camera || '50 MP, f/1.8, (wide), OIS + 12 MP (ultrawide)',
-        features: raw?.detailedSpecs?.mainCamera?.features || 'LED flash, auto-HDR, panorama',
-        video: raw?.detailedSpecs?.mainCamera?.video || '4K@30/60fps, 1080p@30/60/120fps, gyro-EIS',
+        setup: cleanTemplateStr(
+          raw?.detailedSpecs?.mainCamera?.setup || raw?.detailedSpecs?.mainCamera?.modules || raw?.keyHighlights?.camera,
+          '50 MP, f/1.8, 24mm (wide), PDAF, OIS + 12 MP, f/2.2, 120˚ (ultrawide) + 10 MP, f/2.4 (telephoto), 3x optical zoom',
+          '50 MP, f/1.8, (wide), OIS + 12 MP (ultrawide)'
+        ),
+        features: cleanTemplateStr(
+          raw?.detailedSpecs?.mainCamera?.features,
+          'LED flash, auto-HDR, panorama, Laser AF',
+          'LED flash, auto-HDR, panorama'
+        ),
+        video: cleanTemplateStr(
+          raw?.detailedSpecs?.mainCamera?.video,
+          '8K@30fps, 4K@30/60fps, 1080p@30/60/240fps, gyro-EIS, HDR10+',
+          '4K@30/60fps, 1080p@30/60/120fps, gyro-EIS'
+        ),
       },
       selfieCamera: {
-        setup: raw?.detailedSpecs?.selfieCamera?.setup || raw?.detailedSpecs?.selfieCamera?.modules || raw?.keyHighlights?.selfieCamera || '32 MP, f/2.2, (wide)',
-        features: raw?.detailedSpecs?.selfieCamera?.features || 'HDR, panorama',
-        video: raw?.detailedSpecs?.selfieCamera?.video || '4K@30fps, 1080p@30/60fps',
+        setup: cleanTemplateStr(
+          raw?.detailedSpecs?.selfieCamera?.setup || raw?.detailedSpecs?.selfieCamera?.modules || raw?.keyHighlights?.selfieCamera,
+          '32 MP, f/2.2, 26mm (wide), Dual Pixel PDAF',
+          '32 MP, f/2.2, (wide)'
+        ),
+        features: cleanTemplateStr(raw?.detailedSpecs?.selfieCamera?.features, 'Dual video call, Auto-HDR, HDR10+', 'HDR, panorama'),
+        video: cleanTemplateStr(raw?.detailedSpecs?.selfieCamera?.video, '4K@30/60fps, 1080p@30fps', '4K@30fps, 1080p@30/60fps'),
       },
       battery: {
-        capacity: raw?.detailedSpecs?.battery?.capacity || raw?.keyHighlights?.battery || '5000 mAh, non-removable',
-        charging: raw?.detailedSpecs?.battery?.charging || raw?.keyHighlights?.charging || '45W wired fast charging',
-        wirelessCharging: raw?.detailedSpecs?.battery?.wirelessCharging || '15W wireless charging',
+        capacity: cleanTemplateStr(
+          raw?.detailedSpecs?.battery?.capacity || raw?.keyHighlights?.battery,
+          'Li-Ion 5000 mAh, non-removable',
+          '5000 mAh, non-removable'
+        ),
+        charging: cleanTemplateStr(
+          raw?.detailedSpecs?.battery?.charging || raw?.keyHighlights?.charging,
+          '45W wired, PD3.0, 65% in 30 min',
+          '45W wired fast charging'
+        ),
+        wirelessCharging: cleanTemplateStr(
+          raw?.detailedSpecs?.battery?.wirelessCharging,
+          '15W wireless (Qi/PMA), 4.5W reverse wireless',
+          '15W wireless charging'
+        ),
       },
       sound: {
-        loudspeaker: raw?.detailedSpecs?.sound?.loudspeaker || 'Yes, with stereo speakers',
-        jack35mm: raw?.detailedSpecs?.sound?.jack35mm || 'No',
-        audioSpecs: raw?.detailedSpecs?.sound?.audioSpecs || '24-bit/192kHz Hi-Res audio, Dolby Atmos support',
+        loudspeaker: cleanTemplateStr(raw?.detailedSpecs?.sound?.loudspeaker, 'Yes, with stereo speakers', 'Yes, with stereo speakers'),
+        jack35mm: cleanTemplateStr(raw?.detailedSpecs?.sound?.jack35mm, 'No', 'No'),
+        audioSpecs: cleanTemplateStr(
+          raw?.detailedSpecs?.sound?.audioSpecs,
+          '24-bit/192kHz Hi-Res audio, Dolby Atmos support',
+          '24-bit/192kHz Hi-Res audio, Dolby Atmos support'
+        ),
       },
       connectivity: {
-        wlan: raw?.detailedSpecs?.connectivity?.wlan || 'Wi-Fi 802.11 a/b/g/n/ac/6, dual-band',
-        bluetooth: raw?.detailedSpecs?.connectivity?.bluetooth || '5.3, A2DP, LE',
-        nfc: raw?.detailedSpecs?.connectivity?.nfc || 'Yes',
-        radio: raw?.detailedSpecs?.connectivity?.radio || 'No',
-        usb: raw?.detailedSpecs?.connectivity?.usb || 'USB Type-C 2.0, OTG',
-        infrared: raw?.detailedSpecs?.connectivity?.infrared || 'No',
-        positioning: raw?.detailedSpecs?.connectivity?.positioning || 'GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS',
+        wlan: cleanTemplateStr(
+          raw?.detailedSpecs?.connectivity?.wlan,
+          'Wi-Fi 802.11 a/b/g/n/ac/6e/7, tri-band, Wi-Fi Direct',
+          'Wi-Fi 802.11 a/b/g/n/ac/6, dual-band'
+        ),
+        bluetooth: cleanTemplateStr(raw?.detailedSpecs?.connectivity?.bluetooth, '5.3, A2DP, LE', '5.3, A2DP, LE'),
+        nfc: cleanTemplateStr(raw?.detailedSpecs?.connectivity?.nfc, 'Yes', 'Yes'),
+        radio: cleanTemplateStr(raw?.detailedSpecs?.connectivity?.radio, 'No', 'No'),
+        usb: cleanTemplateStr(raw?.detailedSpecs?.connectivity?.usb, 'USB Type-C 3.2, DisplayPort 1.2, OTG', 'USB Type-C 2.0, OTG'),
+        infrared: cleanTemplateStr(raw?.detailedSpecs?.connectivity?.infrared, 'No', 'No'),
+        positioning: cleanTemplateStr(
+          raw?.detailedSpecs?.connectivity?.positioning,
+          'GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS, NavIC',
+          'GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS'
+        ),
       },
-      sensors: raw?.detailedSpecs?.sensors || 'Fingerprint (under display, optical), accelerometer, gyro, proximity, compass',
-      biometrics: raw?.detailedSpecs?.biometrics || '',
-      securityHardware: raw?.detailedSpecs?.securityHardware || '',
+      sensors: cleanTemplateStr(
+        raw?.detailedSpecs?.sensors,
+        'Fingerprint (under display, ultrasonic), accelerometer, gyro, proximity, compass, barometer',
+        'Fingerprint (under display, optical), accelerometer, gyro, proximity, compass'
+      ),
+      biometrics: cleanTemplateStr(
+        raw?.detailedSpecs?.biometrics,
+        'Fingerprint (under display, ultrasonic) & 2D Face Unlock',
+        ''
+      ),
+      securityHardware: cleanTemplateStr(
+        raw?.detailedSpecs?.securityHardware,
+        'Hardware-backed Keystore & Knox / TrustZone TEE',
+        ''
+      ),
     },
-  };
+    ...(raw?.createdAt ? { createdAt: raw.createdAt } : {}),
+    ...(raw?.featuredAt ? { featuredAt: raw.featuredAt } : {}),
+  } as Phone;
 }
 
-export const SEED_PHONE_IDS = new Set<string>(
-  INITIAL_PHONES.map((p) => p.id)
-);
+export function getRecordTimestamp(item: any): number {
+  if (!item) return 0;
+  if (typeof item.createdAt === 'number' && !Number.isNaN(item.createdAt) && item.createdAt > 0) {
+    return item.createdAt;
+  }
+  if (typeof item.createdAt === 'string' && item.createdAt.trim()) {
+    const asNum = Number(item.createdAt);
+    if (!Number.isNaN(asNum) && asNum > 1000000000) return asNum;
+    const parsedCreated = Date.parse(item.createdAt);
+    if (!Number.isNaN(parsedCreated)) return parsedCreated;
+  }
+  const idStr = String(item.id || '');
+  const match = idStr.match(/(\d{10,15})/);
+  if (match) {
+    const idTs = parseInt(match[1], 10);
+    if (!Number.isNaN(idTs)) return idTs;
+  }
+  if (typeof item.date === 'string' && item.date.trim()) {
+    const parsedDate = Date.parse(item.date);
+    if (!Number.isNaN(parsedDate)) return parsedDate;
+  }
+  return 0;
+}
+
+function getDeletedPhoneIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set<string>();
+  try {
+    const raw = localStorage.getItem('gsmscope_deleted_phone_ids_v1');
+    return new Set<string>(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function getDeletedArticleIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set<string>();
+  try {
+    const raw = localStorage.getItem('gsmscope_deleted_article_ids');
+    return new Set<string>(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function getDeletedReviewIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set<string>();
+  try {
+    const raw = localStorage.getItem('gsmscope_deleted_review_ids_v1');
+    return new Set<string>(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set<string>();
+  }
+}
 
 const SEED_PHONE_IMAGE_MAP = new Map<string, string>(
   INITIAL_PHONES.map((p) => [p.id, p.image])
@@ -358,8 +594,20 @@ function mergePhonesAndSync(
   apiPhones: Phone[],
   mediaItems?: MediaItem[]
 ): Phone[] {
-  const normalizedLocal = localPhones.map(normalizePhoneRecord);
-  const normalizedApi = apiPhones.map(normalizePhoneRecord);
+  const deletedPhoneIds = getDeletedPhoneIds();
+  const normalizedLocal = localPhones
+    .filter((p) => p && !deletedPhoneIds.has(p.id))
+    .map(normalizePhoneRecord);
+  const normalizedApi: Phone[] = [];
+  for (const rawApiPhone of apiPhones) {
+    if (!rawApiPhone) continue;
+    if (deletedPhoneIds.has(rawApiPhone.id)) {
+      deletePhoneApi(rawApiPhone.id).catch(() => {});
+      continue;
+    }
+    normalizedApi.push(normalizePhoneRecord(rawApiPhone));
+  }
+
   const apiById = new Map(normalizedApi.map((p) => [p.id, p]));
   const localById = new Map(normalizedLocal.map((p) => [p.id, p]));
 
@@ -419,17 +667,12 @@ function mergePhonesAndSync(
       ...localPhone,
       image: chosenImage,
       images: combinedGallery,
+      createdAt: (localPhone as any).createdAt || (apiPhone as any).createdAt,
+      featuredAt: (localPhone as any).featuredAt || (apiPhone as any).featuredAt,
     });
 
     // If local state has a newer/custom image, specs, or featured status not yet reflected on the backend, push to backend
-    if (
-      mergedPhone.image !== apiPhone.image ||
-      mergedPhone.name !== apiPhone.name ||
-      mergedPhone.priceNGN !== apiPhone.priceNGN ||
-      mergedPhone.isFeatured !== apiPhone.isFeatured ||
-      mergedPhone.isPopular !== apiPhone.isPopular ||
-      JSON.stringify(mergedPhone.categories) !== JSON.stringify(apiPhone.categories)
-    ) {
+    if (JSON.stringify(mergedPhone) !== JSON.stringify(apiPhone)) {
       updatePhoneApi(mergedPhone.id, mergedPhone).catch(() => {});
     }
 
@@ -444,8 +687,8 @@ function mergePhonesAndSync(
   }
 
   // Order:
-  // 1. Newly added custom phones (not in SEED_PHONE_IDS) first, preserving local/API insertion order
-  // 2. Remaining phones in local/API order
+  // 1. Newly added custom phones (not in SEED_PHONE_IDS) first, sorted newest-first
+  // 2. Remaining seed phones in local/API order
   const customPhones: Phone[] = [];
   const seenIds = new Set<string>();
 
@@ -468,6 +711,13 @@ function mergePhonesAndSync(
     }
   }
 
+  customPhones.sort((a, b) => {
+    const tsB = getRecordTimestamp(b);
+    const tsA = getRecordTimestamp(a);
+    if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+    return 0;
+  });
+
   const remainingPhones: Phone[] = [];
   for (const p of normalizedLocal) {
     if (!seenIds.has(p.id)) {
@@ -488,7 +738,9 @@ function mergePhonesAndSync(
     }
   }
 
-  return [...customPhones, ...remainingPhones];
+  const finalPhones = [...customPhones, ...remainingPhones];
+  safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(finalPhones));
+  return finalPhones;
 }
 
 function getDeletedBrandKeys(): Set<string> {
@@ -502,16 +754,14 @@ function getDeletedBrandKeys(): Set<string> {
         return new Set(parsed.map((k) => String(k || '').toLowerCase()).filter(Boolean));
       }
     }
-    localStorage.setItem('gsmscope_deleted_brand_keys_v1', JSON.stringify(defaults));
+    safeSetLocalStorage('gsmscope_deleted_brand_keys_v1', JSON.stringify(defaults));
   } catch {}
   return new Set(defaults);
 }
 
 function saveDeletedBrandKeys(keysSet: Set<string>): void {
   if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem('gsmscope_deleted_brand_keys_v1', JSON.stringify(Array.from(keysSet)));
-  } catch {}
+  safeSetLocalStorage('gsmscope_deleted_brand_keys_v1', JSON.stringify(Array.from(keysSet)));
 }
 
 function mergeBrandsAndSync(localBrands: Brand[], apiBrands: Brand[]): Brand[] {
@@ -527,12 +777,14 @@ function mergeBrandsAndSync(localBrands: Brand[], apiBrands: Brand[]): Brand[] {
 
   const localByKey = new Map<string, Brand>();
   for (const lb of localBrands) {
+    if (!lb) continue;
     for (const k of getBrandKeys(lb)) {
       localByKey.set(k, lb);
     }
   }
 
   for (const ab of apiBrands) {
+    if (!ab) continue;
     const keys = getBrandKeys(ab);
     if (keys.some((k) => deletedKeys.has(k))) {
       deleteBrandApi(ab.id || ab.slug || ab.name).catch(() => {});
@@ -548,7 +800,11 @@ function mergeBrandsAndSync(localBrands: Brand[], apiBrands: Brand[]): Brand[] {
         ...matchedLocal,
         logoUrl: matchedLocal.logoUrl || ab.logoUrl,
       };
-      if (matchedLocal.logoUrl && matchedLocal.logoUrl !== ab.logoUrl) {
+      if (
+        matchedLocal.logoUrl !== ab.logoUrl ||
+        matchedLocal.description !== ab.description ||
+        matchedLocal.country !== ab.country
+      ) {
         updateBrandApi(merged.id, merged).catch(() => {});
       }
       result.push(merged);
@@ -557,9 +813,18 @@ function mergeBrandsAndSync(localBrands: Brand[], apiBrands: Brand[]): Brand[] {
     }
   }
 
-  try {
-    localStorage.setItem('gsmscope_brands_v3', JSON.stringify(result));
-  } catch {}
+  // Also include any custom brands present in localBrands that weren't in apiBrands (e.g. after container restart)
+  for (const lb of localBrands) {
+    if (!lb) continue;
+    const keys = getBrandKeys(lb);
+    if (keys.some((k) => deletedKeys.has(k))) continue;
+    if (keys.some((k) => seenKeys.has(k))) continue;
+    keys.forEach((k) => seenKeys.add(k));
+    createBrandApi(lb).catch(() => {});
+    result.push(lb);
+  }
+
+  safeSetLocalStorage('gsmscope_brands_v3', JSON.stringify(result));
 
   return result;
 }
@@ -623,7 +888,8 @@ function normalizeArticleRecord(raw: any): Article {
     ...(raw?.seoTitle ? { seoTitle: raw.seoTitle } : {}),
     ...(raw?.seoKeywords ? { seoKeywords: raw.seoKeywords } : {}),
     ...(raw?.seoDescription ? { seoDescription: raw.seoDescription } : {}),
-  };
+    ...(raw?.createdAt ? { createdAt: raw.createdAt } : {}),
+  } as Article;
 }
 
 function mergeArticlesAndSync(
@@ -631,8 +897,20 @@ function mergeArticlesAndSync(
   apiArticles: Article[],
   mediaItems?: MediaItem[]
 ): Article[] {
-  const normalizedLocal = localArticles.map(normalizeArticleRecord);
-  const normalizedApi = apiArticles.map(normalizeArticleRecord);
+  const deletedIds = getDeletedArticleIds();
+  const normalizedLocal = localArticles
+    .filter((a) => a && !deletedIds.has(a.id))
+    .map(normalizeArticleRecord);
+  const normalizedApi: Article[] = [];
+  for (const rawApiArt of apiArticles) {
+    if (!rawApiArt) continue;
+    if (deletedIds.has(rawApiArt.id)) {
+      deleteArticleApi(rawApiArt.id).catch(() => {});
+      continue;
+    }
+    normalizedApi.push(normalizeArticleRecord(rawApiArt));
+  }
+
   const apiById = new Map(normalizedApi.map((a) => [a.id, a]));
   const localById = new Map(normalizedLocal.map((a) => [a.id, a]));
 
@@ -651,7 +929,7 @@ function mergeArticlesAndSync(
     }
   }
 
-  const mergedResult: Article[] = [];
+  const mergedById = new Map<string, Article>();
 
   for (const localArt of normalizedLocal) {
     const apiArt = apiById.get(localArt.id);
@@ -659,7 +937,7 @@ function mergeArticlesAndSync(
     if (!apiArt) {
       const toSync = assignedUrl ? { ...localArt, coverImage: assignedUrl } : localArt;
       createArticleApi(toSync).catch(() => {});
-      mergedResult.push(toSync);
+      mergedById.set(toSync.id, toSync);
       continue;
     }
 
@@ -674,6 +952,7 @@ function mergeArticlesAndSync(
       ...apiArt,
       ...localArt,
       coverImage: chosenCover,
+      createdAt: (localArt as any).createdAt || (apiArt as any).createdAt,
     });
 
     if (
@@ -686,62 +965,149 @@ function mergeArticlesAndSync(
       updateArticleApi(mergedArt.id, mergedArt).catch(() => {});
     }
 
-    mergedResult.push(mergedArt);
+    mergedById.set(mergedArt.id, mergedArt);
   }
 
   for (const apiArt of normalizedApi) {
     if (!localById.has(apiArt.id)) {
-      mergedResult.push(apiArt);
+      mergedById.set(apiArt.id, apiArt);
     }
   }
 
-  // Ensure any seed articles/guides from INITIAL_ARTICLES not yet in mergedResult (unless deleted) are included
+  // Ensure any seed articles/guides from INITIAL_ARTICLES not yet in mergedById (unless deleted) are included
   try {
-    const deletedRaw = typeof window !== 'undefined' ? localStorage.getItem('gsmscope_deleted_article_ids') : null;
-    const deletedIds = new Set<string>(deletedRaw ? JSON.parse(deletedRaw) : []);
-    const mergedIds = new Set(mergedResult.map((a) => a.id));
     for (const seedArt of INITIAL_ARTICLES) {
-      if (!mergedIds.has(seedArt.id) && !deletedIds.has(seedArt.id)) {
+      if (!mergedById.has(seedArt.id) && !deletedIds.has(seedArt.id)) {
         const normSeed = normalizeArticleRecord(seedArt);
-        mergedResult.push(normSeed);
+        mergedById.set(normSeed.id, normSeed);
         createArticleApi(normSeed).catch(() => {});
       }
     }
   } catch {}
 
-  return mergedResult;
+  // Order:
+  // 1. Newly added/published custom articles (!SEED_ARTICLE_IDS) first, sorted newest-first
+  // 2. Seed articles in order
+  const customArticles: Article[] = [];
+  const seedArticles: Article[] = [];
+  const seenIds = new Set<string>();
+
+  for (const a of normalizedLocal) {
+    if (seenIds.has(a.id)) continue;
+    const m = mergedById.get(a.id);
+    if (!m) continue;
+    seenIds.add(a.id);
+    if (!SEED_ARTICLE_IDS.has(a.id)) {
+      customArticles.push(m);
+    } else {
+      seedArticles.push(m);
+    }
+  }
+
+  for (const a of normalizedApi) {
+    if (seenIds.has(a.id)) continue;
+    const m = mergedById.get(a.id);
+    if (!m) continue;
+    seenIds.add(a.id);
+    if (!SEED_ARTICLE_IDS.has(a.id)) {
+      customArticles.push(m);
+    } else {
+      seedArticles.push(m);
+    }
+  }
+
+  for (const [id, m] of mergedById.entries()) {
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
+    if (!SEED_ARTICLE_IDS.has(id)) {
+      customArticles.push(m);
+    } else {
+      seedArticles.push(m);
+    }
+  }
+
+  customArticles.sort((a, b) => {
+    const tsB = getRecordTimestamp(b);
+    const tsA = getRecordTimestamp(a);
+    if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+    return 0;
+  });
+
+  const finalArticles = [...customArticles, ...seedArticles];
+  safeSetLocalStorage('gsmscope_articles_v2', JSON.stringify(finalArticles));
+  return finalArticles;
 }
 
 function mergeReviewsAndSync(localReviews: Review[], apiReviews: Review[]): Review[] {
-  const apiById = new Map(apiReviews.map((r) => [r.id, r]));
-  const localById = new Map(localReviews.map((r) => [r.id, r]));
-  const mergedResult: Review[] = [];
+  const deletedReviewIds = getDeletedReviewIds();
+  const filteredLocal = localReviews.filter((r) => r && !deletedReviewIds.has(r.id));
+  const filteredApi: Review[] = [];
+  for (const r of apiReviews) {
+    if (!r) continue;
+    if (deletedReviewIds.has(r.id)) {
+      deleteReviewApi(r.id).catch(() => {});
+      continue;
+    }
+    filteredApi.push(r);
+  }
 
-  for (const localRev of localReviews) {
+  const apiById = new Map(filteredApi.map((r) => [r.id, r]));
+  const localById = new Map(filteredLocal.map((r) => [r.id, r]));
+  const mergedById = new Map<string, Review>();
+
+  for (const localRev of filteredLocal) {
     const apiRev = apiById.get(localRev.id);
     if (!apiRev) {
       submitReviewApi(localRev as any).catch(() => {});
-      mergedResult.push(localRev);
+      mergedById.set(localRev.id, localRev);
     } else {
       const merged: Review = {
         ...apiRev,
         ...localRev,
         imageUrl: localRev.imageUrl || apiRev.imageUrl,
-      };
+        ...(((localRev as any).createdAt || (apiRev as any).createdAt)
+          ? { createdAt: (localRev as any).createdAt || (apiRev as any).createdAt }
+          : {}),
+      } as Review;
       if (localRev.status !== apiRev.status) {
         updateReviewStatusApi(merged.id, merged.status).catch(() => {});
       }
-      mergedResult.push(merged);
+      mergedById.set(merged.id, merged);
     }
   }
 
-  for (const apiRev of apiReviews) {
+  for (const apiRev of filteredApi) {
     if (!localById.has(apiRev.id)) {
-      mergedResult.push(apiRev);
+      mergedById.set(apiRev.id, apiRev);
     }
   }
 
-  return mergedResult;
+  const customReviews: Review[] = [];
+  const seedReviews: Review[] = [];
+  const seenIds = new Set<string>();
+
+  for (const r of [...filteredLocal, ...filteredApi]) {
+    if (!r || seenIds.has(r.id)) continue;
+    const m = mergedById.get(r.id);
+    if (!m) continue;
+    seenIds.add(r.id);
+    if (!SEED_REVIEW_IDS.has(r.id)) {
+      customReviews.push(m);
+    } else {
+      seedReviews.push(m);
+    }
+  }
+
+  customReviews.sort((a, b) => {
+    const tsB = getRecordTimestamp(b);
+    const tsA = getRecordTimestamp(a);
+    if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+    return 0;
+  });
+
+  const finalReviews = [...customReviews, ...seedReviews];
+  safeSetLocalStorage('gsmscope_reviews_v2', JSON.stringify(finalReviews));
+  return finalReviews;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -894,8 +1260,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setAdSettings(prev => mergeAdSettingsAndSync(prev, apiAdSettings, apiMediaItems || undefined));
       }
       if (apiWebsiteContent) {
-        setWebsiteContentState(prev => normalizeWebsiteContent({ ...prev, ...apiWebsiteContent }));
+        setWebsiteContentState(prev => mergeWebsiteContentAndSync(prev, apiWebsiteContent));
       }
+      syncContactInquiriesWithServer().catch(() => {});
       if (apiMediaItems && Array.isArray(apiMediaItems)) {
         setMediaLibraryState(prev => {
           const apiByUrl = new Map(apiMediaItems.map(m => [m.url, m]));
@@ -1257,12 +1624,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       mediaItems
     );
 
-    try {
-      localStorage.setItem('gsmscope_ads_v3', JSON.stringify(mergedAds));
-      if (localHasCustomizations) {
-        localStorage.setItem('gsmscope_ads_admin_saved_v1', 'true');
-      }
-    } catch {}
+    safeSetLocalStorage('gsmscope_ads_v3', JSON.stringify(mergedAds));
+    if (localHasCustomizations) {
+      safeSetLocalStorage('gsmscope_ads_admin_saved_v1', 'true');
+    }
 
     if (needsServerPush && localHasCustomizations) {
       updateAdSettingsApi(mergedAds).catch(() => {});
@@ -1298,6 +1663,61 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!merged.whatsappNumber || merged.whatsappNumber === '+2348030000000') {
       merged.whatsappNumber = '+2349127408003';
     }
+    return merged;
+  };
+
+  const mergeWebsiteContentAndSync = (
+    currentState: Partial<WebsiteContent> | null | undefined,
+    apiRaw: Partial<WebsiteContent> | null | undefined
+  ): WebsiteContent => {
+    let savedLocal: Partial<WebsiteContent> | null = null;
+    let wasAdminSaved = false;
+    try {
+      const savedRaw = localStorage.getItem('gsmscope_website_content_v1');
+      wasAdminSaved = localStorage.getItem('gsmscope_website_content_admin_saved_v1') === 'true';
+      if (savedRaw) {
+        savedLocal = JSON.parse(savedRaw);
+      }
+    } catch {}
+
+    const apiNorm = normalizeWebsiteContent(apiRaw);
+    const localSource = savedLocal || currentState || {};
+    const localUpdatedAt = (localSource as any)?.updatedAt as string | undefined;
+    const apiUpdatedAt = (apiRaw as any)?.updatedAt as string | undefined;
+
+    const preferLocal =
+      wasAdminSaved ||
+      Boolean(localUpdatedAt && (!apiUpdatedAt || localUpdatedAt >= apiUpdatedAt));
+
+    const customOverrides: Partial<WebsiteContent> = {};
+    (Object.keys(localSource) as Array<keyof WebsiteContent>).forEach((key) => {
+      const localVal = (localSource as any)[key];
+      const defaultVal = (INITIAL_WEBSITE_CONTENT as any)[key];
+      const apiVal = (apiNorm as any)[key];
+      if (localVal !== undefined && localVal !== null && localVal !== '') {
+        if (preferLocal || JSON.stringify(localVal) !== JSON.stringify(defaultVal)) {
+          (customOverrides as any)[key] = localVal;
+          if (JSON.stringify(localVal) !== JSON.stringify(apiVal)) {
+            // Will trigger server sync below
+          }
+        }
+      }
+    });
+
+    const merged = normalizeWebsiteContent({
+      ...apiNorm,
+      ...customOverrides,
+      ...((localUpdatedAt || apiUpdatedAt)
+        ? { updatedAt: localUpdatedAt && (!apiUpdatedAt || localUpdatedAt >= apiUpdatedAt) ? localUpdatedAt : apiUpdatedAt }
+        : {}),
+    } as any);
+
+    safeSetLocalStorage('gsmscope_website_content_v1', JSON.stringify(merged));
+
+    if (JSON.stringify(merged) !== JSON.stringify(apiNorm)) {
+      updateWebsiteContentApi(merged).catch(() => {});
+    }
+
     return merged;
   };
 
@@ -1998,19 +2418,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [pulseGlobalLoading, activeTab, adminSubView, adminSection, selectedArticle, selectedPhone, selectedBrand]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('gsmscope_currency', currency);
-    } catch (e) {
-      console.warn('LocalStorage save failed for currency', e);
-    }
+    safeSetLocalStorage('gsmscope_currency', currency);
   }, [currency]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('gsmscope_phones_v3', JSON.stringify(phones));
-    } catch (e) {
-      console.warn('LocalStorage save failed for phones', e);
-    }
+    safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(phones));
   }, [phones]);
 
   // Synchronize each phone's review count and average rating with real submitted reviews
@@ -2034,42 +2446,101 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [reviews]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('gsmscope_brands_v3', JSON.stringify(brands));
-    } catch (e) {
-      console.warn('LocalStorage save failed for brands', e);
-    }
+    safeSetLocalStorage('gsmscope_brands_v3', JSON.stringify(brands));
   }, [brands]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('gsmscope_articles_v2', JSON.stringify(articles));
-    } catch (e) {
-      console.warn('LocalStorage save failed for articles', e);
-    }
+    safeSetLocalStorage('gsmscope_articles_v2', JSON.stringify(articles));
   }, [articles]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('gsmscope_reviews_v2', JSON.stringify(reviews));
-    } catch (e) {
-      console.warn('LocalStorage save failed for reviews', e);
-    }
+    safeSetLocalStorage('gsmscope_reviews_v2', JSON.stringify(reviews));
   }, [reviews]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('gsmscope_compare_v3', JSON.stringify(compareList));
-    } catch (e) {
-      console.warn('LocalStorage save failed for compare', e);
-    }
+    safeSetLocalStorage('gsmscope_compare_v3', JSON.stringify(compareList));
   }, [compareList]);
 
-  // Synchronize state with full-stack Express backend APIs on mount without losing localStorage admin edits
+  useEffect(() => {
+    safeSetLocalStorage('gsmscope_media_library_v1', JSON.stringify(mediaLibrary));
+  }, [mediaLibrary]);
+
+  // Synchronize state with IndexedDB vault + full-stack Express backend APIs on mount without losing any admin edits or uploaded images
   useEffect(() => {
     let isMounted = true;
     async function loadBackendData() {
       try {
+        // 1. Hydrate from high-capacity IndexedDB vault first (recovers data even if localStorage hit its 5MB limit)
+        const idbVault = await loadVaultFromIndexedDB();
+        if (isMounted && idbVault && Object.keys(idbVault).length > 0) {
+          const idbMedia: MediaItem[] | undefined = Array.isArray(idbVault.mediaLibrary)
+            ? idbVault.mediaLibrary
+            : undefined;
+          if (idbMedia && idbMedia.length > 0) {
+            for (const m of idbMedia) {
+              if (m && m.url && m.dataUrl && m.dataUrl.startsWith('data:')) {
+                registerUploadDataUrl(m.url, m.dataUrl);
+              }
+            }
+            setMediaLibraryState((prev) => {
+              const byUrl = new Map<string, MediaItem>();
+              for (const item of [...idbMedia, ...prev]) {
+                if (item && item.url && !byUrl.has(item.url)) {
+                  byUrl.set(item.url, item);
+                }
+              }
+              return Array.from(byUrl.values());
+            });
+          }
+
+          if (Array.isArray(idbVault.phones) && idbVault.phones.length > 0) {
+            const vaultPhones = idbVault.phones;
+            setPhones((prev) => mergePhonesAndSync(vaultPhones, prev, idbMedia));
+          }
+          if (Array.isArray(idbVault.brands) && idbVault.brands.length > 0) {
+            const vaultBrands = idbVault.brands;
+            setBrands((prev) => mergeBrandsAndSync(vaultBrands, prev));
+          }
+          if (Array.isArray(idbVault.articles) && idbVault.articles.length > 0) {
+            const vaultArticles = idbVault.articles;
+            setArticles((prev) => mergeArticlesAndSync(vaultArticles, prev, idbMedia));
+          }
+          if (Array.isArray(idbVault.reviews) && idbVault.reviews.length > 0) {
+            const vaultReviews = idbVault.reviews;
+            setReviews((prev) => mergeReviewsAndSync(vaultReviews, prev));
+          }
+          if (idbVault.adSettings && typeof idbVault.adSettings === 'object') {
+            const vaultAds = idbVault.adSettings;
+            setAdSettings((prev) => mergeAdSettingsAndSync(vaultAds, prev, idbMedia));
+          }
+          if (idbVault.websiteContent && typeof idbVault.websiteContent === 'object') {
+            const vaultContent = idbVault.websiteContent;
+            setWebsiteContentState((prev) => mergeWebsiteContentAndSync(vaultContent, prev));
+          }
+          if (Array.isArray(idbVault.contactInquiries) && idbVault.contactInquiries.length > 0) {
+            try {
+              const existingRaw = localStorage.getItem('gsmscope_contact_inquiries_v1');
+              const existing: any[] = existingRaw ? JSON.parse(existingRaw) : [];
+              const byId = new Map<string, any>();
+              for (const item of [...idbVault.contactInquiries, ...existing]) {
+                if (item && item.id && !byId.has(item.id)) {
+                  byId.set(item.id, item);
+                }
+              }
+              safeSetLocalStorage('gsmscope_contact_inquiries_v1', JSON.stringify(Array.from(byId.values())));
+            } catch {}
+          }
+        }
+
+        // 2. Sync cached uploadDataUrls & mediaLibrary to the Express server so /uploads/... files self-heal after republish
+        const cachedUploads = getAllCachedUploadDataUrls();
+        if (Object.keys(cachedUploads).length > 0) {
+          await syncVaultWithServerApi({
+            uploadDataUrls: cachedUploads,
+          });
+        }
+
+        // 3. Fetch and merge with backend API
         const [apiPhones, apiBrands, apiArticles, apiReviews, apiAdSettings, apiSettings, apiMedia] = await Promise.all([
           fetchPhonesFromApi(),
           fetchBrandsFromApi(),
@@ -2096,37 +2567,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setAdSettings((prev) => mergeAdSettingsAndSync(prev, apiAdSettings, apiMedia || undefined));
           }
           if (apiSettings && !localWebsiteContentModifiedRef.current) {
-            setWebsiteContentState(() => {
-              let merged = normalizeWebsiteContent(apiSettings);
-              try {
-                const savedLocalRaw = localStorage.getItem('gsmscope_website_content_v1');
-                if (savedLocalRaw) {
-                  const savedLocal = JSON.parse(savedLocalRaw) as Partial<WebsiteContent>;
-                  const customOverrides: Partial<WebsiteContent> = {};
-                  (Object.keys(savedLocal) as Array<keyof WebsiteContent>).forEach((key) => {
-                    const localVal = savedLocal[key];
-                    const defaultVal = INITIAL_WEBSITE_CONTENT[key];
-                    const apiVal = (apiSettings as any)[key];
-                    if (
-                      localVal !== undefined &&
-                      localVal !== null &&
-                      localVal !== '' &&
-                      JSON.stringify(localVal) !== JSON.stringify(defaultVal) &&
-                      JSON.stringify(apiVal) === JSON.stringify(defaultVal)
-                    ) {
-                      (customOverrides as any)[key] = localVal;
-                    }
-                  });
-                  if (Object.keys(customOverrides).length > 0) {
-                    merged = normalizeWebsiteContent({ ...merged, ...customOverrides });
-                    updateWebsiteContentApi(merged).catch(() => {});
-                  }
-                }
-                localStorage.setItem('gsmscope_website_content_v1', JSON.stringify(merged));
-              } catch {}
-              return merged;
-            });
+            setWebsiteContentState((prev) => mergeWebsiteContentAndSync(prev, apiSettings));
           }
+          syncContactInquiriesWithServer().catch(() => {});
           if (apiMedia && apiMedia.length > 0) {
             setMediaLibraryState(prev => {
               const apiIds = new Set(apiMedia.map(m => m.id));
@@ -2141,7 +2584,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               );
               // Re-sync any local uploaded media back to the backend if the container restarted
               for (const localItem of localOnly) {
+                if (localItem.dataUrl && localItem.url.startsWith('/uploads/')) {
+                  registerUploadDataUrl(localItem.url, localItem.dataUrl);
+                }
                 addMediaItemApi(localItem).catch(() => {});
+              }
+              if (localOnly.length > 0) {
+                syncVaultWithServerApi({
+                  uploadDataUrls: getAllCachedUploadDataUrls(),
+                  mediaLibrary: localOnly,
+                }).catch(() => {});
               }
               const cleanedApi = apiMedia
                 .filter(
@@ -2152,12 +2604,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 )
                 .map(m => {
                   const localMatch = prev.find(p => p.id === m.id || p.url === m.url);
-                  return localMatch?.dataUrl && !m.dataUrl ? { ...m, dataUrl: localMatch.dataUrl } : m;
+                  const mergedItem = localMatch?.dataUrl && !m.dataUrl ? { ...m, dataUrl: localMatch.dataUrl } : m;
+                  if (mergedItem.dataUrl && mergedItem.url.startsWith('/uploads/')) {
+                    registerUploadDataUrl(mergedItem.url, mergedItem.dataUrl);
+                  }
+                  return mergedItem;
                 });
               const combined = [...localOnly, ...cleanedApi];
-              try {
-                localStorage.setItem('gsmscope_media_library_v1', JSON.stringify(combined));
-              } catch {}
+              safeSetLocalStorage('gsmscope_media_library_v1', JSON.stringify(combined));
               return combined;
             });
           }
@@ -2425,45 +2879,64 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addPhone = (newPhone: Phone) => {
-    const normalized = normalizePhoneRecord(newPhone);
+    const nowTs = Date.now();
+    try {
+      const deletedIds = getDeletedPhoneIds();
+      if (deletedIds.has(newPhone.id)) {
+        deletedIds.delete(newPhone.id);
+        safeSetLocalStorage('gsmscope_deleted_phone_ids_v1', JSON.stringify(Array.from(deletedIds)));
+      }
+    } catch {}
+    const normalized = normalizePhoneRecord({
+      ...newPhone,
+      createdAt: (newPhone as any).createdAt || nowTs,
+      ...(newPhone.isFeatured ? { featuredAt: (newPhone as any).featuredAt || nowTs } : {}),
+    });
     setPhones(prev => {
       const next = [normalized, ...prev.filter(p => p.id !== normalized.id)];
-      try {
-        localStorage.setItem('gsmscope_phones_v3', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(next));
       return next;
     });
     createPhoneApi(normalized).catch(console.warn);
   };
 
   const updatePhone = (updated: Phone) => {
-    const normalized = normalizePhoneRecord({
-      ...updated,
-      images: updated.image
-        ? [updated.image, ...(updated.images || []).filter(u => u !== updated.image)]
-        : updated.images
-    });
+    const nowTs = Date.now();
     setPhones(prev => {
-      const existing = prev.find(p => p.id === normalized.id);
-      const justFeatured = normalized.isFeatured && (!existing || !existing.isFeatured);
+      const existing = prev.find(p => p.id === updated.id);
+      const justFeatured = Boolean(updated.isFeatured && (!existing || !existing.isFeatured));
+      const normalized = normalizePhoneRecord({
+        ...existing,
+        ...updated,
+        createdAt: (updated as any).createdAt || (existing as any)?.createdAt || nowTs,
+        featuredAt: justFeatured
+          ? nowTs
+          : updated.isFeatured
+          ? (updated as any).featuredAt || (existing as any)?.featuredAt || nowTs
+          : undefined,
+        images: updated.image
+          ? [updated.image, ...(updated.images || []).filter(u => u !== updated.image)]
+          : updated.images
+      });
       const next = justFeatured
         ? [normalized, ...prev.filter(p => p.id !== normalized.id)]
         : prev.map(p => p.id === normalized.id ? normalized : p);
-      try {
-        localStorage.setItem('gsmscope_phones_v3', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(next));
+      setSelectedPhoneState(sel => (sel && sel.id === normalized.id ? normalized : sel));
+      updatePhoneApi(normalized.id, normalized).catch(console.warn);
       return next;
     });
-    setSelectedPhoneState(prev => (prev && prev.id === normalized.id ? normalized : prev));
-    updatePhoneApi(normalized.id, normalized).catch(console.warn);
   };
 
   const deletePhone = (id: string) => {
+    try {
+      const deletedIds = getDeletedPhoneIds();
+      deletedIds.add(id);
+      safeSetLocalStorage('gsmscope_deleted_phone_ids_v1', JSON.stringify(Array.from(deletedIds)));
+    } catch {}
     setPhones(prev => {
       const next = prev.filter(p => p.id !== id);
-      try {
-        localStorage.setItem('gsmscope_phones_v3', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(next));
       return next;
     });
     setCompareList(prev => prev.filter(cid => cid !== id));
@@ -2491,9 +2964,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         return p;
       });
-      try {
-        localStorage.setItem('gsmscope_phones_v3', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(next));
       return next;
     });
     updatePhoneApi(id, updatedFields).catch(console.warn);
@@ -2513,9 +2984,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const next = existingIdx !== -1
         ? prev.map((b, i) => (i === existingIdx ? { ...b, ...brand } : b))
         : [...prev, brand];
-      try {
-        localStorage.setItem('gsmscope_brands_v3', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_brands_v3', JSON.stringify(next));
       return next;
     });
     createBrandApi(brand).catch(console.warn);
@@ -2524,9 +2993,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateBrand = (updated: Brand) => {
     setBrands(prev => {
       const next = prev.map(b => (b.id === updated.id || b.slug === updated.slug ? updated : b));
-      try {
-        localStorage.setItem('gsmscope_brands_v3', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_brands_v3', JSON.stringify(next));
       return next;
     });
     setSelectedBrandState(prev => (prev && (prev.id === updated.id || prev.slug === updated.slug) ? updated : prev));
@@ -2558,9 +3025,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           b.slug.toLowerCase() !== targetLower &&
           b.name.toLowerCase() !== targetLower
       );
-      try {
-        localStorage.setItem('gsmscope_brands_v3', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_brands_v3', JSON.stringify(next));
       return next;
     });
     setSelectedBrandState(prev =>
@@ -2575,33 +3040,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addArticle = (article: Article) => {
-    const normalized = normalizeArticleRecord(article);
+    const nowTs = Date.now();
+    try {
+      const deletedIds = getDeletedArticleIds();
+      if (deletedIds.has(article.id)) {
+        deletedIds.delete(article.id);
+        safeSetLocalStorage('gsmscope_deleted_article_ids', JSON.stringify(Array.from(deletedIds)));
+      }
+    } catch {}
+    const normalized = normalizeArticleRecord({
+      ...article,
+      createdAt: (article as any).createdAt || nowTs,
+    });
     setArticles(prev => {
       const next = [normalized, ...prev.filter(a => a.id !== normalized.id)];
-      try {
-        localStorage.setItem('gsmscope_articles_v2', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_articles_v2', JSON.stringify(next));
       return next;
     });
     createArticleApi(normalized).catch(console.warn);
   };
 
   const updateArticle = (updated: Article) => {
-    const normalized = normalizeArticleRecord(updated);
     setArticles(prev => {
-      const exists = prev.some(a => a.id === normalized.id);
+      const existing = prev.find(a => a.id === updated.id);
+      const normalized = normalizeArticleRecord({
+        ...existing,
+        ...updated,
+        createdAt: (updated as any).createdAt || (existing as any)?.createdAt || Date.now(),
+      });
+      const exists = Boolean(existing);
       const next = exists
         ? prev.map(a => a.id === normalized.id ? normalized : a)
         : [normalized, ...prev];
-      try {
-        localStorage.setItem('gsmscope_articles_v2', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_articles_v2', JSON.stringify(next));
+      if (selectedArticle?.id === normalized.id) {
+        setSelectedArticle(normalized);
+      }
+      updateArticleApi(normalized.id, normalized).catch(console.warn);
       return next;
     });
-    if (selectedArticle?.id === normalized.id) {
-      setSelectedArticle(normalized);
-    }
-    updateArticleApi(normalized.id, normalized).catch(console.warn);
   };
 
   const deleteArticle = (id: string) => {
@@ -2609,13 +3086,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const deletedRaw = localStorage.getItem('gsmscope_deleted_article_ids');
       const deletedIds = new Set<string>(deletedRaw ? JSON.parse(deletedRaw) : []);
       deletedIds.add(id);
-      localStorage.setItem('gsmscope_deleted_article_ids', JSON.stringify(Array.from(deletedIds)));
+      safeSetLocalStorage('gsmscope_deleted_article_ids', JSON.stringify(Array.from(deletedIds)));
     } catch {}
     setArticles(prev => {
       const next = prev.filter(a => a.id !== id);
-      try {
-        localStorage.setItem('gsmscope_articles_v2', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_articles_v2', JSON.stringify(next));
       return next;
     });
     if (selectedArticle?.id === id) {
@@ -2642,9 +3117,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         return a;
       });
-      try {
-        localStorage.setItem('gsmscope_articles_v2', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_articles_v2', JSON.stringify(next));
       return next;
     });
     setSelectedArticleState(prev => {
@@ -2657,17 +3130,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addReview = (reviewData: Omit<Review, 'id' | 'date' | 'status'>) => {
+    const nowTs = Date.now();
     const newRev: Review = {
       ...reviewData,
-      id: 'rev-' + Date.now(),
+      id: 'rev-' + nowTs,
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      status: 'approved'
+      status: 'approved',
+      ...({ createdAt: nowTs } as any),
     };
     setReviews(prev => {
       const next = [newRev, ...prev];
-      try {
-        localStorage.setItem('gsmscope_reviews_v2', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_reviews_v2', JSON.stringify(next));
       return next;
     });
     submitReviewApi({
@@ -2693,9 +3166,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateReview = (updatedReview: Review) => {
     setReviews(prev => {
       const next = prev.map(r => r.id === updatedReview.id ? { ...r, ...updatedReview } : r);
-      try {
-        localStorage.setItem('gsmscope_reviews_v2', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_reviews_v2', JSON.stringify(next));
       return next;
     });
     submitReviewApi(updatedReview as any).catch(console.warn);
@@ -2704,20 +3175,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateReviewStatus = (id: string, status: 'approved' | 'pending' | 'rejected') => {
     setReviews(prev => {
       const next = prev.map(r => r.id === id ? { ...r, status } : r);
-      try {
-        localStorage.setItem('gsmscope_reviews_v2', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_reviews_v2', JSON.stringify(next));
       return next;
     });
     updateReviewStatusApi(id, status).catch(console.warn);
   };
 
   const deleteReview = (id: string) => {
+    try {
+      const deletedIds = getDeletedReviewIds();
+      deletedIds.add(id);
+      safeSetLocalStorage('gsmscope_deleted_review_ids_v1', JSON.stringify(Array.from(deletedIds)));
+    } catch {}
     setReviews(prev => {
       const next = prev.filter(r => r.id !== id);
-      try {
-        localStorage.setItem('gsmscope_reviews_v2', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_reviews_v2', JSON.stringify(next));
       return next;
     });
     deleteReviewApi(id).catch(console.warn);
@@ -2731,10 +3203,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updatedAt: nowIso,
     });
     setAdSettings(normalized);
-    try {
-      localStorage.setItem('gsmscope_ads_v3', JSON.stringify(normalized));
-      localStorage.setItem('gsmscope_ads_admin_saved_v1', 'true');
-    } catch {}
+    safeSetLocalStorage('gsmscope_ads_v3', JSON.stringify(normalized));
+    safeSetLocalStorage('gsmscope_ads_admin_saved_v1', 'true');
     updateAdSettingsApi(normalized)
       .then((serverSaved) => {
         if (serverSaved && typeof serverSaved === 'object') {
@@ -2744,9 +3214,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             placements: normalized.placements,
             updatedAt: nowIso,
           });
-          try {
-            localStorage.setItem('gsmscope_ads_v3', JSON.stringify(synced));
-          } catch {}
+          safeSetLocalStorage('gsmscope_ads_v3', JSON.stringify(synced));
         }
       })
       .catch(console.warn);
@@ -2754,21 +3222,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateWebsiteContent = async (content: Partial<WebsiteContent>): Promise<boolean> => {
     localWebsiteContentModifiedRef.current = true;
-    let mergedNext: WebsiteContent = normalizeWebsiteContent({ ...websiteContent, ...content });
+    const nowIso = new Date().toISOString();
+    let mergedNext: WebsiteContent = normalizeWebsiteContent({
+      ...websiteContent,
+      ...content,
+      ...({ updatedAt: nowIso } as any),
+    });
     setWebsiteContentState((prev) => {
-      mergedNext = normalizeWebsiteContent({ ...prev, ...content });
-      try {
-        localStorage.setItem('gsmscope_website_content_v1', JSON.stringify(mergedNext));
-      } catch {}
+      mergedNext = normalizeWebsiteContent({
+        ...prev,
+        ...content,
+        ...({ updatedAt: nowIso } as any),
+      });
+      safeSetLocalStorage('gsmscope_website_content_v1', JSON.stringify(mergedNext));
+      safeSetLocalStorage('gsmscope_website_content_admin_saved_v1', 'true');
       return mergedNext;
     });
     const res = await updateWebsiteContentApi(mergedNext);
     if (res) {
-      const serverSynced = normalizeWebsiteContent({ ...mergedNext, ...res, ...content });
+      const serverSynced = normalizeWebsiteContent({
+        ...mergedNext,
+        ...res,
+        ...content,
+        ...({ updatedAt: nowIso } as any),
+      });
       setWebsiteContentState(serverSynced);
-      try {
-        localStorage.setItem('gsmscope_website_content_v1', JSON.stringify(serverSynced));
-      } catch {}
+      safeSetLocalStorage('gsmscope_website_content_v1', JSON.stringify(serverSynced));
+      safeSetLocalStorage('gsmscope_website_content_admin_saved_v1', 'true');
       return true;
     }
     return true;
@@ -2782,9 +3262,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const localMatch = prev.find((p) => p.id === m.id || p.url === m.url);
           return localMatch?.dataUrl && !m.dataUrl ? { ...m, dataUrl: localMatch.dataUrl } : m;
         });
-        try {
-          localStorage.setItem('gsmscope_media_library_v1', JSON.stringify(merged));
-        } catch {}
+        safeSetLocalStorage('gsmscope_media_library_v1', JSON.stringify(merged));
         return merged;
       });
     }
@@ -2799,17 +3277,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     assignedPhoneId?: string;
     assignedArticleId?: string;
   }) => {
-    const res = await uploadMediaImageApi(payload);
+    const optimizedData = await optimizeImageDataUrl(payload.data);
+    const optimizedPayload = { ...payload, data: optimizedData };
+    const res = await uploadMediaImageApi(optimizedPayload);
     const resolvedMedia: MediaItem = (res.success && res.media)
       ? {
           ...res.media,
-          dataUrl: res.media.dataUrl || payload.data,
+          dataUrl: res.media.dataUrl || optimizedData,
         }
       : {
           id: `media-${Date.now()}`,
           name: payload.name || payload.filename || 'Uploaded Image',
-          url: res.url || payload.data,
-          dataUrl: payload.data,
+          url: res.url || optimizedData,
+          dataUrl: optimizedData,
           uploadedAt: new Date().toISOString(),
           category: payload.category || 'phone',
           alt: payload.alt || payload.name || payload.filename || 'Uploaded image',
@@ -2817,12 +3297,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           assignedArticleId: payload.assignedArticleId,
         };
     const finalUrl = resolvedMedia.url;
+    if (finalUrl && optimizedData.startsWith('data:')) {
+      registerUploadDataUrl(finalUrl, optimizedData);
+    }
 
     setMediaLibraryState((prev) => {
       const next = [resolvedMedia, ...prev.filter((m) => m.id !== resolvedMedia.id)];
-      try {
-        localStorage.setItem('gsmscope_media_library_v1', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_media_library_v1', JSON.stringify(next));
       return next;
     });
 
@@ -2842,9 +3323,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
           return p;
         });
-        try {
-          localStorage.setItem('gsmscope_phones_v3', JSON.stringify(next));
-        } catch {}
+        safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(next));
         return next;
       });
     }
@@ -2864,9 +3343,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
           return a;
         });
-        try {
-          localStorage.setItem('gsmscope_articles_v2', JSON.stringify(next));
-        } catch {}
+        safeSetLocalStorage('gsmscope_articles_v2', JSON.stringify(next));
         return next;
       });
     }
@@ -2899,9 +3376,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setMediaLibraryState((prev) => {
       const next = [finalItem, ...prev];
-      try {
-        localStorage.setItem('gsmscope_media_library_v1', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_media_library_v1', JSON.stringify(next));
       return next;
     });
 
@@ -2920,9 +3395,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
           return p;
         });
-        try {
-          localStorage.setItem('gsmscope_phones_v3', JSON.stringify(next));
-        } catch {}
+        safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(next));
         return next;
       });
     }
@@ -2941,9 +3414,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
           return a;
         });
-        try {
-          localStorage.setItem('gsmscope_articles_v2', JSON.stringify(next));
-        } catch {}
+        safeSetLocalStorage('gsmscope_articles_v2', JSON.stringify(next));
         return next;
       });
     }
@@ -2954,9 +3425,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const deleteMediaItem = async (id: string): Promise<boolean> => {
     setMediaLibraryState((prev) => {
       const next = prev.filter((m) => m.id !== id);
-      try {
-        localStorage.setItem('gsmscope_media_library_v1', JSON.stringify(next));
-      } catch {}
+      safeSetLocalStorage('gsmscope_media_library_v1', JSON.stringify(next));
       return next;
     });
     return await deleteMediaItemApi(id);
@@ -2973,17 +3442,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCompareList([]);
     localStorage.removeItem('gsmscope_phones_v2');
     localStorage.removeItem('gsmscope_phones_v3');
+    localStorage.removeItem('gsmscope_deleted_phone_ids_v1');
     localStorage.removeItem('gsmscope_brands_v2');
     localStorage.removeItem('gsmscope_brands_v3');
     localStorage.removeItem('gsmscope_deleted_brand_keys_v1');
     localStorage.removeItem('gsmscope_articles_v2');
     localStorage.removeItem('gsmscope_deleted_article_ids');
     localStorage.removeItem('gsmscope_reviews_v2');
+    localStorage.removeItem('gsmscope_deleted_review_ids_v1');
     localStorage.removeItem('gsmscope_ads_v2');
+    localStorage.removeItem('gsmscope_ads_v3');
+    localStorage.removeItem('gsmscope_ads_admin_saved_v1');
     localStorage.removeItem('gsmscope_compare_v2');
     localStorage.removeItem('gsmscope_compare_v3');
     localStorage.removeItem('gsmscope_website_content_v1');
+    localStorage.removeItem('gsmscope_website_content_admin_saved_v1');
     localStorage.removeItem('gsmscope_media_library_v1');
+    clearIndexedDBVault().catch(() => {});
     resetDatabaseApi().catch(console.warn);
   };
 

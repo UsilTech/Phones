@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AppProvider, useApp, SEED_PHONE_IDS } from './context/AppContext';
+import { AppProvider, useApp, SEED_PHONE_IDS, SEED_ARTICLE_IDS, getRecordTimestamp } from './context/AppContext';
 import Header from './components/common/Header';
 import Breadcrumbs from './components/common/Breadcrumbs';
 import Footer from './components/common/Footer';
@@ -273,6 +273,15 @@ function MainApp() {
       case 'rating':
         return (b.rating || 0) - (a.rating || 0);
       case 'newest': {
+        const isCustomA = !SEED_PHONE_IDS.has(a.id);
+        const isCustomB = !SEED_PHONE_IDS.has(b.id);
+        if (isCustomA && !isCustomB) return -1;
+        if (!isCustomA && isCustomB) return 1;
+        if (isCustomA && isCustomB) {
+          const tsB = getRecordTimestamp(b);
+          const tsA = getRecordTimestamp(a);
+          if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+        }
         const dateB = Date.parse(b.releaseDate || '') || (b.releaseYear ? new Date(b.releaseYear, 0, 1).getTime() : 0);
         const dateA = Date.parse(a.releaseDate || '') || (a.releaseYear ? new Date(a.releaseYear, 0, 1).getTime() : 0);
         if (dateB !== dateA) return dateB - dateA;
@@ -415,21 +424,23 @@ function MainApp() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 {(() => {
-                  // Newly added phones not selected as featured come first in Latest phones;
-                  // newly added phones selected as featured appear in Featured phone hero carousel instead.
-                  const newlyAddedNonFeatured = phones.filter(
-                    (p) => !SEED_PHONE_IDS.has(p.id) && !p.isFeatured
-                  );
+                  // Phones checked as Featured (isFeatured: true) appear in the Hero carousel and are excluded
+                  // from Latest phones unless not checked while publishing or unchecked later.
+                  // Newly added non-featured phones are always sorted newest-first at the top of Latest phones.
+                  const newlyAddedNonFeatured = [
+                    ...phones.filter((p) => !SEED_PHONE_IDS.has(p.id) && !p.isFeatured),
+                  ].sort((a, b) => {
+                    const tsB = getRecordTimestamp(b);
+                    const tsA = getRecordTimestamp(a);
+                    if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+                    return 0;
+                  });
                   const seedNonFeatured = phones.filter(
                     (p) => SEED_PHONE_IDS.has(p.id) && !p.isFeatured
-                  );
-                  const seedFallback = phones.filter(
-                    (p) => SEED_PHONE_IDS.has(p.id) && p.isFeatured
                   );
                   const latestPhonesToShow = [
                     ...newlyAddedNonFeatured,
                     ...seedNonFeatured,
-                    ...seedFallback,
                   ].slice(0, 8);
                   return latestPhonesToShow.map((phone) => {
                   const inComp = isInCompare(phone.id);
@@ -541,23 +552,23 @@ function MainApp() {
 
               {/* Phone Review Posts */}
               {(() => {
-                const seedReviewIds = new Set([
-                  'art-1', 'art-2', 'art-3', 'art-4', 'art-5', 'art-6', 'art-7', 'art-8',
-                  'art-iphone-16-pro-review', 'art-galaxy-s24-ultra-review', 'art-pixel-9-pro-review',
-                  'art-xiaomi-14-ultra-review', 'art-oneplus-12-review'
-                ]);
                 const phoneReviewArticles = articles.filter(
                   (a) =>
                     (a.category || '').toLowerCase().includes('review') ||
                     (a.title || '').toLowerCase().includes('review') ||
                     (a.tags || []).some((t) => t.toLowerCase().includes('review'))
                 );
-                // Show newly published custom review articles first; among seed reviews, keep iPhone 16 Pro Max first
+                // Show newly published custom review articles first (newest-first); among seed reviews, keep iPhone 16 Pro Max first
                 const sortedReviewArticles = [...phoneReviewArticles].sort((a, b) => {
-                  const isCustomA = !seedReviewIds.has(a.id);
-                  const isCustomB = !seedReviewIds.has(b.id);
+                  const isCustomA = !SEED_ARTICLE_IDS.has(a.id);
+                  const isCustomB = !SEED_ARTICLE_IDS.has(b.id);
                   if (isCustomA && !isCustomB) return -1;
                   if (!isCustomA && isCustomB) return 1;
+                  if (isCustomA && isCustomB) {
+                    const tsB = getRecordTimestamp(b);
+                    const tsA = getRecordTimestamp(a);
+                    if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+                  }
                   if (a.id === 'art-iphone-16-pro-review') return -1;
                   if (b.id === 'art-iphone-16-pro-review') return 1;
                   return 0;
@@ -707,9 +718,20 @@ function MainApp() {
 
               {/* News Posts (1 large featured card at top + 4 horizontal-card list underneath) */}
               {(() => {
-                const newsArticles = articles.filter(
+                const newsArticles = [...articles.filter(
                   (a) => !a.category.toLowerCase().includes('review') && !a.title.toLowerCase().includes('review')
-                );
+                )].sort((a, b) => {
+                  const isCustomA = !SEED_ARTICLE_IDS.has(a.id);
+                  const isCustomB = !SEED_ARTICLE_IDS.has(b.id);
+                  if (isCustomA && !isCustomB) return -1;
+                  if (!isCustomA && isCustomB) return 1;
+                  if (isCustomA && isCustomB) {
+                    const tsB = getRecordTimestamp(b);
+                    const tsA = getRecordTimestamp(a);
+                    if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+                  }
+                  return 0;
+                });
                 const displayNewsPosts = newsArticles.length >= 5
                   ? newsArticles.slice(0, 5)
                   : articles.slice(0, 5);

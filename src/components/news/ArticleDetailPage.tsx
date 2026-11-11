@@ -116,15 +116,10 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
     }
   };
 
-  // SIDEBAR 1: Mentioned smartphones in this article
+  // SIDEBAR 1: Mentioned smartphones explicitly linked in this article
   const mentionedPhones: Phone[] = (article.relatedPhoneIds || [])
     .map(id => phones.find(p => p.id === id))
     .filter((p): p is Phone => Boolean(p));
-
-  // Fallback if none explicitly tagged
-  const displayMentionedPhones = mentionedPhones.length > 0 
-    ? mentionedPhones 
-    : phones.slice(0, 3);
 
   // Check if this is an individual phone review article and resolve the reviewed phone
   const isReviewArticle =
@@ -145,6 +140,7 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
     const titleMatched = phones.find((p) => {
       const pName = p.name.toLowerCase().trim();
       const pBrand = p.brand.toLowerCase().trim();
+      if (!pName) return false;
       const modelOnly = pName.startsWith(pBrand + ' ')
         ? pName.slice(pBrand.length + 1).trim()
         : pName;
@@ -156,185 +152,332 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
     if (mentionedPhones.length > 0) return mentionedPhones[0];
 
     // 4. Match via slug
-    const slugMatched = phones.find((p) => slugLower.includes(p.id.toLowerCase()));
+    const slugMatched = phones.find((p) => p.id && slugLower.includes(p.id.toLowerCase()));
     if (slugMatched) return slugMatched;
 
     return undefined;
   })();
 
-  const specScores = (() => {
-    if (!reviewedPhone) return null;
-    const specs = reviewedPhone.detailedSpecs;
-    const highlights = reviewedPhone.keyHighlights;
+  // Only show phones that are genuinely linked or reviewed on this page (never show fake fallback phones)
+  const displayMentionedPhones: Phone[] = (() => {
+    const combined: Phone[] = [...mentionedPhones];
+    if (reviewedPhone && !combined.some((p) => p.id === reviewedPhone.id)) {
+      combined.unshift(reviewedPhone);
+    }
+    return combined;
+  })();
 
-    // 1. Performance score measured from AnTuTu score, chipset process node, RAM, and storage type
+  const specScores = (() => {
+    if (!isReviewArticle) return null;
+
+    const specs = reviewedPhone?.detailedSpecs;
+    const highlights = reviewedPhone?.keyHighlights;
+    const pageText = `${article.title || ''} ${article.summary || ''} ${article.content || ''}`;
+    const pageTextLower = pageText.toLowerCase();
+
+    // 1. Performance score determined strictly by real phone core specs on this page (chipset, AnTuTu, RAM, storage type)
     const antutuRaw = specs?.platform?.antutuScore || '';
-    const antutuValue = parseInt(antutuRaw.replace(/[^0-9]/g, ''), 10) || 0;
-    const chipsetText = `${specs?.platform?.chipset || ''} ${highlights?.processor || ''} ${specs?.platform?.cpu || ''}`.toLowerCase();
-    const ramText = `${(specs?.memory?.ramVariants || []).join(' ')} ${highlights?.ram || ''}`;
-    const ramMatches = ramText.match(/(\d+)\s*GB/gi) || [];
+    const pageAntutuMatch =
+      pageText.match(/(\d[\d,]{5,8})\s*(?:points?)?\s*\(?antutu/i) ||
+      pageText.match(/antutu[^0-9]{0,25}(\d[\d,]{5,8})/i);
+    const antutuValue =
+      parseInt(antutuRaw.replace(/[^0-9]/g, ''), 10) ||
+      (pageAntutuMatch ? parseInt(pageAntutuMatch[1].replace(/[^0-9]/g, ''), 10) : 0);
+
+    const phoneChipsetRaw = `${specs?.platform?.chipset || ''} ${highlights?.processor || ''} ${specs?.platform?.cpu || ''}`.trim();
+    const pageChipsetMatch = pageText.match(
+      /\b(snapdragon\s+[a-z0-9\s\+]+|dimensity\s+\d+[a-z0-9\s\-]*|apple\s+a\d+\s*(?:pro|bionic)?|a1[5-9]\s*(?:pro|bionic)|exynos\s+\d+|tensor\s+g\d+|helio\s+[a-z0-9]+|unisoc\s+[a-z0-9]+|kirin\s+\d+)/i
+    );
+    const chipsetText = `${phoneChipsetRaw} ${pageChipsetMatch ? pageChipsetMatch[1] : ''}`.toLowerCase().trim();
+
+    const phoneRamRaw = `${(specs?.memory?.ramVariants || []).join(' ')} ${highlights?.ram || ''}`.trim();
+    const pageRamMatches = pageText.match(/\b(4|6|8|12|16|24)\s*GB\s*(?:RAM|LPDDR)/gi) || [];
+    const ramCombinedText = `${phoneRamRaw} ${pageRamMatches.join(' ')}`;
+    const ramMatches = ramCombinedText.match(/(\d+)\s*GB/gi) || [];
     const maxRam = ramMatches.reduce((max, item) => {
       const val = parseInt(item, 10) || 0;
-      return val > max ? val : max;
-    }, 4);
-    const storageType = (specs?.memory?.storageType || highlights?.storage || '').toLowerCase();
+      return val > max && val <= 32 ? val : max;
+    }, 0);
 
-    let perfScore = 6.0;
-    if (antutuValue >= 1750000) {
-      perfScore = 9.6;
-    } else if (antutuValue >= 1400000) {
-      perfScore = 9.2 + ((antutuValue - 1400000) / 350000) * 0.4;
-    } else if (antutuValue >= 900000) {
-      perfScore = 8.3 + ((antutuValue - 900000) / 500000) * 0.8;
-    } else if (antutuValue >= 500000) {
-      perfScore = 7.4 + ((antutuValue - 500000) / 400000) * 0.8;
-    } else if (antutuValue > 0) {
-      perfScore = 5.8 + (Math.min(antutuValue, 500000) / 500000) * 1.5;
-    } else {
-      if (chipsetText.includes('3 nm') || chipsetText.includes('3nm') || chipsetText.includes('a18') || chipsetText.includes('8 gen 3') || chipsetText.includes('8 elite')) {
-        perfScore = 9.6;
-      } else if (chipsetText.includes('4 nm') || chipsetText.includes('4nm') || chipsetText.includes('8 gen 2') || chipsetText.includes('tensor g4') || chipsetText.includes('tensor g3')) {
-        perfScore = 8.9;
-      } else if (chipsetText.includes('6 nm') || chipsetText.includes('6nm') || chipsetText.includes('dimensity')) {
-        perfScore = 7.8;
-      } else {
-        perfScore = 6.3;
+    const storageType = `${specs?.memory?.storageType || ''} ${
+      /\b(ufs\s*[234]\.\d|nvme|emmc\s*5\.1)\b/i.exec(pageText)?.[0] || ''
+    }`.toLowerCase().trim();
+
+    const hasRealPerfSpecs =
+      antutuValue > 0 ||
+      Boolean(phoneChipsetRaw && phoneChipsetRaw.toLowerCase() !== 'octa-core 5g processor' && phoneChipsetRaw.toLowerCase() !== 'octa-core') ||
+      Boolean(pageChipsetMatch) ||
+      maxRam > 0 ||
+      Boolean(storageType);
+
+    let perfScore: number | null = null;
+    if (hasRealPerfSpecs) {
+      let score = 6.2;
+      if (antutuValue >= 1750000) {
+        score = 9.6;
+      } else if (antutuValue >= 1400000) {
+        score = 9.2 + ((antutuValue - 1400000) / 350000) * 0.4;
+      } else if (antutuValue >= 900000) {
+        score = 8.3 + ((antutuValue - 900000) / 500000) * 0.8;
+      } else if (antutuValue >= 500000) {
+        score = 7.4 + ((antutuValue - 500000) / 400000) * 0.8;
+      } else if (antutuValue > 0) {
+        score = 5.8 + (Math.min(antutuValue, 500000) / 500000) * 1.5;
+      } else if (
+        chipsetText.includes('3 nm') ||
+        chipsetText.includes('3nm') ||
+        chipsetText.includes('a18') ||
+        chipsetText.includes('a17 pro') ||
+        chipsetText.includes('8 gen 3') ||
+        chipsetText.includes('8 elite') ||
+        chipsetText.includes('dimensity 9400') ||
+        chipsetText.includes('dimensity 9300')
+      ) {
+        score = 9.5;
+      } else if (
+        chipsetText.includes('4 nm') ||
+        chipsetText.includes('4nm') ||
+        chipsetText.includes('8 gen 2') ||
+        chipsetText.includes('8s gen 3') ||
+        chipsetText.includes('a16') ||
+        chipsetText.includes('tensor g4') ||
+        chipsetText.includes('tensor g3') ||
+        chipsetText.includes('dimensity 9200') ||
+        chipsetText.includes('dimensity 8300') ||
+        chipsetText.includes('exynos 2400')
+      ) {
+        score = 8.9;
+      } else if (
+        chipsetText.includes('6 nm') ||
+        chipsetText.includes('6nm') ||
+        chipsetText.includes('7 gen') ||
+        chipsetText.includes('dimensity 8') ||
+        chipsetText.includes('dimensity 7') ||
+        chipsetText.includes('a15')
+      ) {
+        score = 8.0;
+      } else if (chipsetText.includes('dimensity') || chipsetText.includes('snapdragon') || chipsetText.includes('helio g99') || chipsetText.includes('helio g100')) {
+        score = 7.4;
+      } else if (chipsetText.length > 0) {
+        score = 6.8;
       }
+
+      if (maxRam >= 16) score += 0.3;
+      else if (maxRam >= 12) score += 0.2;
+      else if (maxRam >= 8) score += 0.1;
+      else if (maxRam > 0 && maxRam <= 4) score -= 0.2;
+
+      if (storageType.includes('ufs 4') || storageType.includes('nvme')) score += 0.2;
+      else if (storageType.includes('ufs 3')) score += 0.1;
+      else if (storageType.includes('emmc')) score -= 0.2;
+
+      perfScore = Math.min(10, Math.max(5.0, Math.round(score * 10) / 10));
     }
 
-    if (maxRam >= 16) perfScore += 0.3;
-    else if (maxRam >= 12) perfScore += 0.2;
-    else if (maxRam >= 8) perfScore += 0.1;
-    else if (maxRam <= 4) perfScore -= 0.2;
+    // 2. Camera score determined strictly by real phone core specs on this page (MP, OIS, telephoto/periscope, video, selfie)
+    const phoneCamRaw = `${specs?.mainCamera?.setup || ''} ${specs?.mainCamera?.features || ''} ${highlights?.camera || ''}`.trim();
+    const phoneVideoRaw = (specs?.mainCamera?.video || '').trim();
+    const phoneSelfieRaw = `${specs?.selfieCamera?.setup || ''} ${specs?.selfieCamera?.video || ''}`.trim();
 
-    if (storageType.includes('ufs 4') || storageType.includes('nvme')) perfScore += 0.2;
-    else if (storageType.includes('ufs 3')) perfScore += 0.1;
-    else if (storageType.includes('emmc')) perfScore -= 0.2;
-
-    perfScore = Math.min(10, Math.max(5.0, Math.round(perfScore * 10) / 10));
-
-    // 2. Camera score measured from primary MP, OIS, telephoto/periscope zoom, ultrawide, video capability, and selfie specs
-    const mainCamText = `${specs?.mainCamera?.setup || ''} ${specs?.mainCamera?.features || ''} ${highlights?.camera || ''}`.toLowerCase();
-    const mainVideoText = (specs?.mainCamera?.video || '').toLowerCase();
-    const selfieText = `${specs?.selfieCamera?.setup || ''} ${specs?.selfieCamera?.video || ''}`.toLowerCase();
+    const pageCamMpMatches = pageText.match(/\b(\d{2,3})\s*MP\b/gi) || [];
+    const mainCamText = `${phoneCamRaw} ${pageCamMpMatches.join(' ')}`.toLowerCase();
+    const mainVideoText = `${phoneVideoRaw} ${/\b(8k|4k@\d+fps|4k\s*video|1080p)\b/i.exec(pageText)?.[0] || ''}`.toLowerCase();
+    const selfieText = phoneSelfieRaw.toLowerCase();
 
     const mpMatches = mainCamText.match(/(\d+)\s*mp/gi) || [];
     const maxMainMp = mpMatches.reduce((max, item) => {
       const val = parseInt(item, 10) || 0;
-      return val > max ? val : max;
-    }, 12);
+      return val > max && val <= 250 ? val : max;
+    }, 0);
 
-    let camScore = 5.4;
-    if (maxMainMp >= 200) camScore += 1.4;
-    else if (maxMainMp >= 100) camScore += 1.1;
-    else if (maxMainMp >= 48) camScore += 0.9;
-    else if (maxMainMp >= 32) camScore += 0.6;
-    else camScore += 0.2;
+    const hasRealCamSpecs =
+      maxMainMp > 0 ||
+      Boolean(phoneCamRaw) ||
+      Boolean(phoneVideoRaw) ||
+      /\b(ois|periscope|telephoto|ultrawide)\b/i.test(phoneCamRaw);
 
-    if (mainCamText.includes('ois') || mainCamText.includes('sensor-shift')) camScore += 1.2;
-    if (mainCamText.includes('periscope') || mainCamText.includes('5x') || mainCamText.includes('telephoto') || mainCamText.includes('3x')) camScore += 1.1;
-    if (mainCamText.includes('ultrawide') || mainCamText.includes('uw') || mainCamText.includes('120˚') || mainCamText.includes('114˚')) camScore += 0.5;
-    if (mainVideoText.includes('8k') || mainVideoText.includes('4k@120') || mainVideoText.includes('prores') || mainVideoText.includes('10-bit')) camScore += 0.6;
-    else if (mainVideoText.includes('4k@60') || mainVideoText.includes('4k@30/60')) camScore += 0.4;
-    else if (mainVideoText.includes('4k')) camScore += 0.2;
+    let camScore: number | null = null;
+    if (hasRealCamSpecs) {
+      let score = 5.6;
+      if (maxMainMp >= 200) score += 1.4;
+      else if (maxMainMp >= 100) score += 1.1;
+      else if (maxMainMp >= 48) score += 0.9;
+      else if (maxMainMp >= 32) score += 0.6;
+      else if (maxMainMp > 0) score += 0.3;
 
-    if (selfieText.includes('4k') || selfieText.includes('50 mp') || selfieText.includes('32 mp')) camScore += 0.3;
-    else if (selfieText.includes('12 mp') || selfieText.includes('16 mp')) camScore += 0.1;
+      const camSearchScope = `${mainCamText} ${Boolean(phoneCamRaw) ? '' : pageTextLower}`;
+      if (camSearchScope.includes('ois') || camSearchScope.includes('sensor-shift')) score += 1.2;
+      if (camSearchScope.includes('periscope') || camSearchScope.includes('5x') || camSearchScope.includes('telephoto') || camSearchScope.includes('3x')) score += 1.1;
+      if (camSearchScope.includes('ultrawide') || camSearchScope.includes('uw') || camSearchScope.includes('120˚') || camSearchScope.includes('114˚')) score += 0.5;
+      if (mainVideoText.includes('8k') || mainVideoText.includes('4k@120') || mainVideoText.includes('prores') || mainVideoText.includes('10-bit')) score += 0.6;
+      else if (mainVideoText.includes('4k@60') || mainVideoText.includes('4k@30/60')) score += 0.4;
+      else if (mainVideoText.includes('4k')) score += 0.2;
 
-    camScore = Math.min(10, Math.max(5.0, Math.round(camScore * 10) / 10));
+      if (selfieText.includes('4k') || selfieText.includes('50 mp') || selfieText.includes('32 mp')) score += 0.3;
+      else if (selfieText.includes('12 mp') || selfieText.includes('16 mp')) score += 0.1;
 
-    // 3. Battery score measured from mAh capacity, wired charging wattage, wireless charging, and silicon efficiency
-    const batCapRaw = `${specs?.battery?.capacity || ''} ${highlights?.battery || ''}`;
-    const batCapMatch = batCapRaw.match(/(\d{4,5})\s*mah/i) || batCapRaw.match(/(\d{4,5})/);
-    const batteryMah = batCapMatch ? parseInt(batCapMatch[1], 10) : 5000;
+      camScore = Math.min(10, Math.max(5.0, Math.round(score * 10) / 10));
+    }
 
-    const chargeRaw = `${specs?.battery?.charging || ''} ${highlights?.charging || ''}`;
-    const wattMatch = chargeRaw.match(/(\d+)\s*w/i);
-    const chargeWatts = wattMatch ? parseInt(wattMatch[1], 10) : 18;
+    // 3. Battery score determined strictly by real phone core specs on this page (mAh capacity, charging wattage, wireless charging)
+    const phoneBatRaw = `${specs?.battery?.capacity || ''} ${highlights?.battery || ''}`.trim();
+    const batCapSource = phoneBatRaw || pageText;
+    const batCapMatch = batCapSource.match(/\b(\d{4,5})\s*mAh\b/i) || phoneBatRaw.match(/\b(\d{4,5})\b/);
+    const batteryMah = batCapMatch ? parseInt(batCapMatch[1], 10) : 0;
+
+    const phoneChargeRaw = `${specs?.battery?.charging || ''} ${highlights?.charging || ''}`.trim();
+    const wattMatch =
+      phoneChargeRaw.match(/\b(\d{1,3})\s*W\b/i) ||
+      pageText.match(/\b(\d{2,3})\s*W\s*(?:wired|fast|supervooc|hypercharge|charging|turbo)/i);
+    const chargeWatts = wattMatch ? parseInt(wattMatch[1], 10) : 0;
 
     const wirelessRaw = (specs?.battery?.wirelessCharging || '').toLowerCase();
-    const hasWireless = wirelessRaw.length > 0 && !wirelessRaw.startsWith('no') && !wirelessRaw.includes('none');
+    const hasWireless =
+      (wirelessRaw.length > 0 && !wirelessRaw.startsWith('no') && !wirelessRaw.includes('none')) ||
+      /\b\d+\s*W\s*wireless\b/i.test(pageText);
 
-    let batScore = 5.0;
-    if (batteryMah >= 6000) batScore += 2.6;
-    else if (batteryMah >= 5400) batScore += 2.3;
-    else if (batteryMah >= 5100) batScore += 1.9;
-    else if (batteryMah >= 5000) batScore += 1.6;
-    else if (batteryMah >= 4600) batScore += 1.3;
-    else batScore += 0.9;
+    const hasRealBatSpecs = batteryMah > 0 || chargeWatts > 0 || Boolean(phoneBatRaw) || Boolean(phoneChargeRaw);
 
-    if (chargeWatts >= 100) batScore += 1.8;
-    else if (chargeWatts >= 65) batScore += 1.4;
-    else if (chargeWatts >= 40) batScore += 1.0;
-    else if (chargeWatts >= 25) batScore += 0.7;
-    else if (chargeWatts >= 18) batScore += 0.3;
+    let batScore: number | null = null;
+    if (hasRealBatSpecs) {
+      let score = 5.2;
+      if (batteryMah >= 6000) score += 2.6;
+      else if (batteryMah >= 5400) score += 2.3;
+      else if (batteryMah >= 5100) score += 1.9;
+      else if (batteryMah >= 5000) score += 1.6;
+      else if (batteryMah >= 4500) score += 1.3;
+      else if (batteryMah > 0) score += 0.8;
 
-    if (hasWireless) batScore += 0.6;
-    if (chipsetText.includes('3 nm') || chipsetText.includes('3nm')) batScore += 0.5;
-    else if (chipsetText.includes('4 nm') || chipsetText.includes('4nm')) batScore += 0.3;
+      if (chargeWatts >= 100) score += 1.8;
+      else if (chargeWatts >= 65) score += 1.4;
+      else if (chargeWatts >= 40) score += 1.0;
+      else if (chargeWatts >= 25) score += 0.7;
+      else if (chargeWatts >= 15) score += 0.4;
 
-    batScore = Math.min(10, Math.max(5.0, Math.round(batScore * 10) / 10));
+      if (hasWireless) score += 0.5;
+      if (chipsetText.includes('3 nm') || chipsetText.includes('3nm')) score += 0.4;
+      else if (chipsetText.includes('4 nm') || chipsetText.includes('4nm')) score += 0.2;
 
-    // 4. Display score measured from panel technology, refresh rate, pixel density (PPI), peak brightness (nits), and glass protection
-    const dispType = `${specs?.display?.type || ''} ${highlights?.display || ''}`.toLowerCase();
-    const dispRes = (specs?.display?.resolution || '').toLowerCase();
-    const dispBright = `${specs?.display?.brightness || ''} ${specs?.display?.type || ''}`.toLowerCase();
-    const dispRefresh = `${specs?.display?.refreshRate || ''} ${dispType}`.toLowerCase();
-    const dispProt = (specs?.display?.protection || '').toLowerCase();
-
-    let dispScore = 5.2;
-    if (dispType.includes('ltpo') || dispType.includes('super retina xdr') || dispType.includes('super actua') || dispType.includes('dynamic ltpo')) {
-      dispScore += 2.1;
-    } else if (dispType.includes('amoled') || dispType.includes('oled')) {
-      dispScore += 1.6;
-    } else {
-      dispScore += 0.5;
+      batScore = Math.min(10, Math.max(5.0, Math.round(score * 10) / 10));
     }
 
-    if (dispRefresh.includes('144hz') || dispRefresh.includes('1-120hz') || dispRefresh.includes('adaptive')) {
-      dispScore += 1.1;
-    } else if (dispRefresh.includes('120hz')) {
-      dispScore += 0.9;
-    } else if (dispRefresh.includes('90hz')) {
-      dispScore += 0.5;
+    // 4. Display score determined strictly by real phone core specs on this page (panel type, refresh rate, resolution/PPI, nits brightness)
+    const phoneDispTypeRaw = `${specs?.display?.type || ''} ${highlights?.display || ''}`.trim();
+    const phoneDispResRaw = (specs?.display?.resolution || '').trim();
+    const phoneDispBrightRaw = (specs?.display?.brightness || '').trim();
+    const phoneDispRefreshRaw = (specs?.display?.refreshRate || '').trim();
+    const phoneDispProtRaw = (specs?.display?.protection || '').trim();
+
+    const pageDispPanelMatch = pageText.match(/\b(dynamic\s+ltpo\s+amoled|ltpo\s+amoled|super\s+retina\s+xdr|super\s+actua|amoled|oled|ips\s+lcd)\b/i);
+    const pageRefreshMatch = pageText.match(/\b(60|90|120|144|165)\s*Hz\b/i);
+    const pageNitsMatch = pageText.match(/\b(\d{3,4})\s*nits\b/i);
+
+    const dispType = `${phoneDispTypeRaw} ${pageDispPanelMatch ? pageDispPanelMatch[1] : ''}`.toLowerCase().trim();
+    const dispRes = phoneDispResRaw.toLowerCase();
+    const dispBright = `${phoneDispBrightRaw} ${phoneDispTypeRaw} ${pageNitsMatch ? pageNitsMatch[0] : ''}`.toLowerCase();
+    const dispRefresh = `${phoneDispRefreshRaw} ${dispType} ${pageRefreshMatch ? pageRefreshMatch[0] : ''}`.toLowerCase();
+    const dispProt = phoneDispProtRaw.toLowerCase();
+
+    const hasRealDispSpecs =
+      Boolean(phoneDispTypeRaw) ||
+      Boolean(phoneDispResRaw) ||
+      Boolean(phoneDispBrightRaw) ||
+      Boolean(phoneDispRefreshRaw) ||
+      Boolean(pageDispPanelMatch) ||
+      Boolean(pageRefreshMatch) ||
+      Boolean(pageNitsMatch);
+
+    let dispScore: number | null = null;
+    if (hasRealDispSpecs) {
+      let score = 5.4;
+      if (dispType.includes('ltpo') || dispType.includes('super retina xdr') || dispType.includes('super actua') || dispType.includes('dynamic ltpo')) {
+        score += 2.1;
+      } else if (dispType.includes('amoled') || dispType.includes('oled')) {
+        score += 1.6;
+      } else if (dispType.length > 0) {
+        score += 0.6;
+      }
+
+      if (dispRefresh.includes('165hz') || dispRefresh.includes('144hz') || dispRefresh.includes('1-120hz') || dispRefresh.includes('adaptive')) {
+        score += 1.1;
+      } else if (dispRefresh.includes('120hz')) {
+        score += 0.9;
+      } else if (dispRefresh.includes('90hz')) {
+        score += 0.5;
+      }
+
+      const ppiMatch = dispRes.match(/(\d{3})\s*ppi/i);
+      const ppi = ppiMatch
+        ? parseInt(ppiMatch[1], 10)
+        : dispRes.includes('1440') || dispRes.includes('1320') || dispRes.includes('1264') || dispRes.includes('1220')
+        ? 450
+        : dispRes.includes('1080')
+        ? 395
+        : 0;
+      if (ppi >= 440) score += 0.8;
+      else if (ppi >= 380) score += 0.5;
+      else if (ppi > 0) score += 0.2;
+
+      const nitsMatch = dispBright.match(/(\d{3,4})\s*nits/i);
+      const nits = nitsMatch ? parseInt(nitsMatch[1], 10) : 0;
+      if (nits >= 2400) score += 0.8;
+      else if (nits >= 1600) score += 0.6;
+      else if (nits >= 1000) score += 0.4;
+      else if (nits > 0) score += 0.2;
+
+      if (dispProt.includes('armor') || dispProt.includes('victus') || dispProt.includes('ceramic shield')) {
+        score += 0.2;
+      }
+
+      dispScore = Math.min(10, Math.max(5.0, Math.round(score * 10) / 10));
     }
 
-    const ppiMatch = dispRes.match(/(\d{3})\s*ppi/i);
-    const ppi = ppiMatch
-      ? parseInt(ppiMatch[1], 10)
-      : dispRes.includes('1440') || dispRes.includes('1320') || dispRes.includes('1264') || dispRes.includes('1220')
-      ? 450
-      : dispRes.includes('1080')
-      ? 395
-      : 265;
-    if (ppi >= 440) dispScore += 0.8;
-    else if (ppi >= 380) dispScore += 0.5;
-    else dispScore += 0.1;
-
-    const nitsMatch = dispBright.match(/(\d{3,4})\s*nits/i);
-    const nits = nitsMatch ? parseInt(nitsMatch[1], 10) : 600;
-    if (nits >= 2400) dispScore += 0.8;
-    else if (nits >= 1600) dispScore += 0.6;
-    else if (nits >= 1000) dispScore += 0.4;
-    else dispScore += 0.1;
-
-    if (dispProt.includes('armor') || dispProt.includes('victus') || dispProt.includes('ceramic shield')) {
-      dispScore += 0.2;
+    const metrics: Array<{ label: string; value: number; detail?: string }> = [];
+    if (perfScore !== null) {
+      const perfDetail =
+        specs?.platform?.chipset ||
+        highlights?.processor ||
+        (pageChipsetMatch ? pageChipsetMatch[1] : '') ||
+        (maxRam > 0 ? `${maxRam}GB RAM` : '');
+      metrics.push({ label: 'Performance', value: perfScore, detail: perfDetail || undefined });
+    }
+    if (camScore !== null) {
+      const camDetail =
+        highlights?.camera ||
+        specs?.mainCamera?.setup ||
+        (maxMainMp > 0 ? `${maxMainMp}MP Camera` : '');
+      metrics.push({ label: 'Camera', value: camScore, detail: camDetail || undefined });
+    }
+    if (batScore !== null) {
+      const batParts = [
+        batteryMah > 0 ? `${batteryMah} mAh` : (highlights?.battery || ''),
+        chargeWatts > 0 ? `${chargeWatts}W` : (highlights?.charging || ''),
+      ].filter(Boolean);
+      metrics.push({ label: 'Battery', value: batScore, detail: batParts.join(' · ') || undefined });
+    }
+    if (dispScore !== null) {
+      const dispDetail =
+        highlights?.display ||
+        specs?.display?.type ||
+        [pageDispPanelMatch?.[1], pageRefreshMatch?.[0]].filter(Boolean).join(' ');
+      metrics.push({ label: 'Display', value: dispScore, detail: dispDetail || undefined });
     }
 
-    dispScore = Math.min(10, Math.max(5.0, Math.round(dispScore * 10) / 10));
+    // Never show a fake Score Card if no phone core specs were added on this page
+    if (metrics.length === 0) {
+      return null;
+    }
 
+    const sumScores = metrics.reduce((acc, m) => acc + m.value, 0);
     const overallScore = Math.min(
       10,
-      Math.max(5.0, Math.round(((perfScore + camScore + batScore + dispScore) / 4) * 10) / 10)
+      Math.max(5.0, Math.round((sumScores / metrics.length) * 10) / 10)
     );
 
     return {
       overall: overallScore,
-      performance: perfScore,
-      camera: camScore,
-      battery: batScore,
-      display: dispScore,
+      metrics,
+      phoneName: reviewedPhone?.name,
     };
   })();
 
@@ -402,7 +545,7 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
             <FormattedContent content={article.content} />
           </div>
 
-          {/* Expert Score Card after last paragraph on individual phone review pages */}
+          {/* Expert Score Card after last paragraph on individual phone review pages (only shown when real phone core specs exist on the page) */}
           {isReviewArticle && specScores && (
             <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-950/80 border border-slate-200/90 dark:border-slate-800 shadow-sm">
               {/* Top Row: Circular Ring Score + Title */}
@@ -441,25 +584,27 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
                     Score
                   </h3>
                   <p className="text-xs sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1">
-                    Out of 10, from our testing
+                    Out of 10 — calculated from {specScores.phoneName ? `${specScores.phoneName} core specs` : 'phone core specs on this page'}
                   </p>
                 </div>
               </div>
 
               {/* Spec-Measured Sub-Score Bars */}
               <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                {[
-                  { label: 'Performance', value: specScores.performance },
-                  { label: 'Camera', value: specScores.camera },
-                  { label: 'Battery', value: specScores.battery },
-                  { label: 'Display', value: specScores.display },
-                ].map((metric) => (
+                {specScores.metrics.map((metric) => (
                   <div key={metric.label} className="py-3.5 sm:py-4 first:pt-2 last:pb-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm sm:text-base font-normal text-slate-900 dark:text-slate-100">
-                        {metric.label}
-                      </span>
-                      <span className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="min-w-0">
+                        <span className="text-sm sm:text-base font-normal text-slate-900 dark:text-slate-100">
+                          {metric.label}
+                        </span>
+                        {metric.detail && (
+                          <span className="block text-[11px] font-mono text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                            {metric.detail}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-sm sm:text-base font-bold text-slate-900 dark:text-white shrink-0">
                         {formatScoreValue(metric.value)}
                       </span>
                     </div>
@@ -580,54 +725,56 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
         <aside aria-label="Article related sidebars" className="lg:col-span-4 space-y-6">
 
           {/* SIDEBAR WIDGET 1: Smartphones Mentioned in this Article */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm font-['Space_Grotesk'] flex items-center gap-2">
-                <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Phones Mentioned</span>
-              </h3>
-              <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
-                {displayMentionedPhones.length} Devices
-              </span>
-            </div>
+          {displayMentionedPhones.length > 0 && (
+            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm font-['Space_Grotesk'] flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>Phones Mentioned</span>
+                </h3>
+                <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                  {displayMentionedPhones.length} {displayMentionedPhones.length === 1 ? 'Device' : 'Devices'}
+                </span>
+              </div>
 
-            <div className="space-y-3">
-              {displayMentionedPhones.map((p) => (
-                <div
-                  key={p.id}
-                  onClick={() => {
-                    setSelectedArticle(null);
-                    setSelectedPhone(p);
-                  }}
-                  className="group p-3 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 hover:border-emerald-500/50 hover:bg-emerald-50/30 dark:hover:bg-[#061a11] transition-all cursor-pointer flex items-center gap-3"
-                >
-                  <div className="w-[58px] h-14 bg-slate-950 rounded-lg overflow-hidden p-0 shrink-0 border border-slate-200 dark:border-slate-800">
-                    <img
-                      src={p.image}
-                      alt={p.name}
-                      loading="lazy"
-                      decoding="async"
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 block truncate">
-                      {p.brand}
-                    </span>
-                    <h4 className="post-title font-bold text-slate-900 dark:text-white text-xs leading-snug group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                      {p.name}
-                    </h4>
-                    <div className="flex items-center justify-end text-[11px] mt-1">
-                      <span className="text-slate-400 text-[10px] group-hover:text-emerald-500 flex items-center">
-                        Specs →
+              <div className="space-y-3">
+                {displayMentionedPhones.map((p) => (
+                  <div
+                    key={p.id}
+                    onClick={() => {
+                      setSelectedArticle(null);
+                      setSelectedPhone(p);
+                    }}
+                    className="group p-3 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 hover:border-emerald-500/50 hover:bg-emerald-50/30 dark:hover:bg-[#061a11] transition-all cursor-pointer flex items-center gap-3"
+                  >
+                    <div className="w-[58px] h-14 bg-slate-950 rounded-lg overflow-hidden p-0 shrink-0 border border-slate-200 dark:border-slate-800">
+                      <img
+                        src={p.image}
+                        alt={p.name}
+                        loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 block truncate">
+                        {p.brand}
                       </span>
+                      <h4 className="post-title font-bold text-slate-900 dark:text-white text-xs leading-snug group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                        {p.name}
+                      </h4>
+                      <div className="flex items-center justify-end text-[11px] mt-1">
+                        <span className="text-slate-400 text-[10px] group-hover:text-emerald-500 flex items-center">
+                          Specs →
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* SIDEBAR WIDGET 2: Popular Phones by Views Count */}
           <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">

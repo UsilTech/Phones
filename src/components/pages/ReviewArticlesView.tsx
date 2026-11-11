@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useApp, SEED_ARTICLE_IDS, getRecordTimestamp } from '../../context/AppContext';
 import { useSeoMeta } from '../seo/SeoMeta';
 import AdPlacementSlot from '../common/AdPlacementSlot';
 import {
@@ -25,29 +25,6 @@ export default function ReviewArticlesView() {
 
   const [selectedFilter, setSelectedFilter] = useState<string>('All');
 
-  const seedReviewIds = new Set([
-    'art-1',
-    'art-2',
-    'art-3',
-    'art-4',
-    'art-5',
-    'art-6',
-    'art-7',
-    'art-8',
-    'art-iphone-16-pro-review',
-    'art-s24-ultra-review',
-    'art-galaxy-s24-ultra-review',
-    'art-google-pixel-9-pro-review',
-    'art-pixel-9-pro-review',
-    'art-xiaomi-14-ultra-review',
-    'art-oneplus-12-review',
-    'art-oneplus-12r-review',
-    'art-xiaomi-redmi-13c-review',
-    'art-infinix-note-40-fastcharge',
-    'art-apple-iphone-battery-tips',
-    'art-redmi-vs-infinix',
-  ]);
-
   const allReviewArticles = articles.filter(
     (a) =>
       (a.category || '').toLowerCase().includes('review') ||
@@ -55,12 +32,17 @@ export default function ReviewArticlesView() {
       (a.tags || []).some((t) => t.toLowerCase().includes('review'))
   );
 
-  // Show newly published custom review articles first; among seed reviews, keep iPhone 16 Pro Max first
+  // Show newly published custom review articles first (sorted newest-first); among seed reviews, keep iPhone 16 Pro Max first
   const sortedReviewArticles = [...allReviewArticles].sort((a, b) => {
-    const isCustomA = !seedReviewIds.has(a.id);
-    const isCustomB = !seedReviewIds.has(b.id);
+    const isCustomA = !SEED_ARTICLE_IDS.has(a.id);
+    const isCustomB = !SEED_ARTICLE_IDS.has(b.id);
     if (isCustomA && !isCustomB) return -1;
     if (!isCustomA && isCustomB) return 1;
+    if (isCustomA && isCustomB) {
+      const tsB = getRecordTimestamp(b);
+      const tsA = getRecordTimestamp(a);
+      if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+    }
     if (a.id === 'art-iphone-16-pro-review') return -1;
     if (b.id === 'art-iphone-16-pro-review') return 1;
     return 0;

@@ -1,4 +1,5 @@
 import { Phone, Brand, Article, Review, AdSettings, ContactInquiry, NewsletterSubscriber, NewsletterBroadcast, WebsiteContent, MediaItem } from '../types';
+import { safeSetLocalStorage } from './persistentVault';
 
 /**
  * GsmScope Full-Stack API Client
@@ -360,6 +361,23 @@ export async function importDatabaseApi(payload: {
   }
 }
 
+export async function syncVaultWithServerApi(payload: {
+  uploadDataUrls?: Record<string, string>;
+  mediaLibrary?: MediaItem[];
+}): Promise<boolean> {
+  try {
+    const res = await fetch('/api/database/sync-vault', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('API syncVaultWithServer failed:', err);
+    return false;
+  }
+}
+
 export async function resetDatabaseApi(): Promise<boolean> {
   try {
     const res = await fetch('/api/database/reset', {
@@ -397,7 +415,7 @@ export async function submitContactInquiryApi(data: {
       const existing: ContactInquiry[] = raw ? JSON.parse(raw) : [];
       const filtered = Array.isArray(existing) ? existing.filter((i) => i && i.id !== inquiryToSave.id) : [];
       const updated = [inquiryToSave, ...filtered];
-      localStorage.setItem('gsmscope_contact_inquiries_v1', JSON.stringify(updated));
+      safeSetLocalStorage('gsmscope_contact_inquiries_v1', JSON.stringify(updated));
       window.dispatchEvent(new CustomEvent('gsmscope:contact-updated', { detail: inquiryToSave }));
     } catch {}
   };
@@ -464,7 +482,7 @@ export async function subscribeNewsletterApi(email: string): Promise<{
     wasAlreadyInLocal = savedList.some((item) => item.email.toLowerCase() === cleanEmail);
     if (!wasAlreadyInLocal) {
       savedList.push({ email: cleanEmail, subscribedAt: new Date().toISOString() });
-      localStorage.setItem('gsmscope_newsletter_subscribers', JSON.stringify(savedList));
+      safeSetLocalStorage('gsmscope_newsletter_subscribers', JSON.stringify(savedList));
     }
   } catch {
     // Ignore localStorage quota/privacy errors
@@ -653,11 +671,16 @@ export async function deleteContactInquiryApi(id: string): Promise<boolean> {
   try {
     if (typeof window !== 'undefined') {
       try {
+        const deletedRaw = localStorage.getItem('gsmscope_deleted_inquiry_ids_v1');
+        const deletedSet = new Set<string>(deletedRaw ? JSON.parse(deletedRaw) : []);
+        deletedSet.add(id);
+        safeSetLocalStorage('gsmscope_deleted_inquiry_ids_v1', JSON.stringify(Array.from(deletedSet)));
+
         const raw = localStorage.getItem('gsmscope_contact_inquiries_v1');
         if (raw) {
           const parsed: ContactInquiry[] = JSON.parse(raw);
           if (Array.isArray(parsed)) {
-            localStorage.setItem(
+            safeSetLocalStorage(
               'gsmscope_contact_inquiries_v1',
               JSON.stringify(parsed.filter((i) => i && i.id !== id))
             );
@@ -673,6 +696,104 @@ export async function deleteContactInquiryApi(id: string): Promise<boolean> {
     console.warn('API deleteContactInquiry failed:', err);
     return false;
   }
+}
+
+export async function syncContactInquiriesWithServer(
+  providedServerData?: ContactInquiry[] | null
+): Promise<ContactInquiry[]> {
+  let localList: ContactInquiry[] = [];
+  let deletedIds = new Set<string>();
+
+  if (typeof window !== 'undefined') {
+    try {
+      const localRaw = localStorage.getItem('gsmscope_contact_inquiries_v1');
+      if (localRaw) {
+        const parsed = JSON.parse(localRaw);
+        if (Array.isArray(parsed)) localList = parsed.filter((i) => i && i.id);
+      }
+      const deletedRaw = localStorage.getItem('gsmscope_deleted_inquiry_ids_v1');
+      if (deletedRaw) {
+        const parsedDel = JSON.parse(deletedRaw);
+        if (Array.isArray(parsedDel)) deletedIds = new Set<string>(parsedDel);
+      }
+    } catch {}
+  }
+
+  const serverData =
+    providedServerData !== undefined ? providedServerData : await fetchContactInquiriesApi();
+
+  if (!serverData || !Array.isArray(serverData)) {
+    return localList.filter((i) => !deletedIds.has(i.id));
+  }
+
+  const serverById = new Map<string, ContactInquiry>();
+  for (const sItem of serverData) {
+    if (!sItem || !sItem.id) continue;
+    if (deletedIds.has(sItem.id)) {
+      fetch(`/api/contact/${encodeURIComponent(sItem.id)}`, { method: 'DELETE' }).catch(() => {});
+      continue;
+    }
+    serverById.set(sItem.id, sItem);
+  }
+
+  const mergedById = new Map<string, ContactInquiry>();
+
+  for (const locItem of localList) {
+    if (!locItem || !locItem.id || deletedIds.has(locItem.id)) continue;
+    const srvItem = serverById.get(locItem.id);
+    if (!srvItem) {
+      // Local message missing on server (e.g. after publish/container restart) -> re-sync to server
+      fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(locItem),
+      }).catch(() => {});
+      mergedById.set(locItem.id, locItem);
+    } else {
+      const merged: ContactInquiry = {
+        ...srvItem,
+        ...locItem,
+        status:
+          locItem.replied || srvItem.replied
+            ? 'replied'
+            : locItem.status === 'read' || srvItem.status === 'read'
+            ? 'read'
+            : 'unread',
+        replied: Boolean(locItem.replied || srvItem.replied),
+        repliedAt: locItem.repliedAt || srvItem.repliedAt,
+        replySubject: locItem.replySubject || srvItem.replySubject,
+        replyMessage: locItem.replyMessage || srvItem.replyMessage,
+      };
+      if (merged.replied !== srvItem.replied || merged.status !== srvItem.status) {
+        fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(merged),
+        }).catch(() => {});
+      }
+      mergedById.set(merged.id, merged);
+    }
+  }
+
+  for (const [id, srvItem] of serverById.entries()) {
+    if (!mergedById.has(id)) {
+      mergedById.set(id, srvItem);
+    }
+  }
+
+  const combined = Array.from(mergedById.values()).sort((a, b) => {
+    const tsA = new Date(a.createdAt || 0).getTime() || 0;
+    const tsB = new Date(b.createdAt || 0).getTime() || 0;
+    return tsB - tsA;
+  });
+
+  if (typeof window !== 'undefined') {
+    try {
+      safeSetLocalStorage('gsmscope_contact_inquiries_v1', JSON.stringify(combined));
+    } catch {}
+  }
+
+  return combined;
 }
 
 // Newsletter & Subscriber Broadcast API Client

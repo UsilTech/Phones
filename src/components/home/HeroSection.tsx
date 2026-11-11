@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useApp, SEED_PHONE_IDS } from '../../context/AppContext';
+import { useApp, SEED_PHONE_IDS, getRecordTimestamp } from '../../context/AppContext';
 import { ArrowRight, Scale, Eye, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 
 export default function HeroSection() {
@@ -15,10 +15,19 @@ export default function HeroSection() {
     formatUSD
   } = useApp();
 
-  // Featured phones: prioritize newly added custom phones marked isFeatured first, then featured catalog phones, plus fallback IDs
+  // Featured phones: prioritize newly added custom phones marked isFeatured first (sorted newest-first), then featured catalog phones, plus fallback IDs
   const defaultFeaturedIds = ['smart-20', 'oneplus-12r', 'google-pixel-8-pro', 'tecno-camon-30-pro-5g', 'samsung-galaxy-s24-ultra'];
-  const customFeatured = phones.filter(p => !SEED_PHONE_IDS.has(p.id) && p.isFeatured);
-  const seedFeatured = phones.filter(p => SEED_PHONE_IDS.has(p.id) && p.isFeatured);
+  const customFeatured = [...phones.filter(p => !SEED_PHONE_IDS.has(p.id) && p.isFeatured)].sort((a, b) => {
+    const tsB = Number((b as any).featuredAt) || getRecordTimestamp(b);
+    const tsA = Number((a as any).featuredAt) || getRecordTimestamp(a);
+    if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+    return 0;
+  });
+  const seedFeatured = [...phones.filter(p => SEED_PHONE_IDS.has(p.id) && p.isFeatured)].sort((a, b) => {
+    const tsB = Number((b as any).featuredAt) || 0;
+    const tsA = Number((a as any).featuredAt) || 0;
+    return tsB - tsA;
+  });
   const adminFeatured = [...customFeatured, ...seedFeatured];
   const fallbackFeatured = defaultFeaturedIds
     .map(id => phones.find(p => p.id === id))

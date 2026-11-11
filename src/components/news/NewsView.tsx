@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useApp, SEED_ARTICLE_IDS, getRecordTimestamp } from '../../context/AppContext';
 import { useSeoMeta } from '../seo/SeoMeta';
 import AdPlacementSlot from '../common/AdPlacementSlot';
 import { 
@@ -29,16 +29,29 @@ export default function NewsView() {
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
-  const categories = ['All', 'News', 'Reviews', 'Buying Guide', 'Launch'];
+  const categories = ['All', 'News', 'Buying Guide', 'Launch'];
+
+  // Exclude Review articles (which have their own dedicated Reviews section) and sort newly added/posted articles first
+  const nonReviewArticles = [...articles.filter(
+    (a) => a.category !== 'Reviews' && a.category !== 'Review'
+  )].sort((a, b) => {
+    const isCustomA = !SEED_ARTICLE_IDS.has(a.id);
+    const isCustomB = !SEED_ARTICLE_IDS.has(b.id);
+    if (isCustomA && !isCustomB) return -1;
+    if (!isCustomA && isCustomB) return 1;
+    if (isCustomA && isCustomB) {
+      const tsB = getRecordTimestamp(b);
+      const tsA = getRecordTimestamp(a);
+      if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+    }
+    return 0;
+  });
 
   const filteredArticles = selectedCategory === 'All'
-    ? articles
-    : articles.filter(a => {
+    ? nonReviewArticles
+    : nonReviewArticles.filter(a => {
         if (selectedCategory === 'News') {
           return a.category === 'News' || a.category === 'Phone News' || a.category === 'Smartphone News' || a.category === 'Tech Updates';
-        }
-        if (selectedCategory === 'Reviews') {
-          return a.category === 'Reviews' || a.category === 'Review';
         }
         if (selectedCategory === 'Buying Guide') {
           return (

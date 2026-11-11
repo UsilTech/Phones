@@ -15,6 +15,7 @@ import {
 import {
   fetchContactInquiriesApi,
   deleteContactInquiryApi,
+  syncContactInquiriesWithServer,
   checkServerHealthApi,
   ServerHealthStatus,
 } from '../../services/api';
@@ -338,8 +339,8 @@ function createEmptyPhoneForm(defaultBrand = 'Samsung'): Phone {
     marketStatus: 'Available',
     nairaPriceNotes: 'Available at authorized dealers nationwide and global online stores.',
     releaseYear: year,
-    releaseDate: `${year}, Q1`,
-    modelNumber: 'SM-NEW2025',
+    releaseDate: `${year}`,
+    modelNumber: '',
     image: '/src/assets/images/hero_flagship_phones_1792578844852.jpg',
     images: ['/src/assets/images/hero_flagship_phones_1792578844852.jpg'],
     accentColor: '#10b981',
@@ -354,82 +355,82 @@ function createEmptyPhoneForm(defaultBrand = 'Samsung'): Phone {
     seoKeywords: '',
     seoDescription: '',
     keyHighlights: {
-      display: '6.7" AMOLED 120Hz',
-      processor: 'Snapdragon 8 Gen 3 (4 nm)',
-      ram: '8GB / 12GB',
-      storage: '256GB / 512GB',
-      camera: '50MP OIS Triple Camera',
-      battery: '5000 mAh',
-      charging: '45W Fast Charging',
-      os: 'Android 15',
+      display: '',
+      processor: '',
+      ram: '',
+      storage: '',
+      camera: '',
+      battery: '',
+      charging: '',
+      os: '',
       network5g: true,
     },
     detailedSpecs: {
       network: {
-        technology: 'GSM / HSPA / LTE / 5G',
-        bands5g: 'SA/NSA/Sub6, Bands n1, n3, n5, n7, n8, n20, n28, n38, n40, n41, n77, n78',
-        speed: 'HSPA 42.2/5.76 Mbps, LTE-A, 5G',
-        sim: 'Dual SIM (Nano-SIM, dual stand-by) + eSIM support',
+        technology: '',
+        bands5g: '',
+        speed: '',
+        sim: '',
       },
       body: {
-        dimensions: '162.3 x 75.6 x 8.2 mm',
-        weight: '195 g',
-        build: 'Glass front (Gorilla Glass Victus 2), aluminum frame, glass back',
-        waterResistance: 'IP68 dust/water resistant (up to 1.5m for 30 min)',
+        dimensions: '',
+        weight: '',
+        build: '',
+        waterResistance: '',
       },
       display: {
-        type: 'Dynamic LTPO AMOLED 2X, 120Hz, HDR10+',
-        size: '6.7 inches, 108.4 cm² (~89.2% screen-to-body ratio)',
-        resolution: '1080 x 2400 pixels, 20:9 ratio (~395 ppi density)',
-        protection: 'Corning Gorilla Glass Victus 2',
-        brightness: '2600 nits (peak)',
-        refreshRate: '1Hz - 120Hz adaptive',
+        type: '',
+        size: '',
+        resolution: '',
+        protection: '',
+        brightness: '',
+        refreshRate: '',
       },
       platform: {
-        os: 'Android 15',
-        chipset: 'Qualcomm Snapdragon 8 Gen 3 (4 nm)',
-        cpu: 'Octa-core (1x3.3 GHz Cortex-X4 & 3x3.1 GHz Cortex-A720 & 2x2.9 GHz Cortex-A720 & 2x2.2 GHz Cortex-A520)',
-        gpu: 'Adreno 750',
-        antutuScore: '1,680,000 (AnTuTu v10)',
+        os: '',
+        chipset: '',
+        cpu: '',
+        gpu: '',
+        antutuScore: '',
       },
       memory: {
-        ramVariants: ['8GB', '12GB'],
-        storageVariants: ['256GB', '512GB'],
-        cardSlot: 'No',
-        storageType: 'UFS 4.0',
+        ramVariants: [],
+        storageVariants: [],
+        cardSlot: '',
+        storageType: '',
       },
       mainCamera: {
-        setup: '50 MP, f/1.8, 24mm (wide), PDAF, OIS + 12 MP, f/2.2, 120˚ (ultrawide) + 10 MP, f/2.4 (telephoto), 3x optical zoom',
-        features: 'LED flash, auto-HDR, panorama, Laser AF',
-        video: '8K@30fps, 4K@30/60fps, 1080p@30/60/240fps, gyro-EIS, HDR10+',
+        setup: '',
+        features: '',
+        video: '',
       },
       selfieCamera: {
-        setup: '32 MP, f/2.2, 26mm (wide), Dual Pixel PDAF',
-        features: 'Dual video call, Auto-HDR, HDR10+',
-        video: '4K@30/60fps, 1080p@30fps',
+        setup: '',
+        features: '',
+        video: '',
       },
       battery: {
-        capacity: 'Li-Ion 5000 mAh, non-removable',
-        charging: '45W wired, PD3.0, 65% in 30 min',
-        wirelessCharging: '15W wireless (Qi/PMA), 4.5W reverse wireless',
+        capacity: '',
+        charging: '',
+        wirelessCharging: '',
       },
       sound: {
-        loudspeaker: 'Yes, with stereo speakers',
-        jack35mm: 'No',
-        audioSpecs: '24-bit/192kHz Hi-Res audio, Dolby Atmos support',
+        loudspeaker: '',
+        jack35mm: '',
+        audioSpecs: '',
       },
       connectivity: {
-        wlan: 'Wi-Fi 802.11 a/b/g/n/ac/6e/7, tri-band, Wi-Fi Direct',
-        bluetooth: '5.3, A2DP, LE',
-        nfc: 'Yes',
-        radio: 'No',
-        usb: 'USB Type-C 3.2, DisplayPort 1.2, OTG',
-        infrared: 'No',
-        positioning: 'GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS, NavIC',
+        wlan: '',
+        bluetooth: '',
+        nfc: '',
+        radio: '',
+        usb: '',
+        infrared: '',
+        positioning: '',
       },
-      sensors: 'Fingerprint (under display, ultrasonic), accelerometer, gyro, proximity, compass, barometer',
-      biometrics: 'Fingerprint (under display, ultrasonic) & 2D Face Unlock',
-      securityHardware: 'Hardware-backed Keystore & Knox / TrustZone TEE',
+      sensors: '',
+      biometrics: '',
+      securityHardware: '',
     },
   };
 }
@@ -525,8 +526,8 @@ export default function AdminDashboardModal() {
   const [editingPhoneId, setEditingPhoneId] = useState<string | null>(null);
   const [showPhoneForm, setShowPhoneForm] = useState(false);
   const [phoneDraft, setPhoneDraft] = useState<Phone>(() => createEmptyPhoneForm(brands[0]?.name || 'Samsung'));
-  const [ramVariantsText, setRamVariantsText] = useState('8GB, 12GB');
-  const [storageVariantsText, setStorageVariantsText] = useState('256GB, 512GB');
+  const [ramVariantsText, setRamVariantsText] = useState('');
+  const [storageVariantsText, setStorageVariantsText] = useState('');
   const [galleryUrlsText, setGalleryUrlsText] = useState('');
   const [customCategoriesText, setCustomCategoriesText] = useState('5g, best-battery');
 
@@ -624,7 +625,7 @@ export default function AdminDashboardModal() {
         stopGlobalLoading();
         const finalUrl = uploaded.url || uploaded.media?.url;
         if (uploaded.success && finalUrl) {
-          onUploadedUrl(finalUrl, uploaded.media, rawDataUrl);
+          onUploadedUrl(finalUrl, uploaded.media, uploaded.media?.dataUrl || rawDataUrl);
           showGlobalToast(`Uploaded "${uploaded.media?.name || file.name}" to server (/uploads)`, 'success');
         } else {
           showGlobalToast(uploaded.error || 'Failed to upload image.', 'error');
@@ -640,7 +641,7 @@ export default function AdminDashboardModal() {
     reader.readAsDataURL(file);
   };
 
-  // 6. News / Articles state (including SEO Title, Keywords & Description)
+  // 6. News / Articles state (including SEO Title, Keywords & Description & Linked Phone)
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
   const [articleForm, setArticleForm] = useState({
     title: '',
@@ -651,6 +652,7 @@ export default function AdminDashboardModal() {
     readTime: '4 min read',
     tags: 'Smartphone, Launch, Specs',
     featured: false,
+    relatedPhoneId: '',
     authorName: 'GsmScope Editorial',
     authorRole: 'Senior Hardware Editor',
     seoTitle: '',
@@ -963,32 +965,21 @@ export default function AdminDashboardModal() {
     }
   }, [adminSubView]);
 
-  // Sync Contact Inquiries with backend API and real-time custom events
+  // Sync Contact Inquiries with backend API and real-time custom events without losing messages after publish/restart
   const syncLiveAdminCollections = useCallback(() => {
-    fetchContactInquiriesApi().then((serverData) => {
-      if (serverData && Array.isArray(serverData)) {
-        let merged = [...serverData];
-        try {
-          const localRaw = localStorage.getItem('gsmscope_contact_inquiries_v1');
-          const localList: ContactInquiry[] = localRaw ? JSON.parse(localRaw) : [];
-          if (Array.isArray(localList) && localList.length > 0) {
-            const serverIds = new Set(serverData.map((i) => i.id));
-            // Include any recent local inquiries (submitted within the last 10 minutes) that might still be in flight
-            const recentThreshold = Date.now() - 10 * 60 * 1000;
-            const localUnsynced = localList.filter((item) => {
-              if (!item || !item.id || serverIds.has(item.id)) return false;
-              const ts = new Date(item.createdAt || 0).getTime();
-              return !Number.isNaN(ts) && ts > recentThreshold;
-            });
-            if (localUnsynced.length > 0) {
-              merged = [...localUnsynced, ...merged];
-            }
+    syncContactInquiriesWithServer()
+      .then((merged) => {
+        if (Array.isArray(merged)) {
+          setContactInquiries(merged);
+        }
+      })
+      .catch(() => {
+        fetchContactInquiriesApi().then((serverData) => {
+          if (serverData && Array.isArray(serverData)) {
+            setContactInquiries(serverData);
           }
-          localStorage.setItem('gsmscope_contact_inquiries_v1', JSON.stringify(merged));
-        } catch {}
-        setContactInquiries(merged);
-      }
-    });
+        });
+      });
   }, []);
 
   useEffect(() => {
@@ -1266,15 +1257,15 @@ export default function AdminDashboardModal() {
       seoDescription: (phoneDraft.seoDescription || '').trim() || defaultSeoDescription,
       keyHighlights: {
         ...phoneDraft.keyHighlights,
-        ram: phoneDraft.keyHighlights.ram || ramArr.join(' / ') || '8GB',
-        storage: phoneDraft.keyHighlights.storage || storageArr.join(' / ') || '256GB',
+        ram: phoneDraft.keyHighlights.ram || ramArr.join(' / ') || '',
+        storage: phoneDraft.keyHighlights.storage || storageArr.join(' / ') || '',
       },
       detailedSpecs: {
         ...phoneDraft.detailedSpecs,
         memory: {
           ...phoneDraft.detailedSpecs.memory,
-          ramVariants: ramArr.length > 0 ? ramArr : ['8GB'],
-          storageVariants: storageArr.length > 0 ? storageArr : ['256GB'],
+          ramVariants: ramArr,
+          storageVariants: storageArr,
         },
       },
     };
@@ -1546,6 +1537,7 @@ export default function AdminDashboardModal() {
         readTime: articleForm.readTime,
         tags: tagsArr,
         featured: articleForm.featured,
+        relatedPhoneIds: articleForm.relatedPhoneId ? [articleForm.relatedPhoneId] : [],
         seoTitle: computedSeoTitle,
         seoKeywords: computedSeoKeywords,
         seoDescription: computedSeoDesc,
@@ -1566,6 +1558,7 @@ export default function AdminDashboardModal() {
           readTime: '4 min read',
           tags: 'Smartphone, Launch, Specs',
           featured: false,
+          relatedPhoneId: '',
           authorName: 'GsmScope Editorial',
           authorRole: 'Senior Hardware Editor',
           seoTitle: '',
@@ -1591,7 +1584,7 @@ export default function AdminDashboardModal() {
         tags: tagsArr.length > 0 ? tagsArr : ['News', 'Smartphones'],
         featured: articleForm.featured,
         viewsCount: 0,
-        relatedPhoneIds: [],
+        relatedPhoneIds: articleForm.relatedPhoneId ? [articleForm.relatedPhoneId] : [],
         seoTitle: computedSeoTitle,
         seoKeywords: computedSeoKeywords,
         seoDescription: computedSeoDesc,
@@ -1608,6 +1601,7 @@ export default function AdminDashboardModal() {
           readTime: '4 min read',
           tags: 'Smartphone, Launch, Specs',
           featured: false,
+          relatedPhoneId: '',
           authorName: 'GsmScope Editorial',
           authorRole: 'Senior Hardware Editor',
           seoTitle: '',
@@ -4645,6 +4639,25 @@ export default function AdminDashboardModal() {
                     </div>
                   </div>
 
+                  {/* Linked Phone for Core Specs & Review Score Card */}
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+                      Linked Phone for Core Specs &amp; Review Score Card (Optional)
+                    </label>
+                    <select
+                      value={articleForm.relatedPhoneId}
+                      onChange={(e) => setArticleForm({ ...articleForm, relatedPhoneId: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs"
+                    >
+                      <option value="">— No Linked Phone (Only score if core specs are in article) —</option>
+                      {phones.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.brand} — {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Feature Cover Image Upload + Media Library Picker */}
                   <div>
                     <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
@@ -4937,6 +4950,7 @@ export default function AdminDashboardModal() {
                                     readTime: art.readTime,
                                     tags: (art.tags || []).join(', '),
                                     featured: Boolean(art.featured),
+                                    relatedPhoneId: art.relatedPhoneIds?.[0] || '',
                                     authorName: art.author?.name || 'GsmScope Editorial',
                                     authorRole: art.author?.role || 'Senior Editor',
                                     seoTitle: art.seoTitle || '',

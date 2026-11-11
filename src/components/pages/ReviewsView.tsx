@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useApp, SEED_REVIEW_IDS, getRecordTimestamp } from '../../context/AppContext';
 import { useSeoMeta } from '../seo/SeoMeta';
 import { Star, Plus, Check, Loader2 } from 'lucide-react';
 
@@ -13,7 +13,20 @@ export default function ReviewsView() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const approvedReviews = [...reviews].filter((r) => r.status === 'approved');
+  const approvedReviews = [...reviews]
+    .filter((r) => r.status === 'approved')
+    .sort((a, b) => {
+      const isCustomA = !SEED_REVIEW_IDS.has(a.id);
+      const isCustomB = !SEED_REVIEW_IDS.has(b.id);
+      if (isCustomA && !isCustomB) return -1;
+      if (!isCustomA && isCustomB) return 1;
+      if (isCustomA && isCustomB) {
+        const tsB = getRecordTimestamp(b);
+        const tsA = getRecordTimestamp(a);
+        if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+      }
+      return 0;
+    });
   const leadReviewedPhone = phones.find((p) => p.id === approvedReviews[0]?.phoneId) || phones[0];
 
   useSeoMeta({

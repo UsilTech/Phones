@@ -176,6 +176,12 @@ interface PersistentDatabaseSchema {
     html: string;
     text: string;
   }>;
+  uploadDataUrls?: Record<string, string>;
+  deletedPhoneIds?: string[];
+  deletedArticleIds?: string[];
+  deletedReviewIds?: string[];
+  deletedBrandKeys?: string[];
+  deletedInquiryIds?: string[];
 }
 
 function getDefaultPhones(revs: Review[]): Phone[] {
@@ -247,6 +253,12 @@ let newsletterBroadcasts: NonNullable<PersistentDatabaseSchema['newsletterBroadc
   }
 ];
 let confirmationEmailsLog: PersistentDatabaseSchema['confirmationEmailsLog'] = [];
+let uploadDataUrlsDatabase: Record<string, string> = {};
+let deletedPhoneIdsDatabase = new Set<string>();
+let deletedArticleIdsDatabase = new Set<string>();
+let deletedReviewIdsDatabase = new Set<string>();
+let deletedBrandKeysDatabase = new Set<string>(['nothing', 'brand-nothing']);
+let deletedInquiryIdsDatabase = new Set<string>();
 let cachedEtherealTransporter: any = null;
 
 function saveDatabaseToDisk(): void {
@@ -268,6 +280,12 @@ function saveDatabaseToDisk(): void {
       newsletterSubscribers,
       newsletterBroadcasts,
       confirmationEmailsLog,
+      uploadDataUrls: uploadDataUrlsDatabase,
+      deletedPhoneIds: Array.from(deletedPhoneIdsDatabase),
+      deletedArticleIds: Array.from(deletedArticleIdsDatabase),
+      deletedReviewIds: Array.from(deletedReviewIdsDatabase),
+      deletedBrandKeys: Array.from(deletedBrandKeysDatabase),
+      deletedInquiryIds: Array.from(deletedInquiryIdsDatabase),
     };
     const tempFile = `${DB_FILE_PATH}.tmp`;
     fs.writeFileSync(tempFile, JSON.stringify(payload, null, 2), 'utf-8');
@@ -292,6 +310,12 @@ function saveDatabaseToDisk(): void {
             newsletterSubscribers,
             newsletterBroadcasts,
             confirmationEmailsLog,
+            uploadDataUrls: uploadDataUrlsDatabase,
+            deletedPhoneIds: Array.from(deletedPhoneIdsDatabase),
+            deletedArticleIds: Array.from(deletedArticleIdsDatabase),
+            deletedReviewIds: Array.from(deletedReviewIdsDatabase),
+            deletedBrandKeys: Array.from(deletedBrandKeysDatabase),
+            deletedInquiryIds: Array.from(deletedInquiryIdsDatabase),
           },
           null,
           2
@@ -312,48 +336,85 @@ function loadDatabaseFromDisk(): void {
     if (fs.existsSync(DB_FILE_PATH)) {
       const raw = fs.readFileSync(DB_FILE_PATH, 'utf-8');
       const parsed = JSON.parse(raw) as Partial<PersistentDatabaseSchema>;
+      if (parsed.uploadDataUrls && typeof parsed.uploadDataUrls === 'object') {
+        uploadDataUrlsDatabase = { ...parsed.uploadDataUrls };
+      }
+      if (Array.isArray(parsed.deletedPhoneIds)) {
+        deletedPhoneIdsDatabase = new Set(parsed.deletedPhoneIds);
+      }
+      if (Array.isArray(parsed.deletedArticleIds)) {
+        deletedArticleIdsDatabase = new Set(parsed.deletedArticleIds);
+      }
+      if (Array.isArray(parsed.deletedReviewIds)) {
+        deletedReviewIdsDatabase = new Set(parsed.deletedReviewIds);
+      }
+      if (Array.isArray(parsed.deletedBrandKeys)) {
+        deletedBrandKeysDatabase = new Set(['nothing', 'brand-nothing', ...parsed.deletedBrandKeys]);
+      }
+      if (Array.isArray(parsed.deletedInquiryIds)) {
+        deletedInquiryIdsDatabase = new Set(parsed.deletedInquiryIds);
+      }
       if (Array.isArray(parsed.reviews)) {
-        reviewsDatabase = parsed.reviews;
+        reviewsDatabase = parsed.reviews.filter((r) => r && !deletedReviewIdsDatabase.has(r.id));
       }
       if (Array.isArray(parsed.phones) && parsed.phones.length > 0) {
-        phonesDatabase = parsed.phones.map((p) => {
-          const cleanedCats = (p.categories || []).filter(
-            (c) => !['best-budget', 'under-200k', 'under-100k', 'under-300k'].includes(String(c).toLowerCase())
-          );
-          return {
-            ...p,
-            categories: cleanedCats.length > 0 ? cleanedCats : ['best-battery'],
-          };
-        });
+        const loadedPhones = parsed.phones
+          .filter((p) => p && !deletedPhoneIdsDatabase.has(p.id))
+          .map((p) => {
+            const cleanedCats = (p.categories || []).filter(
+              (c) => !['best-budget', 'under-200k', 'under-100k', 'under-300k'].includes(String(c).toLowerCase())
+            );
+            return {
+              ...p,
+              categories: cleanedCats.length > 0 ? cleanedCats : ['best-battery'],
+            };
+          });
+        const loadedPhoneIds = new Set(loadedPhones.map((p) => p.id));
+        const defaultPhones = getDefaultPhones(reviewsDatabase);
+        for (const seedPhone of defaultPhones) {
+          if (!loadedPhoneIds.has(seedPhone.id) && !deletedPhoneIdsDatabase.has(seedPhone.id)) {
+            loadedPhones.push(seedPhone);
+          }
+        }
+        phonesDatabase = loadedPhones;
       }
       if (Array.isArray(parsed.brands) && parsed.brands.length > 0) {
         brandsDatabase = parsed.brands.filter(
           (b) =>
             b &&
-            String(b.name || '').trim().toLowerCase() !== 'nothing' &&
-            String(b.slug || '').trim().toLowerCase() !== 'nothing' &&
-            String(b.id || '').trim().toLowerCase() !== 'brand-nothing'
+            !deletedBrandKeysDatabase.has(String(b.name || '').trim().toLowerCase()) &&
+            !deletedBrandKeysDatabase.has(String(b.slug || '').trim().toLowerCase()) &&
+            !deletedBrandKeysDatabase.has(String(b.id || '').trim().toLowerCase())
         );
       }
       if (Array.isArray(parsed.articles) && parsed.articles.length > 0) {
-        articlesDatabase = parsed.articles.map((a) => {
-          const rawCat = String(a.category || 'News').trim();
-          const normalizedCat =
-            rawCat === 'Phone News' || rawCat === 'Tech Updates' || rawCat === 'Smartphone News'
-              ? 'News'
-              : rawCat === 'Review'
-              ? 'Reviews'
-              : rawCat === 'Buying Guides' ||
-                rawCat === 'FRP & Servicing Tools' ||
-                rawCat === 'Charging & Battery' ||
-                rawCat === 'Tips & Security'
-              ? 'Buying Guide'
-              : rawCat || 'News';
-          return {
-            ...a,
-            category: normalizedCat,
-          };
-        });
+        const loadedArticles = parsed.articles
+          .filter((a) => a && !deletedArticleIdsDatabase.has(a.id))
+          .map((a) => {
+            const rawCat = String(a.category || 'News').trim();
+            const normalizedCat =
+              rawCat === 'Phone News' || rawCat === 'Tech Updates' || rawCat === 'Smartphone News'
+                ? 'News'
+                : rawCat === 'Review'
+                ? 'Reviews'
+                : rawCat === 'Buying Guides' ||
+                  rawCat === 'FRP & Servicing Tools' ||
+                  rawCat === 'Charging & Battery' ||
+                  rawCat === 'Tips & Security'
+                ? 'Buying Guide'
+                : rawCat || 'News';
+            return {
+              ...a,
+              category: normalizedCat,
+            };
+          });
+        const loadedArtIds = new Set(loadedArticles.map((a) => a.id));
+        for (const seedArt of INITIAL_ARTICLES) {
+          if (!loadedArtIds.has(seedArt.id) && !deletedArticleIdsDatabase.has(seedArt.id)) {
+            loadedArticles.push(seedArt);
+          }
+        }
+        articlesDatabase = loadedArticles;
       }
       if (parsed.adSettings && typeof parsed.adSettings === 'object') {
         const mergedPlacements = { ...INITIAL_AD_SETTINGS.placements } as any;
@@ -403,10 +464,15 @@ function loadDatabaseFromDisk(): void {
             !m.url.includes('/assets/aistudio/IMG_') &&
             !m.url.includes('phone_galaxy_s24_ultra.png')
         );
+        for (const m of cleanedMedia) {
+          if (m?.url && m?.dataUrl && m.dataUrl.startsWith('data:')) {
+            uploadDataUrlsDatabase[m.url] = m.dataUrl;
+          }
+        }
         mediaDatabase = cleanedMedia.length > 0 ? cleanedMedia : [...INITIAL_MEDIA_ITEMS];
       }
       if (Array.isArray(parsed.contactInquiries)) {
-        contactInquiries = parsed.contactInquiries;
+        contactInquiries = parsed.contactInquiries.filter((i) => i && !deletedInquiryIdsDatabase.has(i.id));
       }
       if (Array.isArray(parsed.newsletterSubscribers)) {
         newsletterSubscribers = parsed.newsletterSubscribers;
@@ -417,6 +483,8 @@ function loadDatabaseFromDisk(): void {
       if (Array.isArray(parsed.confirmationEmailsLog)) {
         confirmationEmailsLog = parsed.confirmationEmailsLog;
       }
+      // Save back normalized/expanded seed items if database.json was missing newer seed phones
+      saveDatabaseToDisk();
       console.log(`[Database Persistence] Loaded ${phonesDatabase.length} phones, ${articlesDatabase.length} articles, ${mediaDatabase.length} media items from data/database.json`);
     } else {
       saveDatabaseToDisk();
@@ -434,6 +502,7 @@ function restoreUploadsFromDatabase(): void {
 
     const writeDataUrlToFile = (urlPath?: string, dataUrl?: string) => {
       if (!urlPath || !dataUrl || !urlPath.startsWith('/uploads/') || !dataUrl.includes(';base64,')) return;
+      uploadDataUrlsDatabase[urlPath] = dataUrl;
       const filename = path.basename(urlPath.split('?')[0]);
       if (!filename) return;
       const targetUpload = path.resolve(UPLOADS_DIR, filename);
@@ -445,6 +514,12 @@ function restoreUploadsFromDatabase(): void {
       if (!fs.existsSync(targetPublic)) fs.writeFileSync(targetPublic, buffer);
       if (!fs.existsSync(targetUpload)) fs.writeFileSync(targetUpload, buffer);
     };
+
+    for (const [urlPath, dataUrl] of Object.entries(uploadDataUrlsDatabase)) {
+      if (urlPath && dataUrl) {
+        writeDataUrlToFile(urlPath, dataUrl);
+      }
+    }
 
     for (const item of mediaDatabase) {
       if (item && item.url && item.dataUrl) {
@@ -478,18 +553,22 @@ app.get('/uploads/:filename', (req: Request, res: Response, next) => {
   if (fs.existsSync(diskFile)) return res.sendFile(diskFile);
   if (fs.existsSync(publicDiskFile)) return res.sendFile(publicDiskFile);
 
-  let foundDataUrl: string | undefined;
+  let foundDataUrl: string | undefined = uploadDataUrlsDatabase[targetUrl];
   let foundMime = 'image/png';
 
-  const mediaMatch = mediaDatabase.find((m) => m && m.url === targetUrl && m.dataUrl);
-  if (mediaMatch && mediaMatch.dataUrl) {
-    foundDataUrl = mediaMatch.dataUrl;
-    if (mediaMatch.mimeType) foundMime = mediaMatch.mimeType;
+  if (!foundDataUrl) {
+    const mediaMatch = mediaDatabase.find(
+      (m) => m && (m.url === targetUrl || path.basename(m.url || '') === filename) && m.dataUrl
+    );
+    if (mediaMatch && mediaMatch.dataUrl) {
+      foundDataUrl = mediaMatch.dataUrl;
+      if (mediaMatch.mimeType) foundMime = mediaMatch.mimeType;
+    }
   }
 
   if (!foundDataUrl && adSettingsDatabase?.placements) {
     for (const p of Object.values(adSettingsDatabase.placements)) {
-      if (p && p.imageUrl === targetUrl && p.imageDataUrl) {
+      if (p && (p.imageUrl === targetUrl || path.basename(p.imageUrl || '') === filename) && p.imageDataUrl) {
         foundDataUrl = p.imageDataUrl;
         break;
       }
@@ -861,7 +940,12 @@ app.post('/api/phones/:id/view', (req: Request, res: Response) => {
 
 // Admin: Add new Phone
 app.post('/api/phones', (req: Request, res: Response) => {
-  const newPhone: Phone = req.body;
+  const nowTs = Date.now();
+  const newPhone: Phone = {
+    ...req.body,
+    createdAt: (req.body as any)?.createdAt || nowTs,
+    ...(req.body?.isFeatured ? { featuredAt: (req.body as any)?.featuredAt || nowTs } : {}),
+  } as any;
   if (!newPhone.name || !newPhone.brand || !newPhone.priceNGN) {
     return res.status(400).json({ error: 'Missing required phone fields: name, brand, priceNGN' });
   }
@@ -897,11 +981,14 @@ app.post('/api/phones', (req: Request, res: Response) => {
 // Admin: Update Phone
 app.put('/api/phones/:id', (req: Request, res: Response) => {
   const index = phonesDatabase.findIndex(p => p.id === req.params.id);
+  const nowTs = Date.now();
   if (index === -1) {
     if (req.body && req.body.name) {
       const created: Phone = {
         ...req.body,
         id: req.params.id,
+        createdAt: (req.body as any)?.createdAt || nowTs,
+        ...(req.body?.isFeatured ? { featuredAt: (req.body as any)?.featuredAt || nowTs } : {}),
         images: req.body.image
           ? [req.body.image, ...(Array.isArray(req.body.images) ? req.body.images.filter((u: string) => u !== req.body.image) : [])]
           : (req.body.images || [])
@@ -913,15 +1000,20 @@ app.put('/api/phones/:id', (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Phone not found' });
   }
   const previousPhone = phonesDatabase[index];
-  const mergedPhone: Phone = { ...previousPhone, ...req.body };
+  const justFeatured = Boolean(req.body?.isFeatured && !previousPhone.isFeatured);
+  const mergedPhone: Phone = {
+    ...previousPhone,
+    ...req.body,
+    ...(justFeatured ? { featuredAt: nowTs } : {}),
+  } as any;
   if (mergedPhone.image) {
     mergedPhone.images = [
       mergedPhone.image,
       ...(Array.isArray(mergedPhone.images) ? mergedPhone.images.filter(u => u !== mergedPhone.image) : [])
     ];
   }
-  // If phone was newly assigned to Featured (or is a custom phone being updated as Featured), move it to the front
-  if (mergedPhone.isFeatured && !previousPhone.isFeatured) {
+  // If phone was newly assigned to Featured, move it to the front
+  if (justFeatured) {
     phonesDatabase.splice(index, 1);
     phonesDatabase.unshift(mergedPhone);
   } else {
@@ -933,11 +1025,8 @@ app.put('/api/phones/:id', (req: Request, res: Response) => {
 
 // Admin: Delete Phone
 app.delete('/api/phones/:id', (req: Request, res: Response) => {
-  const initialLen = phonesDatabase.length;
+  deletedPhoneIdsDatabase.add(req.params.id);
   phonesDatabase = phonesDatabase.filter(p => p.id !== req.params.id);
-  if (phonesDatabase.length === initialLen) {
-    return res.status(404).json({ error: 'Phone not found' });
-  }
   saveDatabaseToDisk();
   res.json({ success: true, deletedId: req.params.id });
 });
@@ -952,6 +1041,9 @@ app.post('/api/brands', (req: Request, res: Response) => {
   if (!newBrand.name || !newBrand.slug) {
     return res.status(400).json({ error: 'Missing brand name or slug' });
   }
+  [newBrand.id, newBrand.slug, newBrand.name].forEach((k) => {
+    if (k) deletedBrandKeysDatabase.delete(String(k).toLowerCase());
+  });
   const existingIdx = brandsDatabase.findIndex(
     b =>
       b.id === newBrand.id ||
@@ -987,6 +1079,7 @@ app.put('/api/brands/:id', (req: Request, res: Response) => {
 
 app.delete('/api/brands/:id', (req: Request, res: Response) => {
   const target = decodeURIComponent(req.params.id || '').trim().toLowerCase();
+  if (target) deletedBrandKeysDatabase.add(target);
   brandsDatabase = brandsDatabase.filter(
     b =>
       String(b.id || '').toLowerCase() !== target &&
@@ -1016,7 +1109,10 @@ app.get('/api/articles/:id', (req: Request, res: Response) => {
 });
 
 app.post('/api/articles', (req: Request, res: Response) => {
-  const newArticle: Article = req.body;
+  const newArticle: Article = {
+    ...req.body,
+    createdAt: (req.body as any)?.createdAt || Date.now(),
+  } as any;
   if (!newArticle.title || !newArticle.content) {
     return res.status(400).json({ error: 'Missing article title or content' });
   }
@@ -1066,10 +1162,11 @@ app.put('/api/articles/:id', (req: Request, res: Response) => {
       tags: Array.isArray(req.body.tags) ? req.body.tags : ['News'],
       featured: Boolean(req.body.featured),
       relatedPhoneIds: Array.isArray(req.body.relatedPhoneIds) ? req.body.relatedPhoneIds : [],
+      createdAt: (req.body as any)?.createdAt || Date.now(),
       ...(req.body.seoTitle ? { seoTitle: req.body.seoTitle } : {}),
       ...(req.body.seoKeywords ? { seoKeywords: req.body.seoKeywords } : {}),
       ...(req.body.seoDescription ? { seoDescription: req.body.seoDescription } : {}),
-    };
+    } as any;
     articlesDatabase.unshift(created);
     saveDatabaseToDisk();
     return res.json({ success: true, article: created });
@@ -1080,6 +1177,7 @@ app.put('/api/articles/:id', (req: Request, res: Response) => {
 });
 
 app.delete('/api/articles/:id', (req: Request, res: Response) => {
+  deletedArticleIdsDatabase.add(req.params.id);
   articlesDatabase = articlesDatabase.filter(a => a.id !== req.params.id);
   saveDatabaseToDisk();
   res.json({ success: true, deletedId: req.params.id });
@@ -1110,7 +1208,7 @@ app.get('/api/reviews', (req: Request, res: Response) => {
 });
 
 app.post('/api/reviews', (req: Request, res: Response) => {
-  const { id, phoneId, phoneName, userName, location, rating, title, comment, pros, cons, date, status, verifiedBuyer, imageUrl, seoTitle, seoKeywords } = req.body;
+  const { id, phoneId, phoneName, userName, location, rating, title, comment, pros, cons, date, status, verifiedBuyer, imageUrl, seoTitle, seoKeywords, createdAt } = req.body;
   if (!phoneId || !userName || !comment) {
     return res.status(400).json({ error: 'Missing required review fields' });
   }
@@ -1128,11 +1226,12 @@ app.post('/api/reviews', (req: Request, res: Response) => {
     cons: Array.isArray(cons) ? cons : [],
     date: date || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     status: status || 'approved',
+    createdAt: createdAt || Date.now(),
     ...(verifiedBuyer !== undefined ? { verifiedBuyer: Boolean(verifiedBuyer) } : {}),
     ...(imageUrl ? { imageUrl: String(imageUrl) } : {}),
     ...(seoTitle ? { seoTitle: String(seoTitle) } : {}),
     ...(seoKeywords ? { seoKeywords: String(seoKeywords) } : {})
-  };
+  } as any;
 
   const existingIdx = reviewsDatabase.findIndex(r => r.id === newReview.id);
   if (existingIdx !== -1) {
@@ -1158,6 +1257,16 @@ app.post('/api/reviews', (req: Request, res: Response) => {
 app.put('/api/reviews/:id', (req: Request, res: Response) => {
   const existingIdx = reviewsDatabase.findIndex(r => r.id === req.params.id);
   if (existingIdx === -1) {
+    if (req.body && req.body.phoneId && req.body.comment) {
+      const createdReview: Review = {
+        ...req.body,
+        id: req.params.id,
+        createdAt: req.body.createdAt || Date.now(),
+      };
+      reviewsDatabase.unshift(createdReview);
+      saveDatabaseToDisk();
+      return res.json({ success: true, review: createdReview });
+    }
     return res.status(404).json({ error: 'Review not found' });
   }
   const updatedReview: Review = {
@@ -1220,6 +1329,7 @@ app.patch('/api/reviews/:id/status', (req: Request, res: Response) => {
 });
 
 app.delete('/api/reviews/:id', (req: Request, res: Response) => {
+  deletedReviewIdsDatabase.add(req.params.id);
   const target = reviewsDatabase.find(r => r.id === req.params.id);
   reviewsDatabase = reviewsDatabase.filter(r => r.id !== req.params.id);
   if (target) {
@@ -1362,7 +1472,11 @@ app.get('/api/settings', (_req: Request, res: Response) => {
 });
 
 app.put('/api/settings', (req: Request, res: Response) => {
-  websiteContentDatabase = { ...websiteContentDatabase, ...req.body };
+  websiteContentDatabase = {
+    ...websiteContentDatabase,
+    ...req.body,
+    updatedAt: req.body?.updatedAt || new Date().toISOString(),
+  } as any;
   saveDatabaseToDisk();
   console.log('[Website Settings Updated] Site Name:', websiteContentDatabase.siteName);
   res.json({ success: true, websiteContent: websiteContentDatabase });
@@ -1391,6 +1505,9 @@ app.post('/api/media', (req: Request, res: Response) => {
     assignedPhoneId,
     assignedArticleId
   };
+  if (dataUrl && typeof dataUrl === 'string' && dataUrl.startsWith('data:')) {
+    uploadDataUrlsDatabase[cleanUrl] = dataUrl;
+  }
   if (existingIdx !== -1) {
     mediaDatabase[existingIdx] = { ...mediaDatabase[existingIdx], ...item };
   } else {
@@ -1415,6 +1532,39 @@ app.post('/api/media', (req: Request, res: Response) => {
   restoreUploadsFromDatabase();
   saveDatabaseToDisk();
   res.status(201).json({ success: true, media: item });
+});
+
+app.post('/api/database/sync-vault', (req: Request, res: Response) => {
+  try {
+    const { uploadDataUrls, mediaLibrary } = req.body || {};
+    if (uploadDataUrls && typeof uploadDataUrls === 'object') {
+      for (const [urlPath, dataUrl] of Object.entries(uploadDataUrls)) {
+        if (typeof urlPath === 'string' && typeof dataUrl === 'string' && dataUrl.startsWith('data:')) {
+          uploadDataUrlsDatabase[urlPath] = dataUrl;
+        }
+      }
+    }
+    if (Array.isArray(mediaLibrary)) {
+      const existingIds = new Set(mediaDatabase.map((m) => m.id));
+      const existingUrls = new Set(mediaDatabase.map((m) => m.url));
+      for (const item of mediaLibrary) {
+        if (!item || !item.url) continue;
+        if (item.dataUrl && typeof item.dataUrl === 'string' && item.dataUrl.startsWith('data:')) {
+          uploadDataUrlsDatabase[item.url] = item.dataUrl;
+        }
+        if (!existingIds.has(item.id) && !existingUrls.has(item.url)) {
+          mediaDatabase.unshift(item);
+          existingIds.add(item.id);
+          existingUrls.add(item.url);
+        }
+      }
+    }
+    restoreUploadsFromDatabase();
+    saveDatabaseToDisk();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Vault sync failed' });
+  }
 });
 
 app.post('/api/media/upload', (req: Request, res: Response) => {
@@ -1457,6 +1607,7 @@ app.post('/api/media/upload', (req: Request, res: Response) => {
       assignedArticleId
     };
 
+    uploadDataUrlsDatabase[mediaItem.url] = normalizedDataUrl;
     mediaDatabase.unshift(mediaItem);
     if (assignedPhoneId) {
       const pIdx = phonesDatabase.findIndex(p => p.id === assignedPhoneId);
@@ -1510,7 +1661,7 @@ app.delete('/api/media/:id', (req: Request, res: Response) => {
 
 // 6. Contact Inquiries & Advertising Proposals API
 app.post('/api/contact', (req: Request, res: Response) => {
-  const { id, name, email, phone, subject, message, createdAt } = req.body;
+  const { id, name, email, phone, subject, message, createdAt, status, replied, repliedAt, replySubject, replyMessage } = req.body;
   if (!email || !message) {
     return res.status(400).json({ error: 'Email and message are required' });
   }
@@ -1523,7 +1674,11 @@ app.post('/api/contact', (req: Request, res: Response) => {
     subject: (subject || 'General Inquiry').trim(),
     message: String(message).trim(),
     createdAt: createdAt || new Date().toISOString(),
-    status: 'read' as const
+    status: (status === 'unread' || status === 'replied' ? status : 'read') as 'unread' | 'read' | 'replied',
+    ...(replied !== undefined ? { replied: Boolean(replied) } : {}),
+    ...(repliedAt ? { repliedAt: String(repliedAt) } : {}),
+    ...(replySubject ? { replySubject: String(replySubject) } : {}),
+    ...(replyMessage ? { replyMessage: String(replyMessage) } : {}),
   };
 
   const existingIdx = contactInquiries.findIndex((i) => i.id === inquiry.id);
@@ -1616,11 +1771,8 @@ app.patch('/api/contact/:id/status', (req: Request, res: Response) => {
 // Admin: Delete Contact Message
 app.delete('/api/contact/:id', (req: Request, res: Response) => {
   const { id } = req.params;
-  const initialLen = contactInquiries.length;
+  deletedInquiryIdsDatabase.add(id);
   contactInquiries = contactInquiries.filter((i) => i.id !== id);
-  if (contactInquiries.length === initialLen) {
-    return res.status(404).json({ error: 'Message not found' });
-  }
   saveDatabaseToDisk();
   res.json({ success: true, deletedId: id });
 });
