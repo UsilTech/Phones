@@ -497,6 +497,35 @@ export default defineConfig(() => {
               .replace(/<link\s+rel="modulepreload"[^>]*>/gi, '');
           },
         },
+        closeBundle() {
+          // Automatically bundle server.ts into a cPanel/Passenger/LiteSpeed-compatible CommonJS startup file (app.cjs)
+          try {
+            const rootDir = path.resolve(import.meta.dirname || '.', '.');
+            esbuild.buildSync({
+              entryPoints: [path.resolve(rootDir, 'server.ts')],
+              bundle: true,
+              platform: 'node',
+              format: 'cjs',
+              target: ['node18'],
+              outfile: path.resolve(rootDir, 'app.cjs'),
+              external: [
+                'vite',
+                'esbuild',
+                'lightningcss',
+                'postcss',
+                '@tailwindcss/vite',
+                '@vitejs/plugin-react',
+                '@vitejs/plugin-legacy',
+              ],
+              define: {
+                'process.env.CPANEL_MODE': '"1"',
+              },
+              logLevel: 'silent',
+            });
+          } catch (err) {
+            console.warn('[cPanel Server Bundle Warning]', err);
+          }
+        },
       },
     ],
     resolve: {
