@@ -1,0 +1,12 @@
+{
+  "name": "phones",
+  "main": "worker.js",
+  "compatibility_date": "2025-02-01",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  }
+}
