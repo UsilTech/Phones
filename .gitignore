@@ -8,4 +8,5 @@ coverage/
 !.env.example
 data/*.tmp
 tmp/
+bun.lock
 
