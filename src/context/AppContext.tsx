@@ -2622,21 +2622,64 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     loadBackendData();
 
-    // Keep ad placements synchronized across open browser tabs and after app updates / container restarts
+    // Keep phones, articles, reviews, brands, ads, and site settings synchronized across open browser tabs (e.g. /admin tab -> public tab)
     const handleStorageSync = (e: StorageEvent) => {
-      if (e.key === 'gsmscope_ads_v3' && e.newValue) {
-        try {
+      if (!e.newValue) return;
+      try {
+        if (e.key === 'gsmscope_phones_v3') {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) {
+            setPhones(parsed.map(normalizePhoneRecord));
+          }
+        } else if (e.key === 'gsmscope_articles_v2') {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) {
+            setArticles(parsed.map(normalizeArticleRecord));
+          }
+        } else if (e.key === 'gsmscope_reviews_v2') {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) {
+            setReviews(parsed);
+          }
+        } else if (e.key === 'gsmscope_brands_v3') {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) {
+            setBrands(parsed);
+          }
+        } else if (e.key === 'gsmscope_ads_v3') {
           const parsed = JSON.parse(e.newValue);
           setAdSettings(normalizeAdSettings(parsed));
-        } catch {}
-      }
+        } else if (e.key === 'gsmscope_website_content_v1') {
+          const parsed = JSON.parse(e.newValue);
+          setWebsiteContentState(normalizeWebsiteContent(parsed));
+        }
+      } catch {}
     };
 
     const handleFocusOrVisibilitySync = () => {
       if (document.visibilityState === 'hidden') return;
-      fetchAdSettingsFromApi()
-        .then((srvAds) => {
-          if (srvAds && isMounted) {
+      Promise.all([
+        fetchPhonesFromApi(),
+        fetchArticlesFromApi(),
+        fetchReviewsFromApi(),
+        fetchBrandsFromApi(),
+        fetchAdSettingsFromApi(),
+      ])
+        .then(([srvPhones, srvArticles, srvReviews, srvBrands, srvAds]) => {
+          if (!isMounted) return;
+          if (srvPhones && srvPhones.length > 0) {
+            setPhones((prev) => mergePhonesAndSync(prev, srvPhones));
+          }
+          if (srvArticles && srvArticles.length > 0) {
+            setArticles((prev) => mergeArticlesAndSync(prev, srvArticles));
+          }
+          if (srvReviews && srvReviews.length > 0) {
+            setReviews((prev) => mergeReviewsAndSync(prev, srvReviews));
+          }
+          if (srvBrands && srvBrands.length > 0) {
+            setBrands((prev) => mergeBrandsAndSync(prev, srvBrands));
+          }
+          if (srvAds) {
             setAdSettings((prev) => mergeAdSettingsAndSync(prev, srvAds));
           }
         })

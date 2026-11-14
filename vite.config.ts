@@ -500,6 +500,7 @@ export default defineConfig(() => {
         },
         closeBundle() {
           // Automatically bundle server.ts into a cPanel/Passenger/LiteSpeed-compatible startup file (app.cjs & app.js)
+          // and sync functions/_seed.js for Cloudflare Pages Functions
           try {
             const rootDir = path.resolve(import.meta.dirname || '.', '.');
             esbuild.buildSync({
@@ -524,8 +525,22 @@ export default defineConfig(() => {
               logLevel: 'silent',
             });
             fs.writeFileSync(path.resolve(rootDir, 'app.js'), "import './app.cjs';\n", 'utf-8');
+
+            const dbJsonPath = path.resolve(rootDir, 'data', 'database.json');
+            const functionsDir = path.resolve(rootDir, 'functions');
+            if (fs.existsSync(dbJsonPath)) {
+              if (!fs.existsSync(functionsDir)) {
+                fs.mkdirSync(functionsDir, { recursive: true });
+              }
+              const rawDb = fs.readFileSync(dbJsonPath, 'utf-8');
+              fs.writeFileSync(
+                path.resolve(functionsDir, '_seed.js'),
+                `// Auto-generated from data/database.json for Cloudflare Pages Functions\nexport const SEED_DB = ${rawDb};\n`,
+                'utf-8'
+              );
+            }
           } catch (err) {
-            console.warn('[cPanel Server Bundle Warning]', err);
+            console.warn('[cPanel / Cloudflare Bundle Warning]', err);
           }
         },
       },
