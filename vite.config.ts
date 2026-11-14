@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import esbuild from 'esbuild';
+import fs from 'fs';
 import * as lightningcss from 'lightningcss';
 import path from 'path';
 import postcss from 'postcss';
@@ -498,7 +499,7 @@ export default defineConfig(() => {
           },
         },
         closeBundle() {
-          // Automatically bundle server.ts into a cPanel/Passenger/LiteSpeed-compatible CommonJS startup file (app.cjs)
+          // Automatically bundle server.ts into a cPanel/Passenger/LiteSpeed-compatible startup file (app.cjs & app.js)
           try {
             const rootDir = path.resolve(import.meta.dirname || '.', '.');
             esbuild.buildSync({
@@ -522,6 +523,7 @@ export default defineConfig(() => {
               },
               logLevel: 'silent',
             });
+            fs.writeFileSync(path.resolve(rootDir, 'app.js'), "import './app.cjs';\n", 'utf-8');
           } catch (err) {
             console.warn('[cPanel Server Bundle Warning]', err);
           }
