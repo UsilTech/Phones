@@ -2568,9 +2568,7 @@ function startServer() {
     }));
   }
 
-  const isDevServer =
-    process.env.npm_lifecycle_event === 'dev' ||
-    (process.env.NODE_ENV !== 'production' && !fs.existsSync(prodIndexPath));
+  const isDevServer = process.env.npm_lifecycle_event === 'dev';
 
   // Helper to detect browsers that benefit from the pre-compiled ES2015 classic bundle (e.g. Chrome < 80, Safari < 14, Android < 9, UC, Opera Mini)
   const requiresClassicBundle = (uaHeader: string | undefined): boolean => {
@@ -2672,34 +2670,14 @@ function startServer() {
     });
   }
 
-  const isCloudRun = Boolean(
-    process.env.K_SERVICE ||
-    process.env.K_REVISION ||
-    process.env.CLOUD_RUN_JOB
-  );
-
-  const isCpanelOrPassenger = !isCloudRun && Boolean(
-    process.env.CPANEL_MODE === '1' ||
-    process.env.PASSENGER_APP_ENV ||
-    process.env.IN_PASSENGER ||
-    process.env.LSNODE_SOCKET ||
-    process.env.LSWS_EDITION ||
-    isNaN(Number(PORT))
-  );
-
-  if (isCpanelOrPassenger) {
-    // CRITICAL FOR CPANEL / LITESPEED LSNODE / PHUSION PASSENGER:
-    // Must pass (PORT, callback) with NO '0.0.0.0' host argument!
-    // LiteSpeed lsnode.js replaces arguments[0] with a Unix domain socket path;
-    // passing '0.0.0.0' as arguments[1] causes Node net.Server.listen to throw ERR_SOCKET_BAD_PORT (503).
-    app.listen(PORT, () => {
-      console.log(`GsmScope Full-Stack Server active on ${PORT}`);
-    });
-  } else {
-    app.listen(Number(PORT), '0.0.0.0', () => {
-      console.log(`GsmScope Full-Stack Server active at http://0.0.0.0:${PORT}`);
-    });
-  }
+  // CRITICAL FOR CPANEL / LITESPEED LSNODE / PHUSION PASSENGER & CLOUD RUN:
+  // Always pass (PORT, callback) with NO second '0.0.0.0' host argument!
+  // LiteSpeed lsnode.js replaces arguments[0] with a Unix domain socket path;
+  // passing '0.0.0.0' as arguments[1] causes Node net.Server.listen to fail with 503 Service Unavailable.
+  // When PORT is a TCP port number, Node binds to all interfaces (:: / 0.0.0.0) by default.
+  app.listen(PORT, () => {
+    console.log(`GsmScope Full-Stack Server active on ${PORT}`);
+  });
 }
 
 startServer();

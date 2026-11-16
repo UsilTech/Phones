@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "updatedAt": "2026-10-31T16:52:31.597Z",
+  "updatedAt": "2026-11-16T10:37:25.262Z",
   "phones": [
     {
       "id": "smart-20",
@@ -20,7 +20,7 @@
       "accentColor": "#10b981",
       "rating": 4,
       "reviewsCount": 1,
-      "viewsCount": 0,
+      "viewsCount": 8,
       "categories": [
         "best-battery"
       ],
@@ -93,7 +93,8 @@
         },
         "sound": {
           "loudspeaker": "Yes, with stereo sound (300% volume boost)",
-          "jack35mm": "Yes (3.5mm audio jack included)"
+          "jack35mm": "Yes (3.5mm audio jack included)",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
         },
         "connectivity": {
           "wlan": "Wi-Fi 802.11 a/b/g/n/ac, dual-band",
@@ -101,10 +102,16 @@
           "nfc": "No",
           "radio": "FM radio",
           "usb": "USB Type-C 2.0, OTG",
-          "infrared": "No"
+          "infrared": "No",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
         },
-        "sensors": "Fingerprint (side-mounted), accelerometer, proximity"
-      }
+        "sensors": "Fingerprint (side-mounted), accelerometer, proximity",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
     },
     {
       "id": "oneplus-12r",
@@ -124,7 +131,7 @@
       "accentColor": "#dc2626",
       "rating": 4.8,
       "reviewsCount": 4,
-      "viewsCount": 0,
+      "viewsCount": 5,
       "categories": [
         "best-gaming",
         "best-battery",
@@ -199,7 +206,8 @@
         },
         "sound": {
           "loudspeaker": "Yes, with stereo speakers (Dolby Atmos)",
-          "jack35mm": "No"
+          "jack35mm": "No",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
         },
         "connectivity": {
           "wlan": "Wi-Fi 802.11 a/b/g/n/ac/6/7, dual-band",
@@ -207,10 +215,16 @@
           "nfc": "Yes",
           "radio": "No",
           "usb": "USB Type-C 2.0",
-          "infrared": "Yes"
+          "infrared": "Yes",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
         },
-        "sensors": "Fingerprint (under display, optical), accelerometer, gyro, proximity, compass, color spectrum"
-      }
+        "sensors": "Fingerprint (under display, optical), accelerometer, gyro, proximity, compass, color spectrum",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
     },
     {
       "id": "google-pixel-8-pro",
@@ -230,7 +244,7 @@
       "accentColor": "#14b8a6",
       "rating": 0,
       "reviewsCount": 0,
-      "viewsCount": 0,
+      "viewsCount": 3,
       "categories": [
         "best-camera",
         "best-5g",
@@ -306,7 +320,8 @@
         },
         "sound": {
           "loudspeaker": "Yes, with stereo speakers",
-          "jack35mm": "No"
+          "jack35mm": "No",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
         },
         "connectivity": {
           "wlan": "Wi-Fi 802.11 a/b/g/n/ac/6e/7, tri-band",
@@ -314,10 +329,16 @@
           "nfc": "Yes",
           "radio": "No",
           "usb": "USB Type-C 3.2",
-          "infrared": "No"
+          "infrared": "No",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
         },
-        "sensors": "Fingerprint (under display, optical), accelerometer, gyro, proximity, compass, barometer, thermometer"
-      }
+        "sensors": "Fingerprint (under display, optical), accelerometer, gyro, proximity, compass, barometer, thermometer",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
     },
     {
       "id": "xiaomi-redmi-13c",
@@ -337,7 +358,7 @@
       "accentColor": "#ea580c",
       "rating": 4,
       "reviewsCount": 1,
-      "viewsCount": 0,
+      "viewsCount": 14,
       "categories": [
         "best-battery"
       ],
@@ -411,7 +432,8 @@
         },
         "sound": {
           "loudspeaker": "Yes",
-          "jack35mm": "Yes (3.5mm jack included)"
+          "jack35mm": "Yes (3.5mm jack included)",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
         },
         "connectivity": {
           "wlan": "Wi-Fi 802.11 a/b/g/n/ac, dual-band",
@@ -419,10 +441,16 @@
           "nfc": "Yes (market dependent)",
           "radio": "FM radio",
           "usb": "USB Type-C 2.0",
-          "infrared": "No"
+          "infrared": "No",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
         },
-        "sensors": "Fingerprint (side-mounted), accelerometer, compass, virtual proximity sensing"
-      }
+        "sensors": "Fingerprint (side-mounted), accelerometer, compass, virtual proximity sensing",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
     },
     {
       "id": "xiaomi-redmi-note-13-pro-5g",
@@ -442,7 +470,7 @@
       "accentColor": "#f97316",
       "rating": 0,
       "reviewsCount": 0,
-      "viewsCount": 0,
+      "viewsCount": 2,
       "categories": [
         "best-camera",
         "best-5g"
@@ -517,7 +545,8 @@
         },
         "sound": {
           "loudspeaker": "Yes, with stereo speakers (Dolby Atmos)",
-          "jack35mm": "Yes (3.5mm headphone jack preserved)"
+          "jack35mm": "Yes (3.5mm headphone jack preserved)",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
         },
         "connectivity": {
           "wlan": "Wi-Fi 802.11 a/b/g/n/ac, dual-band",
@@ -525,10 +554,16 @@
           "nfc": "Yes",
           "radio": "No",
           "usb": "USB Type-C 2.0, OTG",
-          "infrared": "Yes"
+          "infrared": "Yes",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
         },
-        "sensors": "Fingerprint (under display, optical), accelerometer, gyro, compass, virtual proximity"
-      }
+        "sensors": "Fingerprint (under display, optical), accelerometer, gyro, compass, virtual proximity",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
     },
     {
       "id": "samsung-galaxy-s24-ultra",
@@ -548,7 +583,7 @@
       "accentColor": "#4f46e5",
       "rating": 4.8,
       "reviewsCount": 4,
-      "viewsCount": 0,
+      "viewsCount": 3,
       "categories": [
         "best-camera",
         "best-5g",
@@ -625,7 +660,8 @@
         },
         "sound": {
           "loudspeaker": "Yes, stereo speakers tuned by AKG",
-          "jack35mm": "No"
+          "jack35mm": "No",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
         },
         "connectivity": {
           "wlan": "Wi-Fi 802.11 a/b/g/n/ac/6e/7, tri-band, Wi-Fi Direct",
@@ -633,10 +669,16 @@
           "nfc": "Yes",
           "radio": "No",
           "usb": "USB Type-C 3.2, DisplayPort 1.2, OTG",
-          "infrared": "No"
+          "infrared": "No",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
         },
-        "sensors": "Fingerprint (under display, ultrasonic), accelerometer, gyro, proximity, compass, barometer, UWB"
-      }
+        "sensors": "Fingerprint (under display, ultrasonic), accelerometer, gyro, proximity, compass, barometer, UWB",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
     },
     {
       "id": "apple-iphone-16-pro-max",
@@ -656,7 +698,7 @@
       "accentColor": "#334155",
       "rating": 0,
       "reviewsCount": 0,
-      "viewsCount": 0,
+      "viewsCount": 2,
       "categories": [
         "best-camera",
         "best-5g",
@@ -733,7 +775,8 @@
         },
         "sound": {
           "loudspeaker": "Yes, with spatial audio stereo playback",
-          "jack35mm": "No"
+          "jack35mm": "No",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
         },
         "connectivity": {
           "wlan": "Wi-Fi 7 (802.11be) with 2x2 MIMO",
@@ -741,10 +784,16 @@
           "nfc": "Yes with reader mode",
           "radio": "No",
           "usb": "USB Type-C 3.2 Gen 2 (up to 10Gb/s), DisplayPort",
-          "infrared": "No"
+          "infrared": "No",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
         },
-        "sensors": "Face ID, LiDAR Scanner, barometer, high-g accelerometer, high dynamic range gyro"
-      }
+        "sensors": "Face ID, LiDAR Scanner, barometer, high-g accelerometer, high dynamic range gyro",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
     },
     {
       "id": "tecno-camon-30-pro-5g",
@@ -764,7 +813,7 @@
       "accentColor": "#2563eb",
       "rating": 0,
       "reviewsCount": 0,
-      "viewsCount": 0,
+      "viewsCount": 2,
       "categories": [
         "best-camera",
         "best-5g",
@@ -839,7 +888,8 @@
         },
         "sound": {
           "loudspeaker": "Yes, dual stereo speakers with Dolby Atmos",
-          "jack35mm": "No"
+          "jack35mm": "No",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
         },
         "connectivity": {
           "wlan": "Wi-Fi 802.11 a/b/g/n/ac/6, dual-band",
@@ -847,10 +897,16 @@
           "nfc": "Yes",
           "radio": "FM radio",
           "usb": "USB Type-C 2.0, OTG",
-          "infrared": "Yes"
+          "infrared": "Yes",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
         },
-        "sensors": "Fingerprint (under display, optical), accelerometer, gyro, proximity, compass"
-      }
+        "sensors": "Fingerprint (under display, optical), accelerometer, gyro, proximity, compass",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
     },
     {
       "id": "umidigi-g5-mecha",
@@ -2557,5 +2613,14 @@
       "status": "delivered"
     }
   ],
-  "confirmationEmailsLog": []
+  "confirmationEmailsLog": [],
+  "uploadDataUrls": {},
+  "deletedPhoneIds": [],
+  "deletedArticleIds": [],
+  "deletedReviewIds": [],
+  "deletedBrandKeys": [
+    "nothing",
+    "brand-nothing"
+  ],
+  "deletedInquiryIds": []
 }

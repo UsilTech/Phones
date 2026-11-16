@@ -499,17 +499,18 @@ export default defineConfig(() => {
           },
         },
         closeBundle() {
-          // Automatically bundle server.ts into a cPanel/Passenger/LiteSpeed-compatible startup file (app.cjs & app.js)
-          // and sync functions/_seed.js for Cloudflare Pages Functions
+          // Automatically bundle server.ts into a cPanel/Passenger/LiteSpeed-compatible CommonJS startup file (both app.cjs & app.js)
+          // and sync functions/_seed.js for Cloudflare Workers / Pages Functions
           try {
             const rootDir = path.resolve(import.meta.dirname || '.', '.');
+            const cjsOutPath = path.resolve(rootDir, 'app.cjs');
             esbuild.buildSync({
               entryPoints: [path.resolve(rootDir, 'server.ts')],
               bundle: true,
               platform: 'node',
               format: 'cjs',
               target: ['node18'],
-              outfile: path.resolve(rootDir, 'app.cjs'),
+              outfile: cjsOutPath,
               external: [
                 'vite',
                 'esbuild',
@@ -524,7 +525,8 @@ export default defineConfig(() => {
               },
               logLevel: 'silent',
             });
-            fs.writeFileSync(path.resolve(rootDir, 'app.js'), "import './app.cjs';\n", 'utf-8');
+            // Copy identical self-contained CommonJS bundle to app.js so cPanel default startup file (app.js) works with require()
+            fs.copyFileSync(cjsOutPath, path.resolve(rootDir, 'app.js'));
 
             const dbJsonPath = path.resolve(rootDir, 'data', 'database.json');
             const functionsDir = path.resolve(rootDir, 'functions');

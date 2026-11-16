@@ -1,7 +1,7 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/gsmscope/phones_app/
+    - export DEPLOYPATH=$HOME/phones_app/
     - /bin/mkdir -p $DEPLOYPATH $DEPLOYPATH/data $DEPLOYPATH/uploads $DEPLOYPATH/public/uploads $DEPLOYPATH/tmp
     - /usr/bin/rsync -av --exclude='.git' --exclude='.cpanel.yml' --exclude='node_modules' --exclude='data/database.json' --exclude='uploads' --exclude='public/uploads' --exclude='tmp' --exclude='.env' --exclude='.htaccess' --exclude='.well-known' --exclude='cgi-bin' ./ $DEPLOYPATH
     - /bin/sh -c '[ -f "$DEPLOYPATH/data/database.json" ] || /bin/cp ./data/database.json "$DEPLOYPATH/data/database.json"'

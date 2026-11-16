@@ -1,0 +1,2627 @@
+// Auto-generated from data/database.json for Cloudflare Pages Functions
+export const SEED_DB = {
+  "version": "2.0",
+  "updatedAt": "2026-11-16T10:37:25.262Z",
+  "phones": [
+    {
+      "id": "smart-20",
+      "name": "Smart 20",
+      "brand": "Infinix",
+      "priceNGN": 130000,
+      "priceUSD": 85,
+      "oldPriceNGN": 145000,
+      "priceRange": "100k-200k",
+      "marketStatus": "Available. Released 2024, October",
+      "nairaPriceNotes": "Entry-level smartphone offering a 90Hz display, 5200 mAh battery, and clean XOS 14. MSRP ~$85 / ₦130,000 with manufacturer warranty.",
+      "releaseYear": 2024,
+      "releaseDate": "October 2024",
+      "modelNumber": "X6525, X6525B",
+      "screenSizeInches": 6.6,
+      "image": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "accentColor": "#10b981",
+      "rating": 4,
+      "reviewsCount": 1,
+      "viewsCount": 8,
+      "categories": [
+        "best-battery"
+      ],
+      "isFeatured": true,
+      "isPopular": true,
+      "keyHighlights": {
+        "display": "6.6\" 90Hz Punch-Hole LCD",
+        "processor": "MediaTek Helio G81 Ultimate",
+        "ram": "4GB (+4GB Extended)",
+        "storage": "64GB / 128GB",
+        "camera": "13MP Dual Camera + Dual Flash",
+        "battery": "5200 mAh",
+        "charging": "18W Type-C Fast Charge",
+        "os": "Android 14 (Go edition), XOS 14",
+        "network5g": false
+      },
+      "detailedSpecs": {
+        "network": {
+          "technology": "GSM / HSPA / LTE",
+          "bands5g": "4G LTE bands 1, 3, 5, 7, 8, 20, 28, 38, 40, 41 (Global bands)",
+          "speed": "HSPA, LTE-A",
+          "sim": "Dual SIM (Nano-SIM, dual stand-by)"
+        },
+        "body": {
+          "dimensions": "163.6 x 75.6 x 8.5 mm",
+          "weight": "186 g",
+          "build": "Glass front, textured composite back with Dynamic Island notification animation",
+          "waterResistance": "IP54 splash resistant"
+        },
+        "display": {
+          "type": "IPS LCD, 90Hz, 500 nits (peak)",
+          "size": "6.6 inches, 104.6 cm2 (~84.5% screen-to-body ratio)",
+          "resolution": "720 x 1612 pixels, 20:9 ratio (~267 ppi density)",
+          "protection": "Reinforced scratch-resistant glass",
+          "brightness": "500 nits peak",
+          "refreshRate": "90Hz"
+        },
+        "platform": {
+          "os": "Android 14 (Go edition), XOS 14",
+          "chipset": "MediaTek Helio G81 Ultimate (12nm)",
+          "cpu": "Octa-core (2x2.0 GHz Cortex-A75 & 6x1.8 GHz Cortex-A55)",
+          "gpu": "Mali-G52 MC2",
+          "antutuScore": "265,000 (v10)"
+        },
+        "memory": {
+          "ramVariants": [
+            "4GB"
+          ],
+          "storageVariants": [
+            "64GB",
+            "128GB"
+          ],
+          "cardSlot": "microSDXC (dedicated slot)",
+          "storageType": "eMMC 5.1"
+        },
+        "mainCamera": {
+          "setup": "13 MP, f/1.8, (wide), AF + 0.08 MP (auxiliary lens)",
+          "features": "Dual-LED flash, HDR, portrait mode",
+          "video": "1080p@30fps"
+        },
+        "selfieCamera": {
+          "setup": "8 MP, f/2.0, (wide), Front Dual Flash",
+          "features": "Selfie flash, Beauty AI",
+          "video": "1080p@30fps"
+        },
+        "battery": {
+          "capacity": "5200 mAh non-removable",
+          "charging": "18W wired via Type-C",
+          "wirelessCharging": "No"
+        },
+        "sound": {
+          "loudspeaker": "Yes, with stereo sound (300% volume boost)",
+          "jack35mm": "Yes (3.5mm audio jack included)",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
+        },
+        "connectivity": {
+          "wlan": "Wi-Fi 802.11 a/b/g/n/ac, dual-band",
+          "bluetooth": "5.0, A2DP, LE",
+          "nfc": "No",
+          "radio": "FM radio",
+          "usb": "USB Type-C 2.0, OTG",
+          "infrared": "No",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
+        },
+        "sensors": "Fingerprint (side-mounted), accelerometer, proximity",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
+    },
+    {
+      "id": "oneplus-12r",
+      "name": "OnePlus 12R",
+      "brand": "OnePlus",
+      "priceNGN": 895000,
+      "priceUSD": 599,
+      "oldPriceNGN": 940000,
+      "priceRange": "600k-1.2m",
+      "marketStatus": "Available. Released 2024, January",
+      "nairaPriceNotes": "Performance flagship killer featuring Qualcomm Snapdragon 8 Gen 2, 16GB RAM, 5500 mAh battery and 100W SUPERVOOC charging. Global MSRP ~$599 / ₦895,000.",
+      "releaseYear": 2024,
+      "releaseDate": "January 2024",
+      "modelNumber": "CPH2609, CPH2611",
+      "screenSizeInches": 6.78,
+      "image": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "accentColor": "#dc2626",
+      "rating": 4.8,
+      "reviewsCount": 4,
+      "viewsCount": 5,
+      "categories": [
+        "best-gaming",
+        "best-battery",
+        "best-5g",
+        "best-phones"
+      ],
+      "isFeatured": true,
+      "isPopular": true,
+      "keyHighlights": {
+        "display": "6.78\" 120Hz 1.5K ProXDR LTPO4 AMOLED",
+        "processor": "Qualcomm Snapdragon 8 Gen 2 4nm",
+        "ram": "16GB LPDDR5X",
+        "storage": "256GB UFS 3.1",
+        "camera": "50MP Sony IMX890 OIS + 8MP UW + 2MP Macro",
+        "battery": "5500 mAh",
+        "charging": "100W SUPERVOOC (1-100% in 26m)",
+        "os": "Android 14, OxygenOS 14",
+        "network5g": true
+      },
+      "detailedSpecs": {
+        "network": {
+          "technology": "GSM / CDMA / HSPA / LTE / 5G",
+          "bands5g": "1, 2, 3, 5, 7, 8, 20, 28, 38, 40, 41, 77, 78 SA/NSA",
+          "speed": "HSPA, LTE-A (CA), 5G",
+          "sim": "Dual SIM (Nano-SIM, dual stand-by)"
+        },
+        "body": {
+          "dimensions": "163.3 x 75.3 x 8.8 mm",
+          "weight": "207 g",
+          "build": "Gorilla Glass Victus 2 front, glass back, aluminum alloy frame",
+          "waterResistance": "IP64 dust/water resistant"
+        },
+        "display": {
+          "type": "LTPO4 AMOLED, 1B colors, 120Hz, Dolby Vision, HDR10+, 4500 nits (peak)",
+          "size": "6.78 inches, 111.7 cm2 (~90.9% screen-to-body ratio)",
+          "resolution": "1264 x 2780 pixels (~450 ppi density)",
+          "protection": "Corning Gorilla Glass Victus 2",
+          "brightness": "4500 nits peak",
+          "refreshRate": "1-120Hz adaptive"
+        },
+        "platform": {
+          "os": "Android 14, OxygenOS 14",
+          "chipset": "Qualcomm SM8550-AB Snapdragon 8 Gen 2 (4 nm)",
+          "cpu": "Octa-core (1x3.2 GHz Cortex-X3 & 2x2.8 GHz Cortex-A715 & 2x2.8 GHz Cortex-A710 & 3x2.0 GHz Cortex-A510)",
+          "gpu": "Adreno 740",
+          "antutuScore": "1,530,000 (v10)"
+        },
+        "memory": {
+          "ramVariants": [
+            "16GB"
+          ],
+          "storageVariants": [
+            "256GB"
+          ],
+          "cardSlot": "No",
+          "storageType": "UFS 3.1"
+        },
+        "mainCamera": {
+          "setup": "50 MP, f/1.8, 24mm (wide), 1/1.56\", 1.0µm, PDAF, OIS Sony IMX890 + 8 MP, f/2.2, 16mm, 112˚ (ultrawide) + 2 MP (macro)",
+          "features": "Dual-LED flash, HDR, panorama",
+          "video": "4K@30/60fps, 1080p@30/60/120/240fps, gyro-EIS, OIS"
+        },
+        "selfieCamera": {
+          "setup": "16 MP, f/2.4, 26mm (wide)",
+          "features": "HDR, panorama",
+          "video": "1080p@30fps, gyro-EIS"
+        },
+        "battery": {
+          "capacity": "5500 mAh non-removable",
+          "charging": "100W wired, 1-100% in 26 min (advertised)",
+          "wirelessCharging": "No"
+        },
+        "sound": {
+          "loudspeaker": "Yes, with stereo speakers (Dolby Atmos)",
+          "jack35mm": "No",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
+        },
+        "connectivity": {
+          "wlan": "Wi-Fi 802.11 a/b/g/n/ac/6/7, dual-band",
+          "bluetooth": "5.3, A2DP, LE, aptX HD",
+          "nfc": "Yes",
+          "radio": "No",
+          "usb": "USB Type-C 2.0",
+          "infrared": "Yes",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
+        },
+        "sensors": "Fingerprint (under display, optical), accelerometer, gyro, proximity, compass, color spectrum",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
+    },
+    {
+      "id": "google-pixel-8-pro",
+      "name": "Google Pixel 8 Pro",
+      "brand": "Google",
+      "priceNGN": 1540000,
+      "priceUSD": 999,
+      "oldPriceNGN": 1620000,
+      "priceRange": "flagship",
+      "marketStatus": "Available. Released 2023, October",
+      "nairaPriceNotes": "Google computational photography benchmark featuring Google Tensor G3, 7 years of major OS upgrades, and Super Actua LTPO OLED display. MSRP ~$999 / ₦1,540,000.",
+      "releaseYear": 2023,
+      "releaseDate": "October 2023",
+      "modelNumber": "GC3VE, G1MNW",
+      "screenSizeInches": 6.7,
+      "image": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "accentColor": "#14b8a6",
+      "rating": 0,
+      "reviewsCount": 0,
+      "viewsCount": 3,
+      "categories": [
+        "best-camera",
+        "best-5g",
+        "best-phones"
+      ],
+      "isFeatured": true,
+      "isPopular": true,
+      "keyHighlights": {
+        "display": "6.7\" 120Hz Super Actua LTPO OLED",
+        "processor": "Google Tensor G3 4nm",
+        "ram": "12GB LPDDR5X",
+        "storage": "128GB / 256GB / 512GB UFS 3.1",
+        "camera": "50MP OIS + 48MP 5x Telephoto + 48MP UW",
+        "battery": "5050 mAh",
+        "charging": "30W wired, 23W wireless",
+        "os": "Android 15 (7 Years of OS Updates)",
+        "network5g": true
+      },
+      "detailedSpecs": {
+        "network": {
+          "technology": "GSM / HSPA / LTE / 5G",
+          "bands5g": "1, 2, 3, 5, 7, 8, 12, 20, 25, 28, 30, 38, 40, 41, 66, 71, 77, 78 SA/NSA/Sub6/mmWave",
+          "speed": "HSPA, LTE-A (CA), 5G",
+          "sim": "Nano-SIM and eSIM"
+        },
+        "body": {
+          "dimensions": "162.6 x 76.5 x 8.8 mm",
+          "weight": "213 g",
+          "build": "Corning Gorilla Glass Victus 2 front and back, matte finish, polished aluminum frame",
+          "waterResistance": "IP68 dust/water resistant (up to 1.5m for 30 min)"
+        },
+        "display": {
+          "type": "LTPO OLED, 120Hz, HDR10+, 2400 nits (peak)",
+          "size": "6.7 inches, 108.7 cm2 (~87.4% screen-to-body ratio)",
+          "resolution": "1344 x 2992 pixels, 20:9 ratio (~489 ppi density)",
+          "protection": "Corning Gorilla Glass Victus 2",
+          "brightness": "2400 nits peak",
+          "refreshRate": "1-120Hz adaptive"
+        },
+        "platform": {
+          "os": "Android 15 (7 major OS upgrades)",
+          "chipset": "Google Tensor G3 (4 nm)",
+          "cpu": "Nona-core (1x3.0 GHz Cortex-X3 & 4x2.45 GHz Cortex-A715 & 4x2.15 GHz Cortex-A510)",
+          "gpu": "Immortalis-G715s MC10",
+          "antutuScore": "1,120,000 (v10)"
+        },
+        "memory": {
+          "ramVariants": [
+            "12GB"
+          ],
+          "storageVariants": [
+            "128GB",
+            "256GB",
+            "512GB"
+          ],
+          "cardSlot": "No",
+          "storageType": "UFS 3.1"
+        },
+        "mainCamera": {
+          "setup": "50 MP, f/1.7, 25mm (wide), 1/1.31\", 1.2µm, dual pixel PDAF, multi-zone Laser AF, OIS + 48 MP (periscope telephoto, 5x optical, OIS) + 48 MP (ultrawide, 126˚)",
+          "features": "Best Take, Magic Audio Eraser, Night Sight, Video Boost",
+          "video": "4K@24/30/60fps, 1080p@30/60/120/240fps; gyro-EIS, OIS, 10-bit HDR"
+        },
+        "selfieCamera": {
+          "setup": "10.5 MP, f/2.2, 20mm (ultrawide), 1/3.1\", 1.22µm, PDAF",
+          "features": "Auto-HDR, panorama",
+          "video": "4K@24/30/60fps, 1080p@30/60fps"
+        },
+        "battery": {
+          "capacity": "5050 mAh non-removable",
+          "charging": "30W wired, PD3.0, 50% in 30 min (advertised)",
+          "wirelessCharging": "23W wireless (Pixel Stand), 12W with Qi, reverse wireless"
+        },
+        "sound": {
+          "loudspeaker": "Yes, with stereo speakers",
+          "jack35mm": "No",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
+        },
+        "connectivity": {
+          "wlan": "Wi-Fi 802.11 a/b/g/n/ac/6e/7, tri-band",
+          "bluetooth": "5.3, A2DP, LE, aptX HD",
+          "nfc": "Yes",
+          "radio": "No",
+          "usb": "USB Type-C 3.2",
+          "infrared": "No",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
+        },
+        "sensors": "Fingerprint (under display, optical), accelerometer, gyro, proximity, compass, barometer, thermometer",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
+    },
+    {
+      "id": "xiaomi-redmi-13c",
+      "name": "Xiaomi Redmi 13C",
+      "brand": "Xiaomi",
+      "priceNGN": 175000,
+      "priceUSD": 119,
+      "oldPriceNGN": 189000,
+      "priceRange": "100k-200k",
+      "marketStatus": "Available. Released 2023, November",
+      "nairaPriceNotes": "Dependable budget favorite with clean 90Hz display, 50MP AI primary camera, and 5000 mAh battery with 18W charging. MSRP ~$119 / ₦175,000.",
+      "releaseYear": 2023,
+      "releaseDate": "November 2023",
+      "modelNumber": "23100RN82L, 23108RN04Y",
+      "screenSizeInches": 6.74,
+      "image": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "accentColor": "#ea580c",
+      "rating": 4,
+      "reviewsCount": 1,
+      "viewsCount": 14,
+      "categories": [
+        "best-battery"
+      ],
+      "isFeatured": false,
+      "isPopular": true,
+      "keyHighlights": {
+        "display": "6.74\" 90Hz IPS LCD",
+        "processor": "MediaTek Helio G85 12nm",
+        "ram": "6GB / 8GB",
+        "storage": "128GB / 256GB eMMC 5.1",
+        "camera": "50MP f/1.8 + 2MP Macro + Auxiliary",
+        "battery": "5000 mAh",
+        "charging": "18W Type-C wired",
+        "os": "Android 13, MIUI 14 (Upgraded to HyperOS)",
+        "network5g": false
+      },
+      "detailedSpecs": {
+        "network": {
+          "technology": "GSM / HSPA / LTE",
+          "bands5g": "4G LTE bands 1, 3, 5, 7, 8, 20, 28, 38, 40, 41",
+          "speed": "HSPA, LTE",
+          "sim": "Dual SIM (Nano-SIM, dual stand-by)"
+        },
+        "body": {
+          "dimensions": "168.0 x 78.0 x 8.09 mm",
+          "weight": "192 g",
+          "build": "Glass front (Corning Gorilla Glass), plastic frame, plastic back",
+          "waterResistance": "None"
+        },
+        "display": {
+          "type": "IPS LCD, 90Hz, 450 nits (typ), 600 nits (HBM)",
+          "size": "6.74 inches, 109.7 cm2 (~83.7% screen-to-body ratio)",
+          "resolution": "720 x 1600 pixels, 20:9 ratio (~260 ppi density)",
+          "protection": "Corning Gorilla Glass",
+          "brightness": "600 nits HBM",
+          "refreshRate": "90Hz"
+        },
+        "platform": {
+          "os": "Android 13, MIUI 14 for POCO / Xiaomi",
+          "chipset": "Mediatek MT6769Z Helio G85 (12nm)",
+          "cpu": "Octa-core (2x2.0 GHz Cortex-A75 & 6x1.8 GHz Cortex-A55)",
+          "gpu": "Mali-G52 MC2",
+          "antutuScore": "280,000 (v10)"
+        },
+        "memory": {
+          "ramVariants": [
+            "6GB",
+            "8GB"
+          ],
+          "storageVariants": [
+            "128GB",
+            "256GB"
+          ],
+          "cardSlot": "microSDXC (dedicated slot)",
+          "storageType": "eMMC 5.1"
+        },
+        "mainCamera": {
+          "setup": "50 MP, f/1.8, 28mm (wide), 0.64µm, PDAF + 2 MP (macro) + 0.08 MP (auxiliary)",
+          "features": "LED flash, HDR, filmCamera filters",
+          "video": "1080p@30fps"
+        },
+        "selfieCamera": {
+          "setup": "8 MP, f/2.0",
+          "features": "HDR, Soft-light ring",
+          "video": "1080p@30fps"
+        },
+        "battery": {
+          "capacity": "5000 mAh non-removable",
+          "charging": "18W wired, PD",
+          "wirelessCharging": "No"
+        },
+        "sound": {
+          "loudspeaker": "Yes",
+          "jack35mm": "Yes (3.5mm jack included)",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
+        },
+        "connectivity": {
+          "wlan": "Wi-Fi 802.11 a/b/g/n/ac, dual-band",
+          "bluetooth": "5.3, A2DP, LE",
+          "nfc": "Yes (market dependent)",
+          "radio": "FM radio",
+          "usb": "USB Type-C 2.0",
+          "infrared": "No",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
+        },
+        "sensors": "Fingerprint (side-mounted), accelerometer, compass, virtual proximity sensing",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
+    },
+    {
+      "id": "xiaomi-redmi-note-13-pro-5g",
+      "name": "Xiaomi Redmi Note 13 Pro 5G",
+      "brand": "Xiaomi",
+      "priceNGN": 450000,
+      "priceUSD": 299,
+      "oldPriceNGN": 480000,
+      "priceRange": "350k-600k",
+      "marketStatus": "Available. Released 2024, January",
+      "nairaPriceNotes": "Class-leading 200MP OIS sensor, crisp 1.5K 120Hz AMOLED screen, and Snapdragon 7s Gen 2 chip with 67W turbo charging. Global MSRP ~$299 / ₦450,000.",
+      "releaseYear": 2024,
+      "releaseDate": "January 2024",
+      "modelNumber": "2312DRA50G, 2312CRAD3C",
+      "screenSizeInches": 6.67,
+      "image": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "accentColor": "#f97316",
+      "rating": 0,
+      "reviewsCount": 0,
+      "viewsCount": 2,
+      "categories": [
+        "best-camera",
+        "best-5g"
+      ],
+      "isFeatured": false,
+      "isPopular": true,
+      "keyHighlights": {
+        "display": "6.67\" 120Hz 1.5K CrystalRes AMOLED",
+        "processor": "Snapdragon 7s Gen 2 4nm 5G",
+        "ram": "8GB / 12GB",
+        "storage": "256GB / 512GB UFS 2.2",
+        "camera": "200MP Samsung ISOCELL HP3 OIS + 8MP UW + 2MP",
+        "battery": "5100 mAh",
+        "charging": "67W Turbo Charge (100% in 44m)",
+        "os": "Android 14, Xiaomi HyperOS",
+        "network5g": true
+      },
+      "detailedSpecs": {
+        "network": {
+          "technology": "GSM / CDMA / HSPA / EVDO / LTE / 5G",
+          "bands5g": "1, 3, 5, 7, 8, 20, 28, 38, 40, 41, 66, 77, 78 SA/NSA",
+          "speed": "HSPA, LTE-A, 5G",
+          "sim": "Dual SIM (Nano-SIM, dual stand-by) or Nano-SIM and eSIM"
+        },
+        "body": {
+          "dimensions": "161.2 x 74.2 x 7.98 mm",
+          "weight": "187 g",
+          "build": "Gorilla Glass Victus front, glass back, plastic frame",
+          "waterResistance": "IP54 splash resistant"
+        },
+        "display": {
+          "type": "AMOLED, 68B colors, 120Hz, Dolby Vision, 1800 nits (peak)",
+          "size": "6.67 inches, 107.4 cm2 (~89.8% screen-to-body ratio)",
+          "resolution": "1220 x 2712 pixels, 20:9 ratio (~446 ppi density)",
+          "protection": "Corning Gorilla Glass Victus",
+          "brightness": "1800 nits peak",
+          "refreshRate": "120Hz"
+        },
+        "platform": {
+          "os": "Android 14, HyperOS",
+          "chipset": "Qualcomm SM7435-AB Snapdragon 7s Gen 2 (4 nm)",
+          "cpu": "Octa-core (4x2.40 GHz Cortex-A78 & 4x1.95 GHz Cortex-A55)",
+          "gpu": "Adreno 710",
+          "antutuScore": "610,000 (v10)"
+        },
+        "memory": {
+          "ramVariants": [
+            "8GB",
+            "12GB"
+          ],
+          "storageVariants": [
+            "256GB",
+            "512GB"
+          ],
+          "cardSlot": "No",
+          "storageType": "UFS 2.2"
+        },
+        "mainCamera": {
+          "setup": "200 MP, f/1.7, (wide), 1/1.4\", 0.56µm, multi-directional PDAF, OIS + 8 MP, f/2.2, 118˚ (ultrawide) + 2 MP (macro)",
+          "features": "Dual-LED dual-tone flash, HDR, panorama, 4x in-sensor zoom",
+          "video": "4K@30fps, 1080p@30/60/120fps, gyro-EIS"
+        },
+        "selfieCamera": {
+          "setup": "16 MP, f/2.4, (wide)",
+          "features": "HDR, panorama",
+          "video": "1080p@30/60fps"
+        },
+        "battery": {
+          "capacity": "5100 mAh non-removable",
+          "charging": "67W wired, PD3.0, 100% in 44 min (advertised)",
+          "wirelessCharging": "No"
+        },
+        "sound": {
+          "loudspeaker": "Yes, with stereo speakers (Dolby Atmos)",
+          "jack35mm": "Yes (3.5mm headphone jack preserved)",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
+        },
+        "connectivity": {
+          "wlan": "Wi-Fi 802.11 a/b/g/n/ac, dual-band",
+          "bluetooth": "5.2, A2DP, LE",
+          "nfc": "Yes",
+          "radio": "No",
+          "usb": "USB Type-C 2.0, OTG",
+          "infrared": "Yes",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
+        },
+        "sensors": "Fingerprint (under display, optical), accelerometer, gyro, compass, virtual proximity",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
+    },
+    {
+      "id": "samsung-galaxy-s24-ultra",
+      "name": "Samsung Galaxy S24 Ultra",
+      "brand": "Samsung",
+      "priceNGN": 1850000,
+      "priceUSD": 1230,
+      "oldPriceNGN": 1980000,
+      "priceRange": "flagship",
+      "marketStatus": "Available. Released 2024, January",
+      "nairaPriceNotes": "Ultra flagship with Titanium frame, Corning Gorilla Armor anti-reflective glass, 200MP quad camera, S-Pen, and 7-year OS update guarantee. MSRP ~$1,230 / ₦1,850,000.",
+      "releaseYear": 2024,
+      "releaseDate": "January 2024",
+      "modelNumber": "SM-S928B, SM-S928B/DS",
+      "screenSizeInches": 6.8,
+      "image": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "accentColor": "#4f46e5",
+      "rating": 4.8,
+      "reviewsCount": 4,
+      "viewsCount": 3,
+      "categories": [
+        "best-camera",
+        "best-5g",
+        "best-gaming",
+        "best-phones"
+      ],
+      "isFeatured": true,
+      "isPopular": true,
+      "keyHighlights": {
+        "display": "6.8\" 120Hz Dynamic LTPO AMOLED 2X",
+        "processor": "Snapdragon 8 Gen 3 for Galaxy 4nm",
+        "ram": "12GB LPDDR5X",
+        "storage": "256GB / 512GB / 1TB UFS 4.0",
+        "camera": "200MP OIS + 50MP 5x Periscope + 10MP 3x + 12MP UW",
+        "battery": "5000 mAh",
+        "charging": "45W wired, 15W wireless",
+        "os": "Android 14, One UI 6.1 (7 Years of OS Updates)",
+        "network5g": true
+      },
+      "detailedSpecs": {
+        "network": {
+          "technology": "GSM / CDMA / HSPA / EVDO / LTE / 5G",
+          "bands5g": "1, 2, 3, 5, 7, 8, 12, 20, 25, 26, 28, 38, 40, 41, 66, 75, 77, 78 SA/NSA/Sub6",
+          "speed": "HSPA, LTE-A (up to 7CA), 5G",
+          "sim": "Nano-SIM and eSIM or Dual Nano-SIM"
+        },
+        "body": {
+          "dimensions": "162.3 x 79.0 x 8.6 mm",
+          "weight": "232 g",
+          "build": "Corning Gorilla Armor front & back, Grade 2 Titanium frame",
+          "waterResistance": "IP68 dust/water resistant (up to 1.5m for 30 min)"
+        },
+        "display": {
+          "type": "Dynamic LTPO AMOLED 2X, 120Hz, HDR10+, anti-reflective coating",
+          "size": "6.8 inches, 113.5 cm2 (~88.5% screen-to-body ratio)",
+          "resolution": "1440 x 3120 pixels, 19.5:9 ratio (~505 ppi density)",
+          "protection": "Corning Gorilla Armor",
+          "brightness": "2600 nits (peak)",
+          "refreshRate": "1-120Hz adaptive"
+        },
+        "platform": {
+          "os": "Android 14, One UI 6.1, Galaxy AI suite",
+          "chipset": "Qualcomm SM8650-AC Snapdragon 8 Gen 3 (4 nm)",
+          "cpu": "8-core (1x3.39GHz Cortex-X4 & 3x3.1GHz Cortex-A720 & 2x2.9GHz Cortex-A720 & 2x2.2GHz Cortex-A520)",
+          "gpu": "Adreno 750 (1 GHz)",
+          "antutuScore": "1,860,000 (v10)"
+        },
+        "memory": {
+          "ramVariants": [
+            "12GB"
+          ],
+          "storageVariants": [
+            "256GB",
+            "512GB",
+            "1TB"
+          ],
+          "cardSlot": "No",
+          "storageType": "UFS 4.0"
+        },
+        "mainCamera": {
+          "setup": "200 MP (f/1.7, 24mm wide, multi-directional PDAF, Laser AF, OIS) + 50 MP (periscope telephoto, 5x optical, OIS) + 10 MP (telephoto, 3x optical, OIS) + 12 MP (ultrawide, 120˚)",
+          "features": "LED flash, auto-HDR, panorama, 8K video at 30fps, 4K at 120fps",
+          "video": "8K@24/30fps, 4K@30/60/120fps, 1080p@30/60/240fps, HDR10+"
+        },
+        "selfieCamera": {
+          "setup": "12 MP, f/2.2, 26mm (wide), Dual Pixel PDAF",
+          "features": "Dual video call, Auto-HDR, HDR10+",
+          "video": "4K@30/60fps, 1080p@30fps"
+        },
+        "battery": {
+          "capacity": "5000 mAh non-removable",
+          "charging": "45W wired, PD3.0, 65% in 30 min (advertised)",
+          "wirelessCharging": "15W wireless (Qi/PMA), 4.5W reverse wireless"
+        },
+        "sound": {
+          "loudspeaker": "Yes, stereo speakers tuned by AKG",
+          "jack35mm": "No",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
+        },
+        "connectivity": {
+          "wlan": "Wi-Fi 802.11 a/b/g/n/ac/6e/7, tri-band, Wi-Fi Direct",
+          "bluetooth": "5.3, A2DP, LE",
+          "nfc": "Yes",
+          "radio": "No",
+          "usb": "USB Type-C 3.2, DisplayPort 1.2, OTG",
+          "infrared": "No",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
+        },
+        "sensors": "Fingerprint (under display, ultrasonic), accelerometer, gyro, proximity, compass, barometer, UWB",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
+    },
+    {
+      "id": "apple-iphone-16-pro-max",
+      "name": "Apple iPhone 16 Pro Max",
+      "brand": "Apple",
+      "priceNGN": 2450000,
+      "priceUSD": 1630,
+      "oldPriceNGN": 2550000,
+      "priceRange": "flagship",
+      "marketStatus": "Available. Released 2024, September",
+      "nairaPriceNotes": "Flagship iPhone built from Grade 5 Titanium, Apple A18 Pro 3nm silicon, 48MP Fusion camera system with 5x optical telephoto, and Camera Control button. MSRP ~$1,630 / ₦2,450,000.",
+      "releaseYear": 2024,
+      "releaseDate": "September 2024",
+      "modelNumber": "A3296, A3084, A3295",
+      "screenSizeInches": 6.9,
+      "image": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "accentColor": "#334155",
+      "rating": 0,
+      "reviewsCount": 0,
+      "viewsCount": 2,
+      "categories": [
+        "best-camera",
+        "best-5g",
+        "best-gaming",
+        "best-phones"
+      ],
+      "isFeatured": true,
+      "isPopular": true,
+      "keyHighlights": {
+        "display": "6.9\" 120Hz Super Retina XDR OLED",
+        "processor": "Apple A18 Pro 3nm",
+        "ram": "8GB Unified",
+        "storage": "256GB / 512GB / 1TB NVMe",
+        "camera": "48MP Fusion Camera + 48MP UW + 12MP 5x Tetraprism Zoom",
+        "battery": "4685 mAh",
+        "charging": "Fast wired PD, 25W MagSafe wireless",
+        "os": "iOS 18 (Apple Intelligence support)",
+        "network5g": true
+      },
+      "detailedSpecs": {
+        "network": {
+          "technology": "GSM / CDMA / HSPA / EVDO / LTE / 5G",
+          "bands5g": "1, 2, 3, 5, 7, 8, 12, 20, 25, 26, 28, 30, 38, 40, 41, 48, 53, 66, 70, 77, 78, 79 SA/NSA/Sub6",
+          "speed": "HSPA, LTE-A, 5G",
+          "sim": "Dual eSIM or Nano-SIM and eSIM"
+        },
+        "body": {
+          "dimensions": "163.0 x 77.6 x 8.25 mm",
+          "weight": "227 g",
+          "build": "Ceramic Shield front, textured matte glass back, Grade 5 Titanium frame, Camera Control button",
+          "waterResistance": "IP68 (6m up to 30 mins)"
+        },
+        "display": {
+          "type": "Super Retina XDR OLED, 120Hz ProMotion, HDR10, Dolby Vision",
+          "size": "6.9 inches, 115.6 cm2 (~91.4% screen-to-body ratio)",
+          "resolution": "1320 x 2868 pixels (~460 ppi density)",
+          "protection": "Ceramic Shield glass (2024 gen)",
+          "brightness": "2000 nits peak outdoor, 1 nit minimum",
+          "refreshRate": "1-120Hz ProMotion"
+        },
+        "platform": {
+          "os": "iOS 18, upgradable to future iOS versions",
+          "chipset": "Apple A18 Pro (3 nm)",
+          "cpu": "Hexa-core (2 performance + 4 efficiency)",
+          "gpu": "Apple 6-core GPU with hardware ray tracing",
+          "antutuScore": "1,920,000 (v10)"
+        },
+        "memory": {
+          "ramVariants": [
+            "8GB"
+          ],
+          "storageVariants": [
+            "256GB",
+            "512GB",
+            "1TB"
+          ],
+          "cardSlot": "No",
+          "storageType": "NVMe"
+        },
+        "mainCamera": {
+          "setup": "48 MP Fusion (24mm, f/1.78, sensor-shift OIS) + 48 MP Ultrawide (13mm, f/2.2, 120˚) + 12 MP 5x Telephoto (120mm, f/2.8, 3D sensor-shift OIS)",
+          "features": "Sapphire crystal lens cover, 4K 120fps Dolby Vision, ProRes, Log video, spatial audio",
+          "video": "4K@24/25/30/60/100/120fps Dolby Vision HDR, ProRes"
+        },
+        "selfieCamera": {
+          "setup": "12 MP TrueDepth camera, f/1.9, autofocus with Focus Pixels",
+          "features": "Retina Flash, Cinematic mode (4K HDR@30fps)",
+          "video": "4K@24/25/30/60fps, 1080p@25/30/60/120fps"
+        },
+        "battery": {
+          "capacity": "4685 mAh non-removable",
+          "charging": "Up to 50% charge in ~30 minutes with 20W adapter or higher",
+          "wirelessCharging": "MagSafe wireless charging up to 25W, Qi2 up to 15W"
+        },
+        "sound": {
+          "loudspeaker": "Yes, with spatial audio stereo playback",
+          "jack35mm": "No",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
+        },
+        "connectivity": {
+          "wlan": "Wi-Fi 7 (802.11be) with 2x2 MIMO",
+          "bluetooth": "5.3",
+          "nfc": "Yes with reader mode",
+          "radio": "No",
+          "usb": "USB Type-C 3.2 Gen 2 (up to 10Gb/s), DisplayPort",
+          "infrared": "No",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
+        },
+        "sensors": "Face ID, LiDAR Scanner, barometer, high-g accelerometer, high dynamic range gyro",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
+    },
+    {
+      "id": "tecno-camon-30-pro-5g",
+      "name": "Tecno Camon 30 Pro 5G",
+      "brand": "Tecno",
+      "priceNGN": 520000,
+      "priceUSD": 350,
+      "oldPriceNGN": 545000,
+      "priceRange": "350k-600k",
+      "marketStatus": "Available. Released 2024, May",
+      "nairaPriceNotes": "Sony IMX890 50MP OIS sensor, fluid 144Hz AMOLED screen, Dimensity 8200 Ultimate 4nm, and 70W fast charging. Global MSRP ~$350 / ₦520,000.",
+      "releaseYear": 2024,
+      "releaseDate": "May 2024",
+      "modelNumber": "CL8, CL8n",
+      "screenSizeInches": 6.78,
+      "image": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "accentColor": "#2563eb",
+      "rating": 0,
+      "reviewsCount": 0,
+      "viewsCount": 2,
+      "categories": [
+        "best-camera",
+        "best-5g",
+        "best-battery"
+      ],
+      "isFeatured": true,
+      "isPopular": true,
+      "keyHighlights": {
+        "display": "6.78\" 144Hz AMOLED 1080p",
+        "processor": "Dimensity 8200 Ultimate 4nm",
+        "ram": "12GB (+12GB Extended)",
+        "storage": "256GB / 512GB UFS 3.1",
+        "camera": "50MP Sony IMX890 OIS + 50MP UW + 50MP Selfie",
+        "battery": "5000 mAh",
+        "charging": "70W Ultra Charge (0-100% in 45m)",
+        "os": "Android 14, HIOS 14",
+        "network5g": true
+      },
+      "detailedSpecs": {
+        "network": {
+          "technology": "GSM / HSPA / LTE / 5G",
+          "bands5g": "1, 3, 5, 7, 8, 20, 28, 38, 40, 41, 77, 78 SA/NSA",
+          "speed": "HSPA, LTE-A, 5G NR",
+          "sim": "Dual SIM (Nano-SIM, dual stand-by)"
+        },
+        "body": {
+          "dimensions": "164.0 x 74.5 x 7.7 mm",
+          "weight": "188 g",
+          "build": "Glass front (Gorilla Glass 5), faux leather or glass back, aluminum alloy frame",
+          "waterResistance": "IP54 splash resistant"
+        },
+        "display": {
+          "type": "AMOLED, 1B colors, 144Hz refresh rate, HDR10+",
+          "size": "6.78 inches, 111.0 cm2 (~90.8% screen-to-body ratio)",
+          "resolution": "1080 x 2436 pixels (~393 ppi density)",
+          "protection": "Corning Gorilla Glass 5",
+          "brightness": "1300 nits peak",
+          "refreshRate": "144Hz"
+        },
+        "platform": {
+          "os": "Android 14, HIOS 14 (Guaranteed 2 major OS upgrades)",
+          "chipset": "MediaTek Dimensity 8200 Ultimate (4 nm)",
+          "cpu": "Octa-core (1x3.1 GHz Cortex-A78 & 3x3.0 GHz Cortex-A78 & 4x2.0 GHz Cortex-A55)",
+          "gpu": "Mali-G610 MC6",
+          "antutuScore": "942,000 (v10)"
+        },
+        "memory": {
+          "ramVariants": [
+            "12GB"
+          ],
+          "storageVariants": [
+            "256GB",
+            "512GB"
+          ],
+          "cardSlot": "No",
+          "storageType": "UFS 3.1"
+        },
+        "mainCamera": {
+          "setup": "50 MP (wide, f/1.9, 1/1.56\", 1.0µm, PDAF, OIS Sony IMX890) + 50 MP (ultrawide, 114˚) + 2 MP (depth)",
+          "features": "Dual-LED flash, HDR, Super Night 3.0, 4K 60fps video",
+          "video": "4K@60fps, 1080p@30/60fps, gyro-EIS"
+        },
+        "selfieCamera": {
+          "setup": "50 MP, f/2.5, 24mm (wide), PDAF with eye autofocus",
+          "features": "Dual-LED flash, 4K video recording",
+          "video": "4K@60fps, 1080p@30fps"
+        },
+        "battery": {
+          "capacity": "5000 mAh non-removable",
+          "charging": "70W wired fast charging (0-100% in 45 min)",
+          "wirelessCharging": "No"
+        },
+        "sound": {
+          "loudspeaker": "Yes, dual stereo speakers with Dolby Atmos",
+          "jack35mm": "No",
+          "audioSpecs": "24-bit/192kHz Hi-Res audio, Dolby Atmos support"
+        },
+        "connectivity": {
+          "wlan": "Wi-Fi 802.11 a/b/g/n/ac/6, dual-band",
+          "bluetooth": "5.3, A2DP, LE",
+          "nfc": "Yes",
+          "radio": "FM radio",
+          "usb": "USB Type-C 2.0, OTG",
+          "infrared": "Yes",
+          "positioning": "GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
+        },
+        "sensors": "Fingerprint (under display, optical), accelerometer, gyro, proximity, compass",
+        "biometrics": "",
+        "securityHardware": ""
+      },
+      "images": [
+        "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+      ]
+    },
+    {
+      "id": "umidigi-g5-mecha",
+      "name": "Umidigi G5 Mecha",
+      "brand": "Umidigi",
+      "priceNGN": 160000,
+      "priceUSD": 110,
+      "oldPriceNGN": 175000,
+      "priceRange": "100k-200k",
+      "marketStatus": "Available. Released 2024, March",
+      "nairaPriceNotes": "Rugged smartphone with 6000 mAh battery, reinforced drop-resistant casing, and IP68/IP69K rating for demanding worksite conditions. MSRP ~$110 / ₦160,000.",
+      "releaseYear": 2024,
+      "releaseDate": "March 2024",
+      "modelNumber": "G5M-2309",
+      "screenSizeInches": 6.6,
+      "image": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "accentColor": "#d97706",
+      "rating": 0,
+      "reviewsCount": 0,
+      "viewsCount": 0,
+      "categories": [
+        "best-battery"
+      ],
+      "isFeatured": false,
+      "isPopular": false,
+      "keyHighlights": {
+        "display": "6.6\" 90Hz HD+ Reinforced Glass",
+        "processor": "Unisoc T606 Octa-Core",
+        "ram": "8GB (+8GB Virtual)",
+        "storage": "128GB",
+        "camera": "50MP AI Main + 2MP Depth",
+        "battery": "6000 mAh Super Battery",
+        "charging": "18W Type-C wired",
+        "os": "Android 13",
+        "network5g": false
+      },
+      "detailedSpecs": {
+        "network": {
+          "technology": "GSM / HSPA / LTE",
+          "bands5g": "4G LTE bands 1, 2, 3, 4, 5, 7, 8, 12, 17, 20, 28",
+          "speed": "HSPA, LTE",
+          "sim": "Dual SIM (Nano-SIM, dual stand-by)"
+        },
+        "body": {
+          "dimensions": "164.7 x 76.5 x 9.9 mm",
+          "weight": "225 g",
+          "build": "Reinforced polycarbonate bumper body, metallic armor accents",
+          "waterResistance": "IP68 and IP69K waterproof & dustproof"
+        },
+        "display": {
+          "type": "IPS LCD, 90Hz",
+          "size": "6.6 inches, 720 x 1612 pixels (~267 ppi)",
+          "resolution": "720 x 1612 pixels",
+          "protection": "Scratch-resistant glass",
+          "brightness": "500 nits",
+          "refreshRate": "90Hz"
+        },
+        "platform": {
+          "os": "Android 13",
+          "chipset": "Unisoc T606 (12 nm)",
+          "cpu": "Octa-core (2x1.6 GHz Cortex-A75 & 6x1.6 GHz Cortex-A55)",
+          "gpu": "Mali-G57 MP1",
+          "antutuScore": "250,000 (v10)"
+        },
+        "memory": {
+          "ramVariants": [
+            "8GB"
+          ],
+          "storageVariants": [
+            "128GB"
+          ],
+          "cardSlot": "microSDXC (dedicated)",
+          "storageType": "eMMC 5.1"
+        },
+        "mainCamera": {
+          "setup": "50 MP, f/1.8 + 2 MP (depth)",
+          "features": "LED flash, HDR, Night Mode",
+          "video": "1080p@30fps"
+        },
+        "selfieCamera": {
+          "setup": "8 MP, f/2.2",
+          "features": "Face unlock",
+          "video": "1080p@30fps"
+        },
+        "battery": {
+          "capacity": "6000 mAh non-removable",
+          "charging": "18W wired",
+          "wirelessCharging": "No"
+        },
+        "sound": {
+          "loudspeaker": "Yes, heavy volume speaker",
+          "jack35mm": "Yes"
+        },
+        "connectivity": {
+          "wlan": "Wi-Fi 802.11 a/b/g/n/ac",
+          "bluetooth": "5.0",
+          "nfc": "Yes",
+          "radio": "FM radio",
+          "usb": "USB Type-C 2.0, OTG",
+          "infrared": "No"
+        },
+        "sensors": "Fingerprint (side-mounted), accelerometer, compass"
+      }
+    }
+  ],
+  "brands": [
+    {
+      "id": "brand-infinix",
+      "name": "Infinix",
+      "slug": "infinix",
+      "country": "Hong Kong (Transsion)",
+      "description": "Trendsetting smart brand focused on youth, high refresh rate displays, fast charging tech, and gaming performance worldwide.",
+      "globalPresence": "Global distribution across Asia, Africa, Middle East, and Latin America via official stores and retail partners.",
+      "popularSeries": [
+        "Smart (Budget Entry)",
+        "Hot (Affordable Gaming)",
+        "Note (All-Round FastCharge)",
+        "Zero (Flagship Design)"
+      ],
+      "warrantyPartner": "Carlcare Global Service Network (12 + 1 months warranty)",
+      "logoLetter": "I",
+      "accentBg": "bg-emerald-600"
+    },
+    {
+      "id": "brand-tecno",
+      "name": "Tecno",
+      "slug": "tecno",
+      "country": "Hong Kong (Transsion)",
+      "description": "Leading global smartphone manufacturer known for camera innovations, balanced pricing, and worldwide service support.",
+      "globalPresence": "Active operations across 70+ countries worldwide with authorized service and flagship experience centers.",
+      "popularSeries": [
+        "Pop (Budget)",
+        "Spark (Mainstream Value)",
+        "Camon (Camera Flagships)",
+        "Phantom (Premium Ultra)"
+      ],
+      "warrantyPartner": "Carlcare Global Service Network (13 - 14 months warranty)",
+      "logoLetter": "T",
+      "accentBg": "bg-blue-600"
+    },
+    {
+      "id": "brand-samsung",
+      "name": "Samsung",
+      "slug": "samsung",
+      "country": "South Korea",
+      "description": "Global technology giant producing industry-leading Dynamic AMOLED displays, Galaxy S Ultra flagships, and Galaxy A series.",
+      "globalPresence": "Global retail presence worldwide in over 130 countries via official Samsung Experience Stores and certified distributors.",
+      "popularSeries": [
+        "Galaxy S (Ultra Flagships)",
+        "Galaxy Z (Foldables)",
+        "Galaxy A (Mid-range & Budget)"
+      ],
+      "warrantyPartner": "Samsung Authorized Service Centers (Global manufacturer warranty)",
+      "logoLetter": "S",
+      "accentBg": "bg-indigo-600"
+    },
+    {
+      "id": "brand-apple",
+      "name": "Apple",
+      "slug": "apple",
+      "country": "United States",
+      "description": "Maker of iPhone, renowned for custom Apple Silicon, iOS ecosystem integration, benchmark video recording, and resale value.",
+      "globalPresence": "Worldwide distribution through Apple Stores, Apple Authorized Resellers, and major telecom carriers.",
+      "popularSeries": [
+        "iPhone 16 / 16 Pro Max",
+        "iPhone 15 / 15 Pro",
+        "iPhone SE"
+      ],
+      "warrantyPartner": "Apple Authorized Service Providers (1-Year Global Apple Warranty)",
+      "logoLetter": "A",
+      "accentBg": "bg-slate-700"
+    },
+    {
+      "id": "brand-xiaomi",
+      "name": "Xiaomi",
+      "slug": "xiaomi",
+      "country": "China",
+      "description": "Consumer electronics brand known for aggressive spec-to-price ratios, HyperOS, and Leica co-engineered mobile cameras.",
+      "globalPresence": "Global distribution in 100+ countries with official Mi Home stores and authorized global partners.",
+      "popularSeries": [
+        "Redmi (Budget Value)",
+        "Redmi Note (Mid-range kings)",
+        "Xiaomi Series (High-End Flagship)",
+        "POCO (Gaming)"
+      ],
+      "warrantyPartner": "Xiaomi Authorized Service Centers",
+      "logoLetter": "X",
+      "accentBg": "bg-orange-600"
+    },
+    {
+      "id": "brand-google",
+      "name": "Google",
+      "slug": "google",
+      "country": "United States",
+      "description": "Google Pixel series featuring computational photography, clean Google Tensor AI processing, and 7 years of OS updates.",
+      "globalPresence": "Available through Google Store worldwide and certified consumer electronics retailers.",
+      "popularSeries": [
+        "Pixel Pro",
+        "Pixel Standard",
+        "Pixel A-Series"
+      ],
+      "warrantyPartner": "Google Store & Certified Repair Network",
+      "logoLetter": "G",
+      "accentBg": "bg-teal-600"
+    },
+    {
+      "id": "brand-oneplus",
+      "name": "OnePlus",
+      "slug": "oneplus",
+      "country": "China",
+      "description": "Performance-driven brand offering fluid OxygenOS, ultra-fast 100W charging, Snapdragon powerhouses, and Hasselblad imaging.",
+      "globalPresence": "Worldwide retail footprint across North America, Europe, Asia, and international direct platforms.",
+      "popularSeries": [
+        "OnePlus R Series",
+        "OnePlus Flagship Number Series",
+        "OnePlus Nord"
+      ],
+      "warrantyPartner": "OnePlus Official Service Network",
+      "logoLetter": "1+",
+      "accentBg": "bg-red-600"
+    },
+    {
+      "id": "brand-umidigi",
+      "name": "Umidigi",
+      "slug": "umidigi",
+      "country": "China",
+      "description": "Known for rugged smartphones, massive 6000 mAh batteries, and smartphones tailored for heavy outdoor and work environments.",
+      "globalPresence": "Distributed worldwide through official online direct stores and verified global distributors.",
+      "popularSeries": [
+        "G Series (Mecha & Rugged)",
+        "A Series (Affordable)",
+        "Bison (Waterproof Outdoor)"
+      ],
+      "warrantyPartner": "Authorized Importer & Manufacturer Warranty",
+      "logoLetter": "U",
+      "accentBg": "bg-amber-600"
+    },
+    {
+      "id": "brand-alcatel",
+      "name": "Alcatel",
+      "slug": "alcatel",
+      "country": "France / China (TCL)",
+      "description": "Accessible consumer mobile brand focused on essential connectivity, affordable 4G smartphones, and feature phones worldwide.",
+      "globalPresence": "Global distribution across Europe, Latin America, North America, and emerging markets.",
+      "popularSeries": [
+        "1 Series (Ultra Budget)",
+        "3 Series (Essential Smartphones)",
+        "Go Flip (Feature Phones)"
+      ],
+      "warrantyPartner": "TCL Global Customer Care & Regional Service Centers",
+      "logoLetter": "Al",
+      "accentBg": "bg-sky-600"
+    },
+    {
+      "id": "brand-asus",
+      "name": "Asus",
+      "slug": "asus",
+      "country": "Taiwan",
+      "description": "High-performance mobile innovator famed for ROG Phone extreme gaming hardware with active cooling and compact flagship Zenfone series.",
+      "globalPresence": "Distributed across North America, Europe, Taiwan, India, and global gaming hardware channels.",
+      "popularSeries": [
+        "ROG Phone (Extreme Gaming)",
+        "Zenfone (Compact Flagship)"
+      ],
+      "warrantyPartner": "ASUS Royal Club & International Warranty Network",
+      "logoLetter": "AS",
+      "accentBg": "bg-blue-700"
+    },
+    {
+      "id": "brand-honor",
+      "name": "Honor",
+      "slug": "honor",
+      "country": "China",
+      "description": "Fast-growing premium smartphone brand recognized for slim foldables like Magic V, Magic series AI photography, and long-lasting silicon-carbon batteries.",
+      "globalPresence": "Direct presence across Europe, Middle East, Asia, and Latin America.",
+      "popularSeries": [
+        "Magic Series (Ultra Flagships & Foldables)",
+        "Honor Number Series (Design & Portraits)",
+        "X Series (Value Durability)"
+      ],
+      "warrantyPartner": "Honor Authorized Service Centers",
+      "logoLetter": "H",
+      "accentBg": "bg-cyan-600"
+    },
+    {
+      "id": "brand-huawei",
+      "name": "Huawei",
+      "slug": "huawei",
+      "country": "China",
+      "description": "Pioneering telecommunications technology giant producing XMAGE optical imaging systems, Mate series flagships, and HarmonyOS ecosystem devices.",
+      "globalPresence": "Extensive global enterprise and consumer presence across Asia, Middle East, Africa, and Europe.",
+      "popularSeries": [
+        "Pura Series (Art & XMAGE Camera)",
+        "Mate Series (Business Flagship)",
+        "Nova Series (Youth & Style)"
+      ],
+      "warrantyPartner": "Huawei Customer Service Centers",
+      "logoLetter": "HW",
+      "accentBg": "bg-red-700"
+    },
+    {
+      "id": "brand-iqoo",
+      "name": "IQOO",
+      "slug": "iqoo",
+      "country": "China (vivo)",
+      "description": "High-performance and eSports gaming smartphone brand featuring bespoke monster touch displays, vapor-chamber cooling, and extreme benchmark scores.",
+      "globalPresence": "Available across China, India, Southeast Asia, and international gaming enthusiast markets.",
+      "popularSeries": [
+        "iQOO Number Series (Flagship Performance)",
+        "Neo Series (Flagship Killer Gaming)",
+        "Z Series (Mid-range Speed)"
+      ],
+      "warrantyPartner": "vivo / iQOO Certified Service Centers",
+      "logoLetter": "iQ",
+      "accentBg": "bg-amber-600"
+    },
+    {
+      "id": "brand-itel",
+      "name": "Itel",
+      "slug": "itel",
+      "country": "Hong Kong (Transsion)",
+      "description": "Reliable budget-focused consumer tech brand providing dependable entry-level smartphones, long battery life, and high accessibility in emerging markets.",
+      "globalPresence": "Market leader in over 50 emerging countries across Africa, South Asia, and Latin America.",
+      "popularSeries": [
+        "A Series (Essential Entry)",
+        "P Series (Power Battery Kings)",
+        "S Series (Affordable Selfies)"
+      ],
+      "warrantyPartner": "Carlcare Global Service Network (100 days free replacement & 12 months warranty)",
+      "logoLetter": "it",
+      "accentBg": "bg-rose-600"
+    },
+    {
+      "id": "brand-motorola",
+      "name": "Motorola",
+      "slug": "motorola",
+      "country": "United States / China (Lenovo)",
+      "description": "Iconic mobile communications pioneer recognized for flip foldables (Razr), clean Android experience (Hello UI), and versatile Moto G series.",
+      "globalPresence": "Broad carrier and retail distribution in North America, Latin America, Europe, and Asia.",
+      "popularSeries": [
+        "Razr (Iconic Foldables)",
+        "Edge (Premium Flagships)",
+        "Moto G (Value Class)"
+      ],
+      "warrantyPartner": "Motorola / Lenovo Care Service Centers",
+      "logoLetter": "M",
+      "accentBg": "bg-blue-800"
+    },
+    {
+      "id": "brand-oppo",
+      "name": "Oppo",
+      "slug": "oppo",
+      "country": "China",
+      "description": "Global smartphone innovator famed for ColorOS fluidity, Hasselblad mobile photography on Find X, and durable Reno series portrait smartphones.",
+      "globalPresence": "Operating in 60+ countries across Asia, Europe, Middle East, and Africa with over 300,000 retail points.",
+      "popularSeries": [
+        "Find X (Ultra Flagship & Foldables)",
+        "Reno (Portrait Camera Kings)",
+        "A Series (Reliable Everyday)"
+      ],
+      "warrantyPartner": "OPPO Official Customer Service Network",
+      "logoLetter": "O",
+      "accentBg": "bg-emerald-700"
+    },
+    {
+      "id": "brand-oscal",
+      "name": "Oscal",
+      "slug": "oscal",
+      "country": "China (Blackview)",
+      "description": "Dynamic tech brand creating durable outdoor rugged devices, budget 5G phones, and stylish ultra-affordable everyday smartphones.",
+      "globalPresence": "Sold worldwide across Europe, Latin America, Southeast Asia, and global online e-commerce channels.",
+      "popularSeries": [
+        "S Series (Outdoor Rugged)",
+        "Tiger Series (Youth Performance)",
+        "Flat Series (Budget Style)"
+      ],
+      "warrantyPartner": "Blackview & Oscal International Warranty Services",
+      "logoLetter": "Os",
+      "accentBg": "bg-teal-700"
+    },
+    {
+      "id": "brand-oukitel",
+      "name": "Oukitel",
+      "slug": "oukitel",
+      "country": "China",
+      "description": "Renowned pioneer of ultra-rugged smartphones with massive 10,000 mAh to 22,000 mAh battery capacities, built-in camping lights, and MIL-STD-810H durability.",
+      "globalPresence": "Global distribution across 60+ countries serving industrial, construction, military, and outdoor adventure markets.",
+      "popularSeries": [
+        "WP Series (Mega-Battery Rugged Flagships)",
+        "C Series (Sleek Everyday Budget)"
+      ],
+      "warrantyPartner": "Oukitel Global Service Hubs & Direct Replacement Warranty",
+      "logoLetter": "Ou",
+      "accentBg": "bg-orange-700"
+    },
+    {
+      "id": "brand-realme",
+      "name": "Realme",
+      "slug": "realme",
+      "country": "China",
+      "description": "Disruptive youth-centric tech brand delivering leap-forward performance, 240W ultra-fast charging records, and bold industrial design collaborations.",
+      "globalPresence": "Fastest-growing brand across 61 markets worldwide spanning Asia, Europe, and Latin America.",
+      "popularSeries": [
+        "GT Series (Flagship Speed & Gaming)",
+        "Number Series (Periscope Camera & Curve OLED)",
+        "C Series (Champion Budget)"
+      ],
+      "warrantyPartner": "realme Authorized Service Centers",
+      "logoLetter": "R",
+      "accentBg": "bg-yellow-600"
+    },
+    {
+      "id": "brand-sony",
+      "name": "Sony",
+      "slug": "sony",
+      "country": "Japan",
+      "description": "Master of professional mobile imaging, producing Xperia phones with true continuous optical zoom periscopes, 4K OLED HDR displays, and Alpha camera sensor integration.",
+      "globalPresence": "Available in Japan, North America, Europe, and select international specialty photography markets.",
+      "popularSeries": [
+        "Xperia 1 (Professional Creator Flagship)",
+        "Xperia 5 (Compact Powerhouse)",
+        "Xperia 10 (Lightweight Mid-Range)"
+      ],
+      "warrantyPartner": "Sony Authorized Service Centers & Global Repair Network",
+      "logoLetter": "SO",
+      "accentBg": "bg-zinc-800"
+    },
+    {
+      "id": "brand-tcl",
+      "name": "TCL",
+      "slug": "tcl",
+      "country": "China",
+      "description": "Display technology giant bringing NXTPAPER paper-like anti-glare eye-care displays and NXTVISION image processing to smartphones.",
+      "globalPresence": "Global distribution across North America, Europe, Australia, and Latin America.",
+      "popularSeries": [
+        "NXTPAPER Series (Eye Comfort Matte Displays)",
+        "TCL 50 / 40 Series (Mainstream 5G Value)"
+      ],
+      "warrantyPartner": "TCL Global Electronics Service Care",
+      "logoLetter": "TCL",
+      "accentBg": "bg-red-800"
+    },
+    {
+      "id": "brand-vivo",
+      "name": "Vivo",
+      "slug": "vivo",
+      "country": "China",
+      "description": "Pioneering mobile imaging brand famed for ZEISS APO telephoto cameras, custom V-series ISP imaging chips, and high-fidelity mobile audio.",
+      "globalPresence": "Present in over 60 markets with hundreds of millions of users across Asia, Europe, and emerging economies.",
+      "popularSeries": [
+        "X Series (ZEISS Professional Camera Flagships)",
+        "V Series (Slim Studio Portrait Kings)",
+        "Y Series (All-Day Battery Mid-Range)"
+      ],
+      "warrantyPartner": "vivo Exclusive Customer Service Centers",
+      "logoLetter": "V",
+      "accentBg": "bg-indigo-700"
+    },
+    {
+      "id": "brand-zte",
+      "name": "ZTE",
+      "slug": "zte",
+      "country": "China",
+      "description": "Telecommunications pioneer behind nubia full-screen under-display cameras, REDMAGIC elite gaming smartphones, and versatile Axon flagships.",
+      "globalPresence": "Operating across 160+ countries worldwide with telecom operators and direct consumer channels.",
+      "popularSeries": [
+        "nubia Z Series (35mm Photography & Full-Screen)",
+        "REDMAGIC (Esports Gaming Titans)",
+        "Blade Series (Everyday Value)"
+      ],
+      "warrantyPartner": "ZTE / nubia Authorized Customer Care Network",
+      "logoLetter": "Z",
+      "accentBg": "bg-blue-900"
+    }
+  ],
+  "articles": [
+    {
+      "id": "art-iphone-16-nigeria",
+      "title": "iPhone 16 series: what Nigerian buyers should know",
+      "slug": "iphone-16-series-what-nigerian-buyers-should-know",
+      "category": "News",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "Prices, camera changes and the features that actually matter if you are upgrading from an older iPhone in Nigeria.",
+      "content": "Apple has refreshed the iPhone line up, and the headline changes are immediately visible: narrower bezels, lighter titanium builds, the dedicated Camera Control button on all models, and Apple Intelligence. But in Nigeria, where the exchange rate pushes flagship phone prices well past two million naira, the question is simple: which changes actually matter in daily life, and which model gives the best return on your money?\n\n### The Price Reality in Nigeria\nAt authorized resellers like Slot and iStore Nigeria, as well as trusted Computer Village importers:\n- **iPhone 16 Standard (128GB)**: ~₦1,650,000 ($1,100)\n- **iPhone 16 Plus (128GB)**: ~₦1,850,000 ($1,230)\n- **iPhone 16 Pro (128GB/256GB)**: ~₦2,050,000 ($1,360)\n- **iPhone 16 Pro Max (256GB)**: ~₦2,450,000 ($1,630)\n\n### What Actually Matters If You Are Upgrading\n1. **Battery Life**: The 16 Pro Max is a genuine two-day device even under heavy Lagos traffic use with Google Maps navigation and mobile hotspot running.\n2. **Camera Control**: The capacitive button allows rapid switching between exposure, depth of field and zoom without tapping the screen.\n3. **4K 120fps Dolby Vision**: For Nigerian content creators and wedding videographers, shooting 4K at 120fps with spatial audio is an industry-grade superpower.\n\n### The Recommendation\nIf you already own an iPhone 15 Pro Max, there is little compelling reason to spend another million naira on the upgrade. However, if you are moving from an iPhone 11, 12, or 13, the leap in battery endurance, 5G carrier speed, and camera versatility is transformative.",
+      "author": {
+        "name": "GsmScope Editors",
+        "role": "Hardware Editorial Team"
+      },
+      "date": "2 Mar 2026",
+      "readTime": "6 min read",
+      "tags": [
+        "iPhone 16",
+        "Apple",
+        "Nigerian Prices",
+        "Buying Advice",
+        "Lagos Tech"
+      ],
+      "featured": true,
+      "viewsCount": 27086,
+      "relatedPhoneIds": [
+        "apple-iphone-16-pro-max"
+      ]
+    },
+    {
+      "id": "art-s24-ultra-lagos-review",
+      "title": "Samsung Galaxy S24 Ultra review: still the camera king?",
+      "slug": "samsung-galaxy-s24-ultra-review-still-the-camera-king",
+      "category": "Reviews",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "Six months of daily use in Lagos: how the 200MP camera, the S Pen and the battery hold up in real life.",
+      "content": "The Galaxy S24 Ultra is Samsung's most expensive non-foldable phone. After six months of navigating Lagos yellow buses, third mainland bridge traffic, high-contrast outdoor sun, and business meetings in Victoria Island, here is our verdict.\n\n### The Gorilla Armor Anti-Reflective Glass\nThis is arguably the single greatest real-world improvement in modern smartphone displays. Under direct tropical sunlight at Bar Beach or in an open vehicle, you can clearly read emails, edit documents and review photos without squinting or maxing out brightness until your battery dies.\n\n### Battery Life and Charging\nThe 5000 mAh battery consistently delivers 8 to 9 hours of screen-on-time. With 45W charging, a quick 30-minute top-up before leaving the office gives you 65% juice, easily carrying you through Lagos traffic jams.\n\n### S-Pen Productivity\nSigning contracts and PDF documents on the go without finding a cyber cafe or printer has saved our team countless hours.\n\n### The Verdict\nAt ₦1,850,000 ($1,230), the Galaxy S24 Ultra is an investment for professionals, executives, and power users. With 7 years of promised Android OS upgrades and titanium construction, it remains the most complete smartphone money can buy in Nigeria.",
+      "author": {
+        "name": "Ada Nwosu",
+        "role": "Senior Hardware Reviewer"
+      },
+      "date": "28 Jan 2026",
+      "readTime": "8 min read",
+      "tags": [
+        "Samsung",
+        "Galaxy S24 Ultra",
+        "Lagos Review",
+        "Flagship",
+        "Cameras"
+      ],
+      "featured": true,
+      "viewsCount": 10916,
+      "relatedPhoneIds": [
+        "samsung-galaxy-s24-ultra"
+      ]
+    },
+    {
+      "id": "art-iphone-16-buyers-guide",
+      "title": "iPhone 16 series: what global buyers should know",
+      "slug": "iphone-16-series-what-buyers-should-know",
+      "category": "News",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "Global pricing, camera enhancements, and the architectural upgrades that matter most when upgrading from previous generations.",
+      "content": "Apple has refreshed the iPhone line up, and the headline changes are immediately noticeable: slimmer uniform bezels, Grade 5 titanium builds, the dedicated Camera Control button on all models, and second-generation 3nm Apple Intelligence silicon. But when deciding whether to upgrade, the core question is simple: which changes actually matter in daily life, and which model gives the best return on your investment?\n\n### Global Pricing & Model Hierarchy\nAcross major international markets and regional distribution channels:\n- **iPhone 16 Standard (128GB)**: ~$799 / ₦1,650,000\n- **iPhone 16 Plus (128GB)**: ~$899 / ₦1,850,000\n- **iPhone 16 Pro (128GB/256GB)**: ~$999 / ₦2,050,000\n- **iPhone 16 Pro Max (256GB)**: ~$1,199 / ₦2,450,000\n\n### Key Upgrades That Make a Difference\n1. **Battery Runtime**: The 16 Pro Max achieves true multi-day battery endurance under heavy navigation, cellular data, and media streaming tests.\n2. **Camera Control Key**: The capacitive, pressure-sensitive switch allows rapid adjustments of exposure, photographic styles, and focal lengths without obstructing the viewfinder.\n3. **4K 120fps Dolby Vision**: For videographers and mobile creators, recording 4K at 120fps with studio-grade spatial audio mic capture represents an industry benchmark.\n\n### The Verdict\nIf you already own an iPhone 15 Pro Max, there is little urgent necessity to upgrade immediately. However, for users stepping up from an iPhone 11, 12, or 13, the leap in display brightness, battery endurance, 5G carrier reception, and camera versatility is transformative.",
+      "author": {
+        "name": "GsmScope",
+        "role": "Hardware Editorial Team"
+      },
+      "date": "2 Mar 2026",
+      "readTime": "6 min read",
+      "tags": [
+        "iPhone 16",
+        "Apple",
+        "Global Pricing",
+        "Buying Advice",
+        "Flagship"
+      ],
+      "featured": true,
+      "relatedPhoneIds": [
+        "apple-iphone-16-pro-max"
+      ]
+    },
+    {
+      "id": "art-redmi-vs-infinix",
+      "title": "Redmi Note 13 Pro 5G vs Infinix Note 40 Pro+: mid-range comparison",
+      "slug": "redmi-note-13-pro-vs-infinix-note-40-pro-which-should-you-buy",
+      "category": "Reviews",
+      "coverImage": "/src/assets/images/news_camera_sensor_1792578845370.jpg",
+      "summary": "Two of the most competitive mid-range smartphones go head-to-head on display, camera sensors, battery endurance, and charging tech.",
+      "content": "Both phones compete in the high-volume mid-range tier, offering high-refresh AMOLED screens, rapid charging speeds, high-megapixel camera sensors, and 5G connectivity at accessible prices.\n\n### Design and Display\n- **Redmi Note 13 Pro 5G**: Flat 6.67\" 1.5K CrystalRes AMOLED panel with 1800 nits peak brightness and Corning Gorilla Glass Victus.\n- **Infinix Note 40 Pro+ 5G**: 6.78\" 3D-Curved AMOLED panel with 1300 nits and an Active Halo notification lighting system on the camera island.\n\nThe curved display on the Infinix provides a flagship aesthetic in the hand, while the Redmi’s flat 1.5K panel is sharper, offers higher pixel density (446 ppi), and is easier to equip with standard glass protectors.\n\n### Charging Architecture\n- **Infinix Note 40 Pro+**: 100W All-Round FastCharge (0 to 50% in 12 minutes) coupled with 20W magnetic wireless MagCharge.\n- **Redmi Note 13 Pro 5G**: 67W Turbo Charge (0 to 100% in 44 minutes). High-efficiency wired charging, though without wireless capability.\n\n### Camera Performance\nRedmi’s 200MP Samsung ISOCELL sensor captures slightly superior fine texture detail in daylight, while the Infinix 108MP camera excels in fast shutter response and vibrant color reproduction.\n\n### Verdict\nIf your priority is 100W wired charging speed and convenient wireless magnetic accessory support, the **Infinix Note 40 Pro+** is a compelling choice. If you prioritize a sharper 1.5K display and higher resolution 200MP sensor crops, the **Redmi Note 13 Pro 5G** takes the edge.",
+      "author": {
+        "name": "Ada Nwosu",
+        "role": "Senior Hardware Reviewer"
+      },
+      "date": "24 Feb 2026",
+      "readTime": "7 min read",
+      "tags": [
+        "Redmi",
+        "Infinix",
+        "Comparison",
+        "Mid-Range",
+        "Hardware"
+      ],
+      "featured": true,
+      "relatedPhoneIds": [
+        "xiaomi-redmi-note-13-pro-5g"
+      ]
+    },
+    {
+      "id": "art-budget-under-200k",
+      "title": "Best budget smartphones under $150 (₦200,000): complete comparison",
+      "slug": "best-budget-phones-under-150-dollars-complete-guide",
+      "category": "Buying Guide",
+      "coverImage": "/src/assets/images/news_nigeria_tech_1792578846595.jpg",
+      "summary": "Five smartphones that stretch entry-level budgets the furthest, covering battery life, screen quality, and camera essentials.",
+      "content": "A modest budget doesn't mean compromising on core smartphone essentials. In today's competitive landscape, the sub-$150 price category offers vibrant high refresh-rate displays, multi-day battery capacities, and capable daily performance.\n\nWe evaluated the top entry-level devices to identify the models that provide the most reliable long-term value:\n\n### 1. Infinix Smart 20 (~$85 / ₦130,000)\nThe overall budget winner. Packs a large 5200 mAh battery, a smooth 90Hz punch-hole display, and 18W Type-C fast charging in a modern chassis.\n\n### 2. Xiaomi Redmi 13C (~$119 / ₦175,000)\nThe reliability champion. Powered by the MediaTek Helio G85 chipset, the Redmi 13C provides dependable multitasking, 6GB or 8GB of RAM options, and a respectable 50MP primary camera.\n\n### 3. Umidigi G5 Mecha (~$110 / ₦160,000)\nBuilt for rugged environments and field use. Equipped with a massive 6000 mAh battery pack, drop-resistant bumpers, and IP68/IP69K water and dust resistance.\n\n### 4. Tecno Pop 8 (~$62 / ₦92,000)\nThe sub-$70 value benchmark. Includes an 90Hz punch-hole display, stereo speakers, and clean Android Go software.",
+      "author": {
+        "name": "GsmScope",
+        "role": "Staff Buyers Desk"
+      },
+      "date": "15 Feb 2026",
+      "readTime": "5 min read",
+      "tags": [
+        "Budget Phones",
+        "Under $150",
+        "Smart 20",
+        "Redmi 13C",
+        "Buying Guide"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "smart-20",
+        "xiaomi-redmi-13c",
+        "umidigi-g5-mecha"
+      ]
+    },
+    {
+      "id": "art-5g-worth-it-2026",
+      "title": "Is 5G worth it in 2026? Global carrier speeds & device compatibility",
+      "slug": "is-5g-worth-it-in-2026-carrier-speeds-and-compatibility",
+      "category": "News",
+      "coverImage": "/src/assets/images/news_mobile_processor_1792578846003.jpg",
+      "summary": "Global 5G network expansion: when high-speed Sub-6 and mmWave bands make a difference for your workflow.",
+      "content": "5G deployment continues to accelerate globally, with Sub-6 GHz and mmWave infrastructure covering metropolitan centers and expanding rapidly across suburban corridors.\n\n### When 5G Is Essential\n- **Remote Work & Content Creation**: Real-world throughput regularly exceeds 400-800 Mbps, offering ultra-low latency for cloud gaming, high-res video streaming, and rapid transfers.\n- **Device Longevity**: For users holding smartphones for 3 to 5 years, selecting a device with broad 5G band support (n1, n3, n28, n77, n78) prevents connectivity obsolescence.\n\n### When 4G LTE Remains Sufficient\nIn regions where legacy LTE networks deliver steady 50-100 Mbps coverage, allocating your budget toward superior AMOLED displays, higher camera sensor quality, or faster wired charging often yields a greater tangible benefit than spending extra on early-generation 5G modems.",
+      "author": {
+        "name": "Tunde Balogun",
+        "role": "Telecom Infrastructure Analyst"
+      },
+      "date": "5 Feb 2026",
+      "readTime": "4 min read",
+      "tags": [
+        "5G Network",
+        "Connectivity",
+        "Carrier Speeds",
+        "Tech Analysis",
+        "Infrastructure"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "oneplus-12r",
+        "xiaomi-redmi-note-13-pro-5g"
+      ]
+    },
+    {
+      "id": "art-s24-ultra-review",
+      "title": "Samsung Galaxy S24 Ultra review: still the camera king?",
+      "slug": "samsung-galaxy-s24-ultra-review-still-the-camera-king",
+      "category": "Reviews",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "Six months of daily testing: how the 200MP camera, Gorilla Armor anti-reflective glass, and S-Pen hold up in real life.",
+      "content": "The Galaxy S24 Ultra represents Samsung's most accomplished flagship to date. After six months of rigorous testing across varying environments, high-contrast sunlight, and intensive mobile workloads, here is our verdict.\n\n### Corning Gorilla Armor Anti-Reflective Glass\nThis is arguably the single most practical improvement in modern flagship displays. Under direct high-intensity sunlight, the anti-reflective coating reduces glare by up to 75%, allowing users to read text, review photo captures, and edit documents without maxing out screen brightness.\n\n### Battery Endurance & Thermal Efficiency\nThe 5000 mAh battery consistently delivers 8 to 9.5 hours of screen-on-time under mixed 5G and Wi-Fi workloads. Paired with 45W charging, a quick 30-minute top-up yields 65% capacity.\n\n### S-Pen Productivity & Galaxy AI\nFrom precision photo retouching and signing PDF contracts to real-time voice call translation and circle-to-search visual lookups, the integrated stylus continues to define Samsung's productivity lead.\n\n### The Verdict\nAt ~$1,230 / ₦1,850,000, the Galaxy S24 Ultra is an investment for power users and mobile professionals. With 7 years of promised Android OS and security upgrades, it stands as one of the most complete flagship smartphones on the market.",
+      "author": {
+        "name": "Ada Nwosu",
+        "role": "Senior Hardware Reviewer"
+      },
+      "date": "28 Jan 2026",
+      "readTime": "8 min read",
+      "tags": [
+        "Samsung",
+        "Galaxy S24 Ultra",
+        "In-Depth Review",
+        "Flagship",
+        "Cameras"
+      ],
+      "featured": true,
+      "relatedPhoneIds": [
+        "samsung-galaxy-s24-ultra"
+      ]
+    },
+    {
+      "id": "art-iphone-16-pro-review",
+      "title": "iPhone 16 Pro Max in-depth review: titanium build & battery test",
+      "slug": "iphone-16-pro-max-in-depth-review-titanium-battery-test",
+      "category": "Reviews",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "Testing the 48MP Fusion camera system, dedicated Camera Control key, and true 2-day battery endurance under heavy mobile use.",
+      "content": "The iPhone 16 Pro Max is Apple's largest and most capable handset to date. We put the device through comprehensive real-world battery tests, camera studio evaluations, and gaming stress sessions.\n\n### Camera Control & Optical Versatility\nThe tactile Camera Control switch provides instant access to camera modes, exposure tuning, and smooth focal length zooms. Combined with the 48MP Fusion sensor and 5x tetraprism telephoto lens, color rendition and dynamic range remain benchmark-class.\n\n### Battery Runtime & Efficiency\nPowered by the Apple A18 Pro 3nm silicon, battery endurance is class-leading. Even with active 5G usage, continuous 4K video recording, and Bluetooth streaming, the 16 Pro Max reliably finishes a 16-hour heavy workday with over 35% capacity remaining.\n\n### Hardware Build & Global Warranty\nFeatures Grade 5 Titanium construction with textured matte glass and full 1-Year Global Apple Warranty support across authorized service networks worldwide.",
+      "author": {
+        "name": "Chidi Okafor",
+        "role": "Staff Hardware Editor"
+      },
+      "date": "18 Feb 2026",
+      "readTime": "7 min read",
+      "tags": [
+        "iPhone 16 Pro Max",
+        "Apple",
+        "Review",
+        "Hardware",
+        "Flagship"
+      ],
+      "featured": true,
+      "relatedPhoneIds": [
+        "apple-iphone-16-pro-max"
+      ]
+    },
+    {
+      "id": "art-oneplus-12r-review",
+      "title": "OnePlus 12R review: the ultimate flagship killer",
+      "slug": "oneplus-12r-review-ultimate-flagship-killer",
+      "category": "Reviews",
+      "coverImage": "/src/assets/images/news_mobile_processor_1792578846003.jpg",
+      "summary": "Massive 5500 mAh battery, blazing 100W SUPERVOOC charging, and Snapdragon 8 Gen 2 gaming performance tested.",
+      "content": "With ultra-flagships frequently surpassing the $1,200 threshold, the OnePlus 12R arrives as a breath of fresh air for performance enthusiasts seeking top-tier power at a sensible price point.\n\n### 100W SUPERVOOC Hyper Charging\nThe bundled 100W SUPERVOOC charger replenishes the 5500 mAh battery from 1% to 100% in exactly 26 minutes, eliminating overnight charging routines.\n\n### Display & Gaming Performance\nThe 6.78-inch 1.5K ProXDR 120Hz LTPO 4.0 display is brilliant, reaching 4500 nits peak brightness. Games such as Genshin Impact and PUBG run smoothly at consistent 60-90 fps with minimal thermal throttle.\n\n### The Verdict\nFor anyone wanting near-flagship performance, class-leading battery endurance, and rapid charging without premium flagship pricing, the OnePlus 12R remains our top recommendation.",
+      "author": {
+        "name": "Ada Nwosu",
+        "role": "Senior Hardware Reviewer"
+      },
+      "date": "10 Feb 2026",
+      "readTime": "6 min read",
+      "tags": [
+        "OnePlus 12R",
+        "Review",
+        "Battery Test",
+        "Flagship Killer",
+        "Performance"
+      ],
+      "featured": true,
+      "relatedPhoneIds": [
+        "oneplus-12r"
+      ]
+    },
+    {
+      "id": "art-samsung-oneui7",
+      "title": "Samsung One UI 7 global rollout: new fluid animations and Galaxy AI updates",
+      "slug": "samsung-one-ui-7-global-rollout-galaxy-ai-updates",
+      "category": "News",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "Samsung begins phased rollout of Android 15-based One UI 7 featuring redesigned notification center and expanded Galaxy AI tools.",
+      "content": "Samsung has kicked off the wider international release of One UI 7. Built atop Android 15, the new update delivers the most substantial visual overhaul to Galaxy devices in several generations.\n\nKey improvements include decoupled Quick Settings and notifications, smoother spring-physics animation curves, and enhanced generative photo studio features directly in Samsung Gallery.",
+      "author": {
+        "name": "Elena Rostova",
+        "role": "Software Features Lead"
+      },
+      "date": "22 Oct 2026",
+      "readTime": "4 min read",
+      "tags": [
+        "Samsung",
+        "Galaxy",
+        "One UI 7",
+        "Android 15",
+        "Software"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "samsung-galaxy-s24-ultra"
+      ]
+    },
+    {
+      "id": "art-samsung-s25-benchmarks",
+      "title": "Samsung Galaxy S25 Ultra benchmarks surface with Snapdragon 8 Elite",
+      "slug": "samsung-galaxy-s25-ultra-benchmarks-snapdragon-8-elite",
+      "category": "News",
+      "coverImage": "/src/assets/images/news_mobile_processor_1792578846003.jpg",
+      "summary": "Leaked Geekbench 6 scores indicate massive multi-core gains and improved thermal dissipation for next-generation Galaxy flagship.",
+      "content": "Preliminary Geekbench runs for Samsung's upcoming flagship indicate single-core performance exceeding 3,100 points and multi-core results topping 10,000 points, powered by Qualcomm's custom Oryon CPU cores.",
+      "author": {
+        "name": "Tunde Balogun",
+        "role": "Mobile Hardware Analyst"
+      },
+      "date": "21 Oct 2026",
+      "readTime": "3 min read",
+      "tags": [
+        "Samsung",
+        "Galaxy S25",
+        "Snapdragon 8 Elite",
+        "Benchmarks"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "samsung-galaxy-s24-ultra"
+      ]
+    },
+    {
+      "id": "art-apple-intelligence-features",
+      "title": "Apple Intelligence features expanded in new iOS release for iPhone 16",
+      "slug": "apple-intelligence-expanded-features-iphone-16",
+      "category": "News",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "Visual Intelligence with Camera Control, priority notifications, and Clean Up photo editing arrive for global iPhone users.",
+      "content": "Apple continues rolling out core Apple Intelligence tools across European, African, and Asian markets. The integration with the tactile Camera Control button allows immediate object identification and instant summary generation.",
+      "author": {
+        "name": "Chidi Okafor",
+        "role": "Staff Hardware Editor"
+      },
+      "date": "22 Oct 2026",
+      "readTime": "5 min read",
+      "tags": [
+        "Apple",
+        "iPhone 16",
+        "iOS",
+        "Apple Intelligence"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "apple-iphone-16-pro-max"
+      ]
+    },
+    {
+      "id": "art-apple-iphone-battery-tips",
+      "title": "Apple iPhone 16 Pro Max real-world battery endurance test report",
+      "slug": "apple-iphone-16-pro-max-real-world-battery-test",
+      "category": "Reviews",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "Our 30-day battery log reveals how 3nm A18 Pro silicon handles 4K ProRes capture, high-contrast GPS navigation, and 5G roaming.",
+      "content": "After four weeks of rigorous testing, the iPhone 16 Pro Max achieved an average of 9 hours and 45 minutes of screen-on-time under mixed LTE/5G network loads, setting a new runtime benchmark for iOS flagships.",
+      "author": {
+        "name": "GsmScope",
+        "role": "Editorial Staff"
+      },
+      "date": "19 Oct 2026",
+      "readTime": "6 min read",
+      "tags": [
+        "Apple",
+        "iPhone 16 Pro Max",
+        "Battery",
+        "Review"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "apple-iphone-16-pro-max"
+      ]
+    },
+    {
+      "id": "art-tecno-camon-30-imaging",
+      "title": "Tecno Camon 30 Premier camera deep dive: Sony PolarNick quad imaging tested",
+      "slug": "tecno-camon-30-premier-camera-deep-dive-sony-imaging",
+      "category": "News",
+      "coverImage": "/src/assets/images/news_camera_sensor_1792578845370.jpg",
+      "summary": "Dual imaging chips and periscope telephoto zoom bring flagship photo credentials to Tecno’s high-value mid-ranger.",
+      "content": "Tecno has positioned the Camon 30 Premier as an imaging powerhouse, featuring a custom Sony imaging co-processor that handles 4K Ultra Night video and real-time portrait tone mapping with exceptional color fidelity.",
+      "author": {
+        "name": "Ada Nwosu",
+        "role": "Senior Hardware Reviewer"
+      },
+      "date": "20 Oct 2026",
+      "readTime": "4 min read",
+      "tags": [
+        "Tecno",
+        "Camon",
+        "Camera Test",
+        "Sony Sensor"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "tecno-camon-30-premier"
+      ]
+    },
+    {
+      "id": "art-tecno-phantom-fold2",
+      "title": "Tecno Phantom V Fold2 goes global: slim book-style foldable with aerospace hinge",
+      "slug": "tecno-phantom-v-fold2-goes-global-aerospace-hinge",
+      "category": "Launch",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "Tecno challenges foldable rivals with sub-6mm unfolded profile, 5750 mAh battery, and competitive international pricing.",
+      "content": "Tecno has officially expanded retail availability of the Phantom V Fold2. The device features an aerospace-grade titanium teardrop hinge certified for over 400,000 folds and 70W fast charging.",
+      "author": {
+        "name": "Tunde Balogun",
+        "role": "Hardware Analyst"
+      },
+      "date": "18 Oct 2026",
+      "readTime": "5 min read",
+      "tags": [
+        "Tecno",
+        "Phantom",
+        "Foldable",
+        "Global Launch"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "tecno-camon-30-premier"
+      ]
+    },
+    {
+      "id": "art-infinix-note-40-fastcharge",
+      "title": "Infinix Note 40 Pro+ 5G long-term test: 100W All-Round FastCharge and MagKit",
+      "slug": "infinix-note-40-pro-plus-fastcharge-magkit-tested",
+      "category": "Reviews",
+      "coverImage": "/src/assets/images/news_nigeria_tech_1792578846595.jpg",
+      "summary": "How Infinix’s Cheetah X1 power management chip handles high temperatures and magnetic wireless charging after 90 days.",
+      "content": "Infinix disrupted the mid-range segment by bundling both a 100W wired brick and 20W magnetic wireless MagPad in the retail box. Our long-term testing demonstrates consistent battery health retention and rapid 0-50% top-ups in 12 minutes.",
+      "author": {
+        "name": "Ada Nwosu",
+        "role": "Senior Hardware Reviewer"
+      },
+      "date": "21 Oct 2026",
+      "readTime": "5 min read",
+      "tags": [
+        "Infinix",
+        "Note 40 Pro+",
+        "FastCharge",
+        "MagKit"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "infinix-note-40-pro-plus",
+        "smart-20"
+      ]
+    },
+    {
+      "id": "art-infinix-zero-flip",
+      "title": "Infinix Zero Flip brings 4K 60fps ProStudio vlogging and zero-gap hinge",
+      "slug": "infinix-zero-flip-4k-60fps-prostudio-vlogging-launch",
+      "category": "Launch",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "Featuring a 3.64-inch 120Hz cover screen, dual 50MP cameras, and seamless GoPro integration for creators.",
+      "content": "Infinix entered the compact flip category with the Zero Flip, prioritizing content creators with 4K 60fps recording across both front and rear camera sensors, paired with JBL-tuned stereo speakers.",
+      "author": {
+        "name": "Chidi Okafor",
+        "role": "Staff Hardware Editor"
+      },
+      "date": "17 Oct 2026",
+      "readTime": "4 min read",
+      "tags": [
+        "Infinix",
+        "Zero Flip",
+        "Vlogging",
+        "Foldable"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "smart-20"
+      ]
+    },
+    {
+      "id": "art-xiaomi-14-ultra-lens",
+      "title": "Xiaomi 14 Ultra Leica Summilux lens shootout: variable aperture in action",
+      "slug": "xiaomi-14-ultra-leica-summilux-variable-aperture-shootout",
+      "category": "News",
+      "coverImage": "/src/assets/images/news_camera_sensor_1792578845370.jpg",
+      "summary": "Testing the 1-inch Sony LYT-900 sensor and stepless f/1.63-f/4.0 aperture in low light and portrait situations.",
+      "content": "Xiaomi continues its partnership with Leica, delivering a quad-50MP camera setup on the 14 Ultra that offers physical diaphragm control, creamy natural bokeh, and outstanding dynamic range.",
+      "author": {
+        "name": "Liam Cooper",
+        "role": "Camera Lab Specialist"
+      },
+      "date": "22 Oct 2026",
+      "readTime": "5 min read",
+      "tags": [
+        "Xiaomi",
+        "Leica",
+        "Camera Test",
+        "Xiaomi 14 Ultra"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "xiaomi-redmi-note-13-pro-5g",
+        "xiaomi-redmi-13c"
+      ]
+    },
+    {
+      "id": "art-google-pixel-9-pro-review",
+      "title": "Google Pixel 9 Pro XL review: Tensor G4, Super Res Zoom, and satellite SOS evaluated",
+      "slug": "google-pixel-9-pro-xl-review-tensor-g4-satellite-sos",
+      "category": "Reviews",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "A refined flat-rail aesthetic, 16GB of unified RAM for Gemini Nano, and 7 years of Pixel drops make this Google’s best hardware yet.",
+      "content": "The Pixel 9 Pro XL represents Google’s most polished smartphone design to date. With flat satin-finish glass, polished metal frame, ultrasonic fingerprint scanning, and dependable multi-day standby, Google has addressed past hardware pain points.",
+      "author": {
+        "name": "Sarah Jenkins",
+        "role": "Senior Hardware Critic"
+      },
+      "date": "20 Oct 2026",
+      "readTime": "7 min read",
+      "tags": [
+        "Google",
+        "Pixel 9 Pro XL",
+        "Tensor G4",
+        "Review"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "google-pixel-9-pro-xl"
+      ]
+    },
+    {
+      "id": "art-google-pixel-9-ai-update",
+      "title": "Google Pixel 9 receives new Gemini Live camera integration and call notes",
+      "slug": "google-pixel-9-gemini-live-camera-call-notes",
+      "category": "News",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "Google rolls out real-time multimodal assistant capabilities directly to Pixel 9 and Pixel 9 Pro camera viewfinders.",
+      "content": "Google has begun distributing the latest feature drop to Pixel 9 devices, introducing live camera scene interpretation and on-device transcription summaries for phone calls.",
+      "author": {
+        "name": "Sarah Jenkins",
+        "role": "Senior Hardware Critic"
+      },
+      "date": "23 Oct 2026",
+      "readTime": "3 min read",
+      "tags": [
+        "Google",
+        "Pixel 9",
+        "Gemini Live",
+        "AI Updates"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "google-pixel-9-pro-xl"
+      ]
+    },
+    {
+      "id": "art-oneplus-13-announcement",
+      "title": "OnePlus 13 confirmed with BOE X2 Oriental screen and 6,000mAh Glacier battery",
+      "slug": "oneplus-13-confirmed-boe-x2-oriental-screen-glacier-battery",
+      "category": "News",
+      "coverImage": "/src/assets/images/news_mobile_processor_1792578846003.jpg",
+      "summary": "OnePlus details its flagship upgrade featuring silicon-carbon battery density, IP69 dust and water resistance, and Snapdragon 8 Elite.",
+      "content": "OnePlus has unveiled the technical specifications for its next generation flagship, highlighting high-density silicon battery chemistry and an ultra-bright BOE display panel.",
+      "author": {
+        "name": "Tunde Balogun",
+        "role": "Mobile Hardware Analyst"
+      },
+      "date": "24 Oct 2026",
+      "readTime": "4 min read",
+      "tags": [
+        "OnePlus",
+        "OnePlus 13",
+        "Glacier Battery",
+        "Hardware"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "oneplus-12r"
+      ]
+    },
+    {
+      "id": "art-xiaomi-redmi-13c-review",
+      "title": "Xiaomi Redmi 13C Review",
+      "slug": "xiaomi-redmi-13c-review",
+      "category": "Reviews",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "A comprehensive hands-on evaluation of Xiaomi’s budget champion: assessing 90Hz display smoothness, 50MP AI camera performance, Helio G85 endurance, and daily value for under $120.",
+      "content": "### Xiaomi Redmi 13C Review: The Value Standard\nXiaomi's Redmi C-series has long dominated the entry-level smartphone segment by offering reliable specifications at price points accessible to students, first-time smartphone buyers, and users seeking a dependable secondary device. With the Redmi 13C, Xiaomi modernizes the design with flat edges, a smooth 90Hz display, and a sleek matte finish.\n\n### Design & Build Quality\nHolding the Redmi 13C feels considerably more premium than its ~$119 / ₦175,000 price suggests. The flat frame aesthetic borrows heavily from higher-tier devices, and the dual-tone camera island houses the 50MP optics without excessive wobble. At 192 grams and 8.09mm thickness, it sits comfortably in the hand with reassuring structural rigidity.\n\n### 6.74-Inch 90Hz Display Experience\nThe standout upgrade on the Redmi 13C is its large 6.74-inch IPS LCD panel featuring a 90Hz refresh rate. Navigating through MIUI / HyperOS and scrolling through social feeds like TikTok, Twitter/X, and WhatsApp feels noticeably fluid. Reading mode and TÜV Rheinland Low Blue Light certification reduce eye strain during extended night reading sessions.\n\n### MediaTek Helio G85 Performance\nUnder the hood, the 12nm MediaTek Helio G85 chipset paired with up to 8GB of RAM and Mali-G52 MC2 graphics provides dependable daily performance. App launches are brisk, social media multitasking is stutter-free, and casual gaming titles like Subway Surfers and Call of Duty: Mobile (at medium graphical presets) run at consistent framerates without thermal throttling.\n\n### 50MP AI Triple Camera Setup\nThe primary 50MP f/1.8 sensor captures crisp, color-accurate photos in daylight with good dynamic range for this category. Xiaomi's AI portrait mode effectively separates subjects from the background with pleasant natural bokeh. The front-facing 8MP camera includes a soft-light ring that brightens selfies in dim indoor lighting.\n\n### Battery Life & 18W Charging\nA robust 5,000 mAh battery easily delivers a full day and a half of typical mixed use (social browsing, video streaming, calls, and hotspot sharing). Our standardized battery endurance test logged over 13 hours of continuous web browsing. The device supports 18W Power Delivery charging via USB Type-C.\n\n### Verdict\nFor budget-conscious shoppers looking for balanced everyday usability, the Xiaomi Redmi 13C hits the sweet spot between affordability, dependable battery stamina, and modern styling.",
+      "author": {
+        "name": "Liam Cooper",
+        "role": "Camera & Hardware Lab Specialist"
+      },
+      "date": "25 Oct 2026",
+      "readTime": "6 min read",
+      "tags": [
+        "Xiaomi",
+        "Redmi 13C",
+        "Review",
+        "Budget Phones",
+        "Helio G85"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "xiaomi-redmi-13c"
+      ]
+    },
+    {
+      "id": "guide-1",
+      "title": "Best phones under $151 / £113 (₦200,000) right now",
+      "slug": "best-phones-under-200000-naira-right-now",
+      "category": "Buying Guide",
+      "coverImage": "/src/assets/images/news_nigeria_tech_1792578846595.jpg",
+      "summary": "Budget phones have caught up fast. These are the models we would buy under $151 / £113 (₦200,000) with high refresh displays, 5000mAh batteries and Type-C fast charge.",
+      "content": "Finding value under $151 / £113 (₦200,000) across global retail markets and major online stores has gotten significantly better over the past year. Entry-level chipsets have evolved from laggy quad-core silicon to smooth MediaTek Helio G85/G99 and Unisoc T606/T612 processors.\n\nOur top recommendation remains the Infinix Hot 40 / Tecno Spark 20 series for their balanced 8GB extended RAM configurations, dependable 5000 mAh batteries with 18W–33W fast charge, and verified official warranty support.\n\nWhen purchasing in local or international markets, ensure you verify the sealed package to avoid open-box swap units and confirm the IMEI matches on both the phone box and SIM tray.",
+      "author": {
+        "name": "Chidi Nwosu",
+        "role": "Buying Guides Editor"
+      },
+      "date": "17 Sept 2026",
+      "readTime": "6 min read",
+      "tags": [
+        "Infinix & Tecno",
+        "Buying Guide",
+        "Budget Phones"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "xiaomi-redmi-13c",
+        "smart-20"
+      ]
+    },
+    {
+      "id": "guide-2",
+      "title": "How to Enable ADB on Samsung Using Quick Share (FRP Bypass & Servicing)",
+      "slug": "how-to-enable-adb-on-samsung-using-quick-share",
+      "category": "Buying Guide",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "A step-by-step technical guide to enabling Android Debug Bridge (ADB) on modern Samsung One UI devices using TalkBack, Quick Share, and official diagnostic tools.",
+      "content": "Android Debug Bridge (ADB) is the primary diagnostic protocol used by phone technicians worldwide to troubleshoot system issues, remove forgotten lock credentials with proof of ownership, and flash carrier binaries.\n\nThis tutorial outlines the modern Quick Share protocol pathway on One UI 6 and One UI 7, explaining how accessibility shortcuts can be utilized legitimately by repair shops to establish a trusted handshake with a technician PC.\n\nAlways ensure device ownership is validated before performing any bypass or servicing operations.",
+      "author": {
+        "name": "GsmScope Tech Desk",
+        "role": "Servicing & Firmware Specialist"
+      },
+      "date": "4 Sept 2026",
+      "readTime": "8 min read",
+      "tags": [
+        "Samsung",
+        "FRP & Servicing Tools",
+        "ADB"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "samsung-galaxy-s24-ultra"
+      ]
+    },
+    {
+      "id": "guide-3",
+      "title": "BFT Tool: Free Android Tool for FRP Bypass & Factory Reset",
+      "slug": "bft-tool-free-android-tool-frp-bypass-factory-reset",
+      "category": "Buying Guide",
+      "coverImage": "/src/assets/images/news_mobile_processor_1792578846003.jpg",
+      "summary": "A comprehensive guide to BFT Tool, a Windows-based Android servicing utility supporting FRP removal, factory reset, and account servicing for Samsung, Xiaomi, and other Android devices.",
+      "content": "BFT Tool has become one of the most widely used diagnostic toolkits in repair centers worldwide. It supports direct MTP mode operations, ADB shell commands, and emergency EDL flashing on Qualcomm chipsets.\n\nKey features include one-click FRP reset on Samsung Exynos and Snapdragon hardware, Xiaomi Mi Account temporary bypass, and Fastboot to EDL reboot commands.\n\nWe cover driver installation (SAMSUNG USB Mobile Drivers, MTK VCOM, and Qualcomm 9008 drivers) to ensure clean communication without boot loops.",
+      "author": {
+        "name": "GsmScope Tech Desk",
+        "role": "Servicing & Firmware Specialist"
+      },
+      "date": "2 Sept 2026",
+      "readTime": "7 min read",
+      "tags": [
+        "Universal Android",
+        "FRP & Servicing Tools",
+        "BFT Tool"
+      ],
+      "featured": false,
+      "relatedPhoneIds": []
+    },
+    {
+      "id": "guide-4",
+      "title": "SamFw Tool: Free Android Tool for FRP Bypass & Mi Account",
+      "slug": "samfw-tool-free-android-tool-frp-bypass-mi-account",
+      "category": "Buying Guide",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "A comprehensive walkthrough of SamFw FRP Tool, a trusted servicing utility supporting Samsung test mode (*#0*#), Knox diagnostics, and Xiaomi sideload operations.",
+      "content": "SamFw Tool remains the benchmark free servicing software for smartphone technicians worldwide. Its ability to send test mode exploits (*#0*# or *#*#88#*#*) allows ADB authorization in seconds on supported security patch levels.\n\nThe guide details how to execute CSC change commands without wiping data, enabling native call recording and regional carrier network optimizations on imported US, European, and Asian Galaxy variants.",
+      "author": {
+        "name": "GsmScope Tech Desk",
+        "role": "Servicing & Firmware Specialist"
+      },
+      "date": "1 Sept 2026",
+      "readTime": "9 min read",
+      "tags": [
+        "Samsung & Xiaomi",
+        "FRP & Servicing Tools",
+        "SamFw"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "samsung-galaxy-s24-ultra"
+      ]
+    },
+    {
+      "id": "guide-5",
+      "title": "Fast charging explained: what 45W, 90W and 120W really mean",
+      "slug": "fast-charging-explained-45w-90w-120w",
+      "category": "Buying Guide",
+      "coverImage": "/src/assets/images/news_nigeria_tech_1792578846595.jpg",
+      "summary": "Bigger numbers charge faster, but only with the right charger, cable and temperature control. Here is how thermal conditions affect fast charging longevity.",
+      "content": "Proprietary fast charging protocols like Infinix All-Round FastCharge (70W–100W), Tecno Ultra Charge (70W), and Xiaomi HyperCharge (120W) require specialized charge pumps and dual-cell battery designs.\n\nWhen ambient temperatures exceed 32°C, charging silicon automatically throttles wattage to protect battery health. Charging in a ventilated room or utilizing Bypass Charging during gaming preserves your battery cell capacity over 3+ years.",
+      "author": {
+        "name": "Amaka Obi",
+        "role": "Battery & Power Lab"
+      },
+      "date": "29 Aug 2026",
+      "readTime": "5 min read",
+      "tags": [
+        "Battery & Power",
+        "Charging & Battery",
+        "Fast Charging"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "infinix-note-40-pro-plus",
+        "oneplus-12r"
+      ]
+    },
+    {
+      "id": "guide-6",
+      "title": "Free Samsung, Redmi, Tecno & Infinix FRP Bypass Servicing Tools",
+      "slug": "free-samsung-redmi-tecno-infinix-frp-bypass-servicing-tools",
+      "category": "Buying Guide",
+      "coverImage": "/src/assets/images/news_camera_sensor_1792578845370.jpg",
+      "summary": "A curated list of verified free Android servicing tools including SAMFW Tool, BFT Tool, and MTK Client for diagnosing and restoring locked Android hardware.",
+      "content": "Mobile repair technicians worldwide rely on a stable suite of open-source and freeware tools. This guide compares MTK Client for MediaTek chipsets, Qualcomm QFIL for raw XML flashing, and dedicated Samsung MTP unlockers.\n\nWe also provide safety precautions against rogue trojans commonly bundled in unverified flash tool downloads.",
+      "author": {
+        "name": "GsmScope Tech Desk",
+        "role": "Servicing & Firmware Specialist"
+      },
+      "date": "23 Aug 2026",
+      "readTime": "10 min read",
+      "tags": [
+        "Multi-Brand",
+        "FRP & Servicing Tools",
+        "MTK Client"
+      ],
+      "featured": false,
+      "relatedPhoneIds": []
+    },
+    {
+      "id": "guide-7",
+      "title": "How to Enable ADB on Samsung KG Locked Phones",
+      "slug": "how-to-enable-adb-on-samsung-kg-locked-phones",
+      "category": "Buying Guide",
+      "coverImage": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "summary": "A practical tutorial on how technicians analyze Knox Guard (KG) locked devices, verify carrier leasing status, and enable ADB for troubleshooting.",
+      "content": "Knox Guard (KG) status (Active, Completed, Checking) controls whether device bootloaders and debugging interfaces can be enabled. We explain how to identify genuine carrier contract status versus gray-market locked units before purchasing second-hand.",
+      "author": {
+        "name": "GsmScope Tech Desk",
+        "role": "Servicing & Firmware Specialist"
+      },
+      "date": "22 Aug 2026",
+      "readTime": "8 min read",
+      "tags": [
+        "Samsung Knox Guard",
+        "FRP & Servicing Tools",
+        "Knox Guard"
+      ],
+      "featured": false,
+      "relatedPhoneIds": [
+        "samsung-galaxy-s24-ultra"
+      ]
+    }
+  ],
+  "reviews": [
+    {
+      "id": "rev-op-12r",
+      "phoneId": "oneplus-12r",
+      "phoneName": "OnePlus 12R",
+      "userName": "David Miller",
+      "location": "London, UK",
+      "rating": 5,
+      "title": "Incredible battery life and very fast charging",
+      "comment": "The 5500 mAh battery easily lasts two full days of heavy use, and when it needs a top up, the 100W charger gets it to 100% in under half an hour. The 1.5K display is very bright outdoors in direct sun.",
+      "pros": [
+        "100W SUPERVOOC charging",
+        "5500 mAh endurance",
+        "Snapdragon 8 Gen 2 handles gaming smoothly"
+      ],
+      "cons": [
+        "No dedicated telephoto zoom lens",
+        "Curved edges can trigger occasional accidental palm touches"
+      ],
+      "date": "10 Feb 2026",
+      "status": "approved"
+    },
+    {
+      "id": "rev-s24u",
+      "phoneId": "samsung-galaxy-s24-ultra",
+      "phoneName": "Samsung Galaxy S24 Ultra",
+      "userName": "Elena Rostova",
+      "location": "Berlin, Germany",
+      "rating": 5,
+      "title": "Still the camera and productivity benchmark",
+      "comment": "The antireflective glass is genuinely impressive. You can read documents under bright sunlight with zero glare. The 200MP camera and 5x optical telephoto capture crisp details and night street light trails.",
+      "pros": [
+        "Gorilla Armor anti-glare screen",
+        "S-Pen for digital signatures",
+        "7-year software updates"
+      ],
+      "cons": [
+        "Substantial device weight and squared corners",
+        "MSRP is at the upper flagship tier"
+      ],
+      "date": "28 Jan 2026",
+      "status": "approved"
+    },
+    {
+      "id": "rev-smart-20",
+      "phoneId": "smart-20",
+      "phoneName": "Smart 20",
+      "userName": "Marcus Chen",
+      "location": "Singapore",
+      "rating": 4,
+      "title": "Solid daily driver under $100",
+      "comment": "At this price point, getting a 5200 mAh battery and a smooth 90Hz punch-hole screen is remarkable value. Sound is loud through the stereo speakers and call clarity is reliable.",
+      "pros": [
+        "Big 5200 mAh battery",
+        "Loud stereo speakers",
+        "Type-C charging port"
+      ],
+      "cons": [
+        "Low light photography is modest",
+        "18W charging takes approximately 2 hours for a full cycle"
+      ],
+      "date": "12 Jan 2026",
+      "status": "approved"
+    },
+    {
+      "id": "rev-redmi-13c",
+      "phoneId": "xiaomi-redmi-13c",
+      "phoneName": "Xiaomi Redmi 13C",
+      "userName": "Sarah Jenkins",
+      "location": "Austin, TX, USA",
+      "rating": 4,
+      "title": "Dependable phone for student and budget use",
+      "comment": "Does everything needed: messaging, social media, PDF documents, and daily apps without stuttering. 50MP camera takes clear photos for notes and daylight portraits.",
+      "pros": [
+        "Helio G85 handles multitasking reliably",
+        "Headphone jack included",
+        "Clean aesthetic styling"
+      ],
+      "cons": [
+        "Bundled charging brick in some regions is 10W even though device supports 18W"
+      ],
+      "date": "18 Jan 2026",
+      "status": "approved"
+    },
+    {
+      "id": "rev-s24u-2",
+      "phoneId": "samsung-galaxy-s24-ultra",
+      "phoneName": "Samsung Galaxy S24 Ultra",
+      "userName": "Kelechi Eze",
+      "location": "Lagos, Nigeria",
+      "rating": 5,
+      "title": "Top-tier display and battery endurance in hot weather",
+      "comment": "Using this for daily multitasking, GPS navigation, and mobile video editing. Screen brightness easily overcomes midday sunshine and battery holds up for over 8 hours of screen-on time.",
+      "pros": [
+        "Bright display outdoors",
+        "Snapdragon 8 Gen 3 efficiency",
+        "S-Pen remote shutter"
+      ],
+      "cons": [
+        "Heavy in pocket with protective case"
+      ],
+      "date": "02 Feb 2026",
+      "status": "approved"
+    },
+    {
+      "id": "rev-s24u-3",
+      "phoneId": "samsung-galaxy-s24-ultra",
+      "phoneName": "Samsung Galaxy S24 Ultra",
+      "userName": "Liam Cooper",
+      "location": "Sydney, Australia",
+      "rating": 5,
+      "title": "Camera zoom capabilities are unmatched",
+      "comment": "The 5x and 10x hybrid zoom for stadium concerts and nature photography produces sharp, noise-free shots. Galaxy AI photo expansion works surprisingly well.",
+      "pros": [
+        "Versatile quad camera array",
+        "Titanium frame rigidity",
+        "Fast One UI 6.1 animations"
+      ],
+      "cons": [
+        "Slightly slower 45W charging vs Chinese rivals"
+      ],
+      "date": "14 Feb 2026",
+      "status": "approved"
+    },
+    {
+      "id": "rev-s24u-4",
+      "phoneId": "samsung-galaxy-s24-ultra",
+      "phoneName": "Samsung Galaxy S24 Ultra",
+      "userName": "Fatima Al-Mansoor",
+      "location": "Dubai, UAE",
+      "rating": 4,
+      "title": "Premium build quality and reliable software updates",
+      "comment": "Sleek design with flat display edges which makes applying glass screen protectors much easier than previous curved models.",
+      "pros": [
+        "Flat display glass",
+        "Fast ultrasonic fingerprint reader",
+        "7-year OS guarantee"
+      ],
+      "cons": [
+        "Sharp bottom corners when held one-handed"
+      ],
+      "date": "20 Feb 2026",
+      "status": "approved"
+    },
+    {
+      "id": "rev-op-12r-2",
+      "phoneId": "oneplus-12r",
+      "phoneName": "OnePlus 12R",
+      "userName": "Tariq Johnson",
+      "location": "Manchester, UK",
+      "rating": 5,
+      "title": "Smooth 120Hz display and cool running thermals",
+      "comment": "Plays heavy mobile games without getting warm. OxygenOS feels clean and responsive.",
+      "pros": [
+        "Great thermals",
+        "Loud dual speakers",
+        "Blazing fast charging"
+      ],
+      "cons": [
+        "No wireless charging"
+      ],
+      "date": "15 Feb 2026",
+      "status": "approved"
+    },
+    {
+      "id": "rev-op-12r-3",
+      "phoneId": "oneplus-12r",
+      "phoneName": "OnePlus 12R",
+      "userName": "Ngozi Adebayo",
+      "location": "Abuja, Nigeria",
+      "rating": 4,
+      "title": "Best value performance smartphone of 2024/2025",
+      "comment": "Battery easily goes 1.5 days. Charger in the box is huge plus when other brands stopped including chargers.",
+      "pros": [
+        "Charger included in box",
+        "High brightness ProXDR panel"
+      ],
+      "cons": [
+        "Macro camera is modest"
+      ],
+      "date": "22 Feb 2026",
+      "status": "approved"
+    },
+    {
+      "id": "rev-op-12r-4",
+      "phoneId": "oneplus-12r",
+      "phoneName": "OnePlus 12R",
+      "userName": "Mateo Rossi",
+      "location": "Milan, Italy",
+      "rating": 5,
+      "title": "Fast, fluid, and zero battery anxiety",
+      "comment": "Plug it in while showering and it is back to 90%. Exceptional value.",
+      "pros": [
+        "100W charging speed",
+        "Great haptic feedback"
+      ],
+      "cons": [
+        "No official IP68 rating (IP64 only)"
+      ],
+      "date": "25 Feb 2026",
+      "status": "approved"
+    }
+  ],
+  "adSettings": {
+    "topBanner": {
+      "enabled": false,
+      "title": "News update & launch alerts",
+      "subtitle": "Track live global USD ($) & local market price updates, new phone launches, and verified warranty deals.",
+      "linkUrl": "/?tab=phones",
+      "tag": "GSMSCOPE LIVE"
+    },
+    "sidebarBanner": {
+      "enabled": false,
+      "title": "Reach 50,000+ Daily Smartphone Enthusiasts",
+      "subtitle": "GsmScope offers sponsored articles, banner placements, and featured device spots across our global tech network.",
+      "sponsor": "GsmScope Partner Network",
+      "linkUrl": "#advertise"
+    },
+    "sponsoredPhoneId": "oneplus-12r",
+    "placements": {
+      "header_top": {
+        "id": "header_top",
+        "name": "Top Header Ad Placement",
+        "pageLabel": "Sitewide Header",
+        "positionLabel": "Top Header Ad (Above Navigation / Header)",
+        "enabled": false,
+        "adType": "banner",
+        "badgeText": "GSMSCOPE LIVE",
+        "title": "News update & launch alerts",
+        "subtitle": "Track live global USD ($) & local market price updates, new phone launches, and verified warranty deals.",
+        "imageUrl": "",
+        "showLearnMore": true,
+        "learnMoreText": "Explore verified deals",
+        "learnMoreUrl": "/?tab=phones",
+        "openInNewTab": false,
+        "scriptCode": ""
+      },
+      "home_above_trending": {
+        "id": "home_above_trending",
+        "name": "Above Latest Phones Section",
+        "pageLabel": "Homepage",
+        "positionLabel": "Homepage — Above Latest phones section",
+        "enabled": false,
+        "adType": "banner",
+        "badgeText": "Sponsored",
+        "title": "Upgrade to Flagship 5G Smartphones at Verified Retail Prices",
+        "subtitle": "Compare official warranty models, live USD & NGN pricing, and verified specifications before you buy.",
+        "imageUrl": "",
+        "showLearnMore": true,
+        "learnMoreText": "Learn More",
+        "learnMoreUrl": "/?tab=phones",
+        "openInNewTab": false,
+        "scriptCode": ""
+      },
+      "home_above_reviews": {
+        "id": "home_above_reviews",
+        "name": "Above Latest Reviews Section",
+        "pageLabel": "Homepage",
+        "positionLabel": "Homepage — Above Latest Reviews section",
+        "enabled": false,
+        "adType": "banner",
+        "badgeText": "Sponsored",
+        "title": "Hands-On Smartphone Camera & Battery Endurance Lab Reports",
+        "subtitle": "Discover how the latest flagship and mid-range phones perform in real-world daily testing.",
+        "imageUrl": "",
+        "showLearnMore": true,
+        "learnMoreText": "Learn More",
+        "learnMoreUrl": "/?tab=reviews",
+        "openInNewTab": false,
+        "scriptCode": ""
+      },
+      "home_above_guides": {
+        "id": "home_above_guides",
+        "name": "Above Buying Guides Section",
+        "pageLabel": "Homepage",
+        "positionLabel": "Homepage — Above Buying Guides section",
+        "enabled": false,
+        "adType": "banner",
+        "badgeText": "Sponsored",
+        "title": "2026 Smartphone Buyer’s Guide: Best Camera, Gaming & Battery Picks",
+        "subtitle": "Find the best phone for your budget with our side-by-side comparison matrix and buyer recommendations.",
+        "imageUrl": "",
+        "showLearnMore": true,
+        "learnMoreText": "Learn More",
+        "learnMoreUrl": "/?tab=guides",
+        "openInNewTab": false,
+        "scriptCode": ""
+      },
+      "phones_below_top_result": {
+        "id": "phones_below_top_result",
+        "name": "Below Top Result (Phones Page)",
+        "pageLabel": "Phones Page",
+        "positionLabel": "Phones page — Below Top result",
+        "enabled": false,
+        "adType": "banner",
+        "badgeText": "Sponsored Deal",
+        "title": "Compare Side-by-Side Specs & Official Retail Deals",
+        "subtitle": "Check verified 5G bands, AnTuTu v10 scores, fast charging wattage, and distributor warranty coverage.",
+        "imageUrl": "",
+        "showLearnMore": true,
+        "learnMoreText": "Learn More",
+        "learnMoreUrl": "/?tab=compare",
+        "openInNewTab": false,
+        "scriptCode": ""
+      },
+      "best_above_top_rated": {
+        "id": "best_above_top_rated",
+        "name": "Above Top Rated Phones (Best Phones Page)",
+        "pageLabel": "Best Phones Page",
+        "positionLabel": "Best phones page — Above Top Rated Phones",
+        "enabled": false,
+        "adType": "banner",
+        "badgeText": "Sponsored Spotlight",
+        "title": "Top-Rated Flagship & Value Champions of the Year",
+        "subtitle": "Explore devices rated 4.7★ and above by hardware reviewers and verified smartphone owners.",
+        "imageUrl": "",
+        "showLearnMore": true,
+        "learnMoreText": "Learn More",
+        "learnMoreUrl": "/?tab=phones",
+        "openInNewTab": false,
+        "scriptCode": ""
+      },
+      "news_below_featured": {
+        "id": "news_below_featured",
+        "name": "Below Featured Story (News Page)",
+        "pageLabel": "News Page",
+        "positionLabel": "News page — Below featured story",
+        "enabled": false,
+        "adType": "banner",
+        "badgeText": "Sponsored Partner",
+        "title": "Advertise Your Mobile Brand or Retail Store on GsmScope",
+        "subtitle": "Reach thousands of daily smartphone buyers, tech enthusiasts, and hardware researchers.",
+        "imageUrl": "",
+        "showLearnMore": true,
+        "learnMoreText": "Learn More",
+        "learnMoreUrl": "/?tab=advertise",
+        "openInNewTab": false,
+        "scriptCode": ""
+      },
+      "guides_below_featured": {
+        "id": "guides_below_featured",
+        "name": "Below Featured Guide (Buying Guides Page)",
+        "pageLabel": "Buying Guides Page",
+        "positionLabel": "Buying guides page — Below Featured Guide",
+        "enabled": false,
+        "adType": "banner",
+        "badgeText": "Sponsored Guide",
+        "title": "Need Help Choosing Between Two Phones? Use Our Spec Comparison Tool",
+        "subtitle": "Compare display brightness, chipset benchmarks, camera sensors, and battery life side by side.",
+        "imageUrl": "",
+        "showLearnMore": true,
+        "learnMoreText": "Learn More",
+        "learnMoreUrl": "/?tab=compare",
+        "openInNewTab": false,
+        "scriptCode": ""
+      }
+    },
+    "adsensePublisherId": "",
+    "adsenseAutoAdsEnabled": false,
+    "adsTxtContent": "# GsmScope Authorized Digital Sellers (ads.txt)\n# Replace pub-0000000000000000 with your live Google AdSense Publisher ID in Admin Dashboard -> Advertisements\ngoogle.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0\n"
+  },
+  "websiteContent": {
+    "siteName": "GsmScope",
+    "siteTagline": "Mobile Phone Specifications, Reviews & Live Prices",
+    "announcementBar": "Live Smartphone Specifications, Verified Hardware Benchmarks & Multi-Currency Price Tracking",
+    "heroHeadline": "Smartphone Specs, Camera Benchmarks & Live Market Prices",
+    "heroSubtitle": "Explore complete specifications, benchmark ratings, and daily street market prices for the latest smartphones.",
+    "aboutSummary": "GsmScope is an independent mobile hardware database providing detailed technical specifications, camera benchmarks, battery endurance tests, and multi-currency pricing across global retail markets and regional technology hubs.",
+    "comparePhone1Id": "apple-iphone-16-pro-max",
+    "comparePhone2Id": "samsung-galaxy-s24-ultra",
+    "compareHeadline": "Which phone is right for you?",
+    "compareSubtitle": "Put phones side by side and see which one wins on price, camera, battery and speed.",
+    "contactEmail": "info@gsmscope.com",
+    "contactPhone": "+2349127408003",
+    "officeLocation": "Sokoto, Nigeria",
+    "footerCopyright": "© 2026 GsmScope Mobile Technology Network. All rights reserved.",
+    "footerDisclaimer": "Prices, specifications, and device availability are updated continuously based on authorized distributors and market retailers. Variations may occur by region and currency conversion fluctuations.",
+    "headerLogoUrl": "/assets/aistudio/GsmScope_header_logo_fc9cfbb4.webp",
+    "headerLogoDarkUrl": "/assets/aistudio/GsmScope_header_logo_dark.webp",
+    "mobileLogoUrl": "/assets/aistudio/GsmScope_header_logo_dark.webp",
+    "faviconUrl": "/favicon.ico",
+    "defaultSeoTitle": "GsmScope — Mobile Phone Specifications, Reviews & Live Prices",
+    "defaultSeoKeywords": "gsmscope, smartphone specs, phone prices, mobile phone reviews, buy phones, tech news, mobile benchmarks",
+    "defaultSeoDescription": "Compare smartphones, explore full hardware specifications, camera sensors, battery benchmarks, and live prices in USD and NGN on GsmScope.",
+    "facebookUrl": "https://www.facebook.com/share/1HKzhSt52c/",
+    "youtubeUrl": "https://www.youtube.com/@gsm_scope",
+    "whatsappNumber": "+2349127408003"
+  },
+  "mediaLibrary": [
+    {
+      "id": "media-header-dark",
+      "name": "GsmScope Header Logo (Dark)",
+      "url": "/assets/aistudio/GsmScope_header_logo_dark.webp",
+      "uploadedAt": "System Asset",
+      "category": "logo",
+      "alt": "GsmScope Header Logo Dark"
+    },
+    {
+      "id": "media-header-light",
+      "name": "GsmScope Header Logo (Light)",
+      "url": "/assets/aistudio/GsmScope_header_logo_fc9cfbb4.webp",
+      "uploadedAt": "System Asset",
+      "category": "logo",
+      "alt": "GsmScope Header Logo Light"
+    },
+    {
+      "id": "media-flagship-phones",
+      "name": "Flagship Smartphones Studio Render",
+      "url": "/src/assets/images/hero_flagship_phones_1792578844852.jpg",
+      "uploadedAt": "System Asset",
+      "category": "phone",
+      "alt": "Flagship Smartphones Studio Render"
+    },
+    {
+      "id": "media-camera-sensor",
+      "name": "Periscope Camera Sensor Optics",
+      "url": "/src/assets/images/news_camera_sensor_1792578845370.jpg",
+      "uploadedAt": "System Asset",
+      "category": "article",
+      "alt": "Periscope Camera Sensor Optics"
+    },
+    {
+      "id": "media-mobile-processor",
+      "name": "Mobile Silicon SoC Architecture",
+      "url": "/src/assets/images/news_mobile_processor_1792578846003.jpg",
+      "uploadedAt": "System Asset",
+      "category": "article",
+      "alt": "Mobile Silicon SoC Architecture"
+    },
+    {
+      "id": "media-nigeria-tech",
+      "name": "Nigeria Smartphone Retail & Market Index",
+      "url": "/src/assets/images/news_nigeria_tech_1792578846595.jpg",
+      "uploadedAt": "System Asset",
+      "category": "guide",
+      "alt": "Nigeria Smartphone Retail & Market Index"
+    }
+  ],
+  "contactInquiries": [
+    {
+      "id": "inq-sample-1",
+      "name": "Emeka Okoye",
+      "email": "emeka.okoye@gmail.com",
+      "phone": "+234 803 456 7890",
+      "subject": "Inquiry on iPhone 16 Pro Max price in Ikeja Computer Village",
+      "message": "Hello GsmScope Team, I saw your price review for the iPhone 16 Pro Max 256GB. Is this price indicative of slot authorized dealers or gray market Computer Village street prices? Thanks!",
+      "createdAt": "2026-10-31T12:39:11.848Z",
+      "status": "unread"
+    },
+    {
+      "id": "inq-sample-2",
+      "name": "Folashade Adebayo",
+      "email": "folashade@transsion-agency.ng",
+      "phone": "+234 802 111 2233",
+      "subject": "Brand advertising & sponsored device review collaboration",
+      "message": "Good day. We represent an OEM brand launching a new Dimensity 5G device next month. We would like to request your media kit and banner ad placement rates.",
+      "createdAt": "2026-10-30T16:39:11.850Z",
+      "status": "replied",
+      "replied": true,
+      "repliedAt": "2026-10-31T06:39:11.850Z",
+      "replySubject": "Re: Brand advertising & sponsored device review collaboration",
+      "replyMessage": "Dear Folashade, thank you for reaching out. We have sent our 2026 Q4 Media Deck and sponsored device benchmark kit to your email. Best regards, GsmScope Editorial."
+    }
+  ],
+  "newsletterSubscribers": [
+    {
+      "email": "sub.lagos@gsmscope.com",
+      "subscribedAt": "2026-10-26T16:39:11.850Z"
+    },
+    {
+      "email": "techfan2026@gmail.com",
+      "subscribedAt": "2026-10-28T16:39:11.850Z"
+    },
+    {
+      "email": "gadgetreviewer.ng@yahoo.com",
+      "subscribedAt": "2026-10-30T16:39:11.850Z"
+    },
+    {
+      "email": "ikeja.retailer@gmail.com",
+      "subscribedAt": "2026-10-31T04:39:11.850Z"
+    }
+  ],
+  "newsletterBroadcasts": [
+    {
+      "id": "bc-1",
+      "type": "alert",
+      "title": "Weekly Smartphone Price Drops & Computer Village Street Index",
+      "message": "Official CBN and parallel market rates updated alongside new stock prices for Apple, Samsung, and Tecno.",
+      "actionUrl": "/?tab=phones",
+      "actionLabel": "Check Live Prices",
+      "recipientsCount": 4,
+      "sentAt": "2026-10-30T16:39:11.850Z",
+      "status": "delivered"
+    }
+  ],
+  "confirmationEmailsLog": [],
+  "uploadDataUrls": {},
+  "deletedPhoneIds": [],
+  "deletedArticleIds": [],
+  "deletedReviewIds": [],
+  "deletedBrandKeys": [
+    "nothing",
+    "brand-nothing"
+  ],
+  "deletedInquiryIds": []
+};
