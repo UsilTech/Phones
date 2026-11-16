@@ -18083,10 +18083,10 @@ var require_layer = __commonJS({
 var require_methods = __commonJS({
   "node_modules/methods/index.js"(exports2, module2) {
     "use strict";
-    var http2 = require("http");
+    var http3 = require("http");
     module2.exports = getCurrentNodeMethods() || getBasicNodeMethods();
     function getCurrentNodeMethods() {
-      return http2.METHODS && http2.METHODS.map(function lowerCaseMethod(method) {
+      return http3.METHODS && http3.METHODS.map(function lowerCaseMethod(method) {
         return method.toLowerCase();
       });
     }
@@ -20892,7 +20892,7 @@ var require_application = __commonJS({
     var query = require_query();
     var debug = require_src()("express:application");
     var View = require_view();
-    var http2 = require("http");
+    var http3 = require("http");
     var compileETag = require_utils2().compileETag;
     var compileQueryParser = require_utils2().compileQueryParser;
     var compileTrust = require_utils2().compileTrust;
@@ -21141,7 +21141,7 @@ var require_application = __commonJS({
       tryRender(view, renderOptions, done);
     };
     app2.listen = function listen() {
-      var server = http2.createServer(this);
+      var server = http3.createServer(this);
       return server.listen.apply(server, arguments);
     };
     function logerror(err) {
@@ -21743,12 +21743,12 @@ var require_request = __commonJS({
     var deprecate = require_depd()("express");
     var isIP = require("net").isIP;
     var typeis = require_type_is();
-    var http2 = require("http");
+    var http3 = require("http");
     var fresh = require_fresh();
     var parseRange = require_range_parser();
     var parse2 = require_parseurl();
     var proxyaddr = require_proxy_addr();
-    var req = Object.create(http2.IncomingMessage.prototype);
+    var req = Object.create(http3.IncomingMessage.prototype);
     module2.exports = req;
     req.get = req.header = function header(name2) {
       if (!name2) {
@@ -22169,7 +22169,7 @@ var require_response = __commonJS({
     var deprecate = require_depd()("express");
     var encodeUrl = require_encodeurl();
     var escapeHtml = require_escape_html();
-    var http2 = require("http");
+    var http3 = require("http");
     var isAbsolute = require_utils2().isAbsolute;
     var onFinished = require_on_finished();
     var path4 = require("path");
@@ -22185,7 +22185,7 @@ var require_response = __commonJS({
     var mime = send.mime;
     var resolve3 = path4.resolve;
     var vary = require_vary();
-    var res = Object.create(http2.ServerResponse.prototype);
+    var res = Object.create(http3.ServerResponse.prototype);
     module2.exports = res;
     var charsetRegExp = /;\s*charset\s*=/;
     res.status = function status(code) {
@@ -23202,8 +23202,9 @@ var require_main = __commonJS({
   }
 });
 
-// server.ts
+// src/server-main.ts
 var import_express = __toESM(require_express2());
+var import_http = __toESM(require("http"));
 var import_path = __toESM(require("path"));
 var import_url = require("url");
 var import_fs = __toESM(require("fs"));
@@ -38629,20 +38630,28 @@ var INITIAL_MEDIA_ITEMS = [
   }
 ];
 
-// server.ts
+// src/server-main.ts
 var import_meta = {};
+process.on("uncaughtException", (err) => {
+  console.error("[Server UncaughtException]", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[Server UnhandledRejection]", reason);
+});
 import_dotenv.default.config({ quiet: true });
 var APP_ROOT = (() => {
   try {
     if (typeof __dirname === "string" && __dirname) {
-      return import_path.default.basename(__dirname) === "dist" ? import_path.default.resolve(__dirname, "..") : __dirname;
+      const base2 = import_path.default.basename(__dirname);
+      return base2 === "dist" || base2 === "src" ? import_path.default.resolve(__dirname, "..") : __dirname;
     }
   } catch {
   }
   try {
     if (typeof import_meta?.url === "string" && import_meta.url) {
       const dir = import_path.default.dirname((0, import_url.fileURLToPath)(import_meta.url));
-      return import_path.default.basename(dir) === "dist" ? import_path.default.resolve(dir, "..") : dir;
+      const base2 = import_path.default.basename(dir);
+      return base2 === "dist" || base2 === "src" ? import_path.default.resolve(dir, "..") : dir;
     }
   } catch {
   }
@@ -38702,7 +38711,9 @@ try {
   console.warn("[Uploads Directory Init]", e);
 }
 var DIST_ASSETS_DIR = import_path.default.resolve(APP_ROOT, "dist", "assets");
+var CPANEL_BUILD_ASSETS_DIR = import_path.default.resolve(APP_ROOT, "cpanel_build", "assets");
 app.use("/assets", import_express.default.static(DIST_ASSETS_DIR, { maxAge: 0, etag: true, lastModified: true }));
+app.use("/assets", import_express.default.static(CPANEL_BUILD_ASSETS_DIR, { maxAge: 0, etag: true, lastModified: true }));
 app.use("/uploads", import_express.default.static(PUBLIC_UPLOADS_DIR, { maxAge: "7d", etag: true }));
 app.use("/uploads", import_express.default.static(UPLOADS_DIR, { maxAge: "7d", etag: true }));
 app.use("/assets", import_express.default.static(import_path.default.resolve(APP_ROOT, "public", "assets"), { maxAge: "7d", etag: true }));
@@ -38980,7 +38991,6 @@ function loadDatabaseFromDisk() {
       if (Array.isArray(parsed.confirmationEmailsLog)) {
         confirmationEmailsLog = parsed.confirmationEmailsLog;
       }
-      saveDatabaseToDisk();
       console.log(`[Database Persistence] Loaded ${phonesDatabase.length} phones, ${articlesDatabase.length} articles, ${mediaDatabase.length} media items from data/database.json`);
     } else {
       saveDatabaseToDisk();
@@ -39030,7 +39040,9 @@ function restoreUploadsFromDatabase() {
   }
 }
 loadDatabaseFromDisk();
-restoreUploadsFromDatabase();
+setImmediate(() => {
+  restoreUploadsFromDatabase();
+});
 app.get("/uploads/:filename", (req, res, next) => {
   const filename = import_path.default.basename(req.params.filename || "");
   if (!filename) return next();
@@ -40768,8 +40780,18 @@ function startServer() {
   const distPath = import_path.default.resolve(APP_ROOT, "dist");
   const prodIndexPath = import_path.default.resolve(distPath, "index.html");
   const distAssetsPath = import_path.default.resolve(distPath, "assets");
+  const cpanelBuildPath = import_path.default.resolve(APP_ROOT, "cpanel_build");
+  const cpanelIndexPath = import_path.default.resolve(cpanelBuildPath, "index.html");
+  const cpanelAssetsPath = import_path.default.resolve(cpanelBuildPath, "assets");
   if (import_fs.default.existsSync(distAssetsPath)) {
     app.use("/assets", import_express.default.static(distAssetsPath, {
+      maxAge: 0,
+      etag: true,
+      lastModified: true
+    }));
+  }
+  if (import_fs.default.existsSync(cpanelAssetsPath)) {
+    app.use("/assets", import_express.default.static(cpanelAssetsPath, {
       maxAge: 0,
       etag: true,
       lastModified: true
@@ -40807,8 +40829,9 @@ function startServer() {
         return next();
       }
       try {
-        if (requiresClassicBundle(req.headers["user-agent"]) && import_fs.default.existsSync(prodIndexPath)) {
-          const prodTemplate = import_fs.default.readFileSync(prodIndexPath, "utf-8");
+        const fallbackClassicIndex = import_fs.default.existsSync(prodIndexPath) ? prodIndexPath : import_fs.default.existsSync(cpanelIndexPath) ? cpanelIndexPath : "";
+        if (requiresClassicBundle(req.headers["user-agent"]) && fallbackClassicIndex) {
+          const prodTemplate = import_fs.default.readFileSync(fallbackClassicIndex, "utf-8");
           const seoHtml2 = injectDynamicSeoIntoHtml(prodTemplate, req);
           return res.status(200).set({ "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" }).send(seoHtml2);
         }
@@ -40826,9 +40849,21 @@ function startServer() {
     if (import_fs.default.existsSync(distAssetsPath)) {
       app.use("/assets", import_express.default.static(distAssetsPath, { maxAge: 0, etag: true, lastModified: true }));
     }
+    if (import_fs.default.existsSync(cpanelAssetsPath)) {
+      app.use("/assets", import_express.default.static(cpanelAssetsPath, { maxAge: 0, etag: true, lastModified: true }));
+    }
     if (import_fs.default.existsSync(distPath)) {
       app.use(
         import_express.default.static(distPath, {
+          index: false,
+          maxAge: 0,
+          etag: true
+        })
+      );
+    }
+    if (import_fs.default.existsSync(cpanelBuildPath)) {
+      app.use(
+        import_express.default.static(cpanelBuildPath, {
           index: false,
           maxAge: 0,
           etag: true
@@ -40841,11 +40876,12 @@ function startServer() {
       if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/")) {
         return next();
       }
-      if (import_fs.default.existsSync(prodIndexPath)) {
+      const activeIndexPath = import_fs.default.existsSync(prodIndexPath) ? prodIndexPath : import_fs.default.existsSync(cpanelIndexPath) ? cpanelIndexPath : "";
+      if (activeIndexPath) {
         try {
-          const stat = import_fs.default.statSync(prodIndexPath);
+          const stat = import_fs.default.statSync(activeIndexPath);
           if (!cachedProdTemplate || stat.mtimeMs !== cachedProdMtime) {
-            cachedProdTemplate = import_fs.default.readFileSync(prodIndexPath, "utf-8");
+            cachedProdTemplate = import_fs.default.readFileSync(activeIndexPath, "utf-8");
             cachedProdMtime = stat.mtimeMs;
           }
         } catch {
@@ -40868,9 +40904,30 @@ function startServer() {
       }
     });
   }
-  app.listen(PORT, () => {
-    console.log(`GsmScope Full-Stack Server active on ${PORT}`);
+  const server = import_http.default.createServer(app);
+  const isCloudRunOrAiStudioDev = isDevServer || Boolean(process.env.K_SERVICE || process.env.K_REVISION || process.env.CLOUD_RUN_JOB);
+  server.on("error", (err) => {
+    console.error("[HTTP Server Listen Error]", err.code, err.message);
+    if (err.code === "EADDRINUSE") {
+      try {
+        server.listen(0);
+      } catch {
+      }
+    }
   });
+  if (isCloudRunOrAiStudioDev && false) {
+    server.listen(PORT, () => {
+      console.log(`GsmScope Full-Stack Server active on ${PORT}`);
+    });
+  } else if (process.env.PORT && process.env.PORT !== "8080") {
+    server.listen(process.env.PORT, () => {
+      console.log(`GsmScope cPanel Server active on ${process.env.PORT}`);
+    });
+  } else {
+    server.listen(() => {
+      console.log("GsmScope cPanel Server active on Passenger/LiteSpeed socket");
+    });
+  }
 }
 startServer();
 /*! Bundled license information:

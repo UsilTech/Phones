@@ -499,13 +499,14 @@ export default defineConfig(() => {
           },
         },
         closeBundle() {
-          // Automatically bundle server.ts into a cPanel/Passenger/LiteSpeed-compatible CommonJS startup file (both app.cjs & app.js)
+          // Automatically bundle src/server-main.ts into a cPanel/Passenger/LiteSpeed-compatible CommonJS startup file (both app.cjs & app.js),
+          // copy compiled frontend assets into /cpanel_build (so they persist in Git even after `npm run clean` deletes `dist/`),
           // and sync functions/_seed.js for Cloudflare Workers / Pages Functions
           try {
             const rootDir = path.resolve(import.meta.dirname || '.', '.');
             const cjsOutPath = path.resolve(rootDir, 'app.cjs');
             esbuild.buildSync({
-              entryPoints: [path.resolve(rootDir, 'server.ts')],
+              entryPoints: [path.resolve(rootDir, 'src/server-main.ts')],
               bundle: true,
               platform: 'node',
               format: 'cjs',
@@ -527,6 +528,14 @@ export default defineConfig(() => {
             });
             // Copy identical self-contained CommonJS bundle to app.js so cPanel default startup file (app.js) works with require()
             fs.copyFileSync(cjsOutPath, path.resolve(rootDir, 'app.js'));
+
+            // Copy built dist/index.html and dist/assets/* into /cpanel_build so GitHub exports always include the compiled production frontend
+            const distDir = path.resolve(rootDir, 'dist');
+            const cpanelBuildDir = path.resolve(rootDir, 'cpanel_build');
+            if (fs.existsSync(distDir)) {
+              fs.rmSync(cpanelBuildDir, { recursive: true, force: true });
+              fs.cpSync(distDir, cpanelBuildDir, { recursive: true });
+            }
 
             const dbJsonPath = path.resolve(rootDir, 'data', 'database.json');
             const functionsDir = path.resolve(rootDir, 'functions');
