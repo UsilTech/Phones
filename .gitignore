@@ -9,4 +9,3 @@ data/*.tmp
 tmp/
 bun.lock
 package-lock.json
-.wrangler/

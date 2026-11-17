@@ -1,6 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 import http from 'http';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -121,14 +122,57 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Uploads directories for cPanel hosting & local Vite dev
+// Uploads & cPanel public_html directories (ensures LiteSpeed Web Server on cPanel serves /uploads/* directly from $HOME/public_html/uploads/* as well as $DEPLOYPATH/uploads/*)
+const HOME_DIR = process.env.HOME || os.homedir() || path.resolve(APP_ROOT, '..');
+const PUBLIC_HTML_DIR = path.resolve(HOME_DIR, 'public_html');
+const PUBLIC_HTML_UPLOADS_DIR = path.resolve(PUBLIC_HTML_DIR, 'uploads');
 const UPLOADS_DIR = path.resolve(APP_ROOT, 'uploads');
 const PUBLIC_UPLOADS_DIR = path.resolve(APP_ROOT, 'public', 'uploads');
 try {
   if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
   if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
+  if (fs.existsSync(PUBLIC_HTML_DIR) && !fs.existsSync(PUBLIC_HTML_UPLOADS_DIR)) {
+    fs.mkdirSync(PUBLIC_HTML_UPLOADS_DIR, { recursive: true });
+  }
 } catch (e) {
   console.warn('[Uploads Directory Init]', e);
+}
+
+function writeFileToAllUploadDirs(filename: string, buffer: Buffer): void {
+  const safeName = path.basename(filename);
+  if (!safeName) return;
+  const targets = [
+    path.resolve(PUBLIC_UPLOADS_DIR, safeName),
+    path.resolve(UPLOADS_DIR, safeName),
+  ];
+  if (fs.existsSync(PUBLIC_HTML_DIR)) {
+    try {
+      if (!fs.existsSync(PUBLIC_HTML_UPLOADS_DIR)) {
+        fs.mkdirSync(PUBLIC_HTML_UPLOADS_DIR, { recursive: true });
+      }
+      targets.push(path.resolve(PUBLIC_HTML_UPLOADS_DIR, safeName));
+    } catch {}
+  }
+  for (const target of targets) {
+    try {
+      fs.writeFileSync(target, buffer);
+    } catch {}
+  }
+}
+
+function deleteFileFromAllUploadDirs(filename: string): void {
+  const safeName = path.basename(filename);
+  if (!safeName) return;
+  const targets = [
+    path.resolve(PUBLIC_UPLOADS_DIR, safeName),
+    path.resolve(UPLOADS_DIR, safeName),
+    path.resolve(PUBLIC_HTML_UPLOADS_DIR, safeName),
+  ];
+  for (const target of targets) {
+    try {
+      if (fs.existsSync(target)) fs.unlinkSync(target);
+    } catch {}
+  }
 }
 
 // Serve uploaded media and static assets with ETag revalidation so rebuilt CSS/JS bundles take effect immediately
@@ -207,6 +251,9 @@ app.get(['/api/client-bundle', '/assets/app-bundle.js'], (_req: Request, res: Re
 
 app.use('/assets', express.static(DIST_ASSETS_DIR, { maxAge: 0, etag: true, lastModified: true }));
 app.use('/assets', express.static(CPANEL_BUILD_ASSETS_DIR, { maxAge: 0, etag: true, lastModified: true }));
+if (fs.existsSync(PUBLIC_HTML_UPLOADS_DIR)) {
+  app.use('/uploads', express.static(PUBLIC_HTML_UPLOADS_DIR, { maxAge: '7d', etag: true }));
+}
 app.use('/uploads', express.static(PUBLIC_UPLOADS_DIR, { maxAge: '7d', etag: true }));
 app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d', etag: true }));
 app.use('/assets', express.static(path.resolve(APP_ROOT, 'public', 'assets'), { maxAge: '7d', etag: true }));
@@ -231,9 +278,11 @@ app.get('/assets/:assetFile', (req: Request, res: Response, next) => {
   next();
 });
 
-// Persistent JSON File Storage (survives Phusion Passenger restarts on cPanel)
+// Persistent JSON File Storage (survives Phusion Passenger restarts & app folder redeployments on cPanel)
 const DATA_DIR = path.resolve(APP_ROOT, 'data');
 const DB_FILE_PATH = path.resolve(DATA_DIR, 'database.json');
+const HOME_BACKUP_DATA_DIR = path.resolve(HOME_DIR, '.gsmscope_data');
+const HOME_BACKUP_DB_PATH = path.resolve(HOME_BACKUP_DATA_DIR, 'database.json');
 
 interface PersistentDatabaseSchema {
   version: string;
@@ -394,41 +443,51 @@ function saveDatabaseToDisk(): void {
       deletedBrandKeys: Array.from(deletedBrandKeysDatabase),
       deletedInquiryIds: Array.from(deletedInquiryIdsDatabase),
     };
+    const serialized = JSON.stringify(payload, null, 2);
     const tempFile = `${DB_FILE_PATH}.tmp`;
-    fs.writeFileSync(tempFile, JSON.stringify(payload, null, 2), 'utf-8');
+    fs.writeFileSync(tempFile, serialized, 'utf-8');
     fs.renameSync(tempFile, DB_FILE_PATH);
+    try {
+      if (!fs.existsSync(HOME_BACKUP_DATA_DIR)) {
+        fs.mkdirSync(HOME_BACKUP_DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(HOME_BACKUP_DB_PATH, serialized, 'utf-8');
+    } catch {}
   } catch (err) {
     try {
       // Fallback direct write if atomic rename fails across filesystems
-      fs.writeFileSync(
-        DB_FILE_PATH,
-        JSON.stringify(
-          {
-            version: '2.0',
-            updatedAt: new Date().toISOString(),
-            phones: phonesDatabase,
-            brands: brandsDatabase,
-            articles: articlesDatabase,
-            reviews: reviewsDatabase,
-            adSettings: adSettingsDatabase,
-            websiteContent: websiteContentDatabase,
-            mediaLibrary: mediaDatabase,
-            contactInquiries,
-            newsletterSubscribers,
-            newsletterBroadcasts,
-            confirmationEmailsLog,
-            uploadDataUrls: uploadDataUrlsDatabase,
-            deletedPhoneIds: Array.from(deletedPhoneIdsDatabase),
-            deletedArticleIds: Array.from(deletedArticleIdsDatabase),
-            deletedReviewIds: Array.from(deletedReviewIdsDatabase),
-            deletedBrandKeys: Array.from(deletedBrandKeysDatabase),
-            deletedInquiryIds: Array.from(deletedInquiryIdsDatabase),
-          },
-          null,
-          2
-        ),
-        'utf-8'
+      const fallbackSerialized = JSON.stringify(
+        {
+          version: '2.0',
+          updatedAt: new Date().toISOString(),
+          phones: phonesDatabase,
+          brands: brandsDatabase,
+          articles: articlesDatabase,
+          reviews: reviewsDatabase,
+          adSettings: adSettingsDatabase,
+          websiteContent: websiteContentDatabase,
+          mediaLibrary: mediaDatabase,
+          contactInquiries,
+          newsletterSubscribers,
+          newsletterBroadcasts,
+          confirmationEmailsLog,
+          uploadDataUrls: uploadDataUrlsDatabase,
+          deletedPhoneIds: Array.from(deletedPhoneIdsDatabase),
+          deletedArticleIds: Array.from(deletedArticleIdsDatabase),
+          deletedReviewIds: Array.from(deletedReviewIdsDatabase),
+          deletedBrandKeys: Array.from(deletedBrandKeysDatabase),
+          deletedInquiryIds: Array.from(deletedInquiryIdsDatabase),
+        },
+        null,
+        2
       );
+      fs.writeFileSync(DB_FILE_PATH, fallbackSerialized, 'utf-8');
+      try {
+        if (!fs.existsSync(HOME_BACKUP_DATA_DIR)) {
+          fs.mkdirSync(HOME_BACKUP_DATA_DIR, { recursive: true });
+        }
+        fs.writeFileSync(HOME_BACKUP_DB_PATH, fallbackSerialized, 'utf-8');
+      } catch {}
     } catch (writeErr) {
       console.error('[Database Persistence] Failed to write data/database.json:', writeErr);
     }
@@ -441,11 +500,17 @@ function loadDatabaseFromDisk(): void {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     if (!fs.existsSync(DB_FILE_PATH)) {
-      const seedDbFallback = path.resolve(APP_ROOT, 'cpanel_build', 'seed-database.json');
-      if (fs.existsSync(seedDbFallback)) {
+      if (fs.existsSync(HOME_BACKUP_DB_PATH)) {
         try {
-          fs.copyFileSync(seedDbFallback, DB_FILE_PATH);
+          fs.copyFileSync(HOME_BACKUP_DB_PATH, DB_FILE_PATH);
         } catch {}
+      } else {
+        const seedDbFallback = path.resolve(APP_ROOT, 'cpanel_build', 'seed-database.json');
+        if (fs.existsSync(seedDbFallback)) {
+          try {
+            fs.copyFileSync(seedDbFallback, DB_FILE_PATH);
+          } catch {}
+        }
       }
     }
     if (fs.existsSync(DB_FILE_PATH)) {
@@ -612,6 +677,9 @@ function restoreUploadsFromDatabase(): void {
   try {
     if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
     if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
+    if (fs.existsSync(PUBLIC_HTML_DIR) && !fs.existsSync(PUBLIC_HTML_UPLOADS_DIR)) {
+      fs.mkdirSync(PUBLIC_HTML_UPLOADS_DIR, { recursive: true });
+    }
 
     const writeDataUrlToFile = (urlPath?: string, dataUrl?: string) => {
       if (!urlPath || !dataUrl || !urlPath.startsWith('/uploads/') || !dataUrl.includes(';base64,')) return;
@@ -620,12 +688,13 @@ function restoreUploadsFromDatabase(): void {
       if (!filename) return;
       const targetUpload = path.resolve(UPLOADS_DIR, filename);
       const targetPublic = path.resolve(PUBLIC_UPLOADS_DIR, filename);
-      if (fs.existsSync(targetUpload) && fs.existsSync(targetPublic)) return;
+      const targetPublicHtml = path.resolve(PUBLIC_HTML_UPLOADS_DIR, filename);
+      const needsPublicHtml = fs.existsSync(PUBLIC_HTML_DIR) && !fs.existsSync(targetPublicHtml);
+      if (fs.existsSync(targetUpload) && fs.existsSync(targetPublic) && !needsPublicHtml) return;
       const base64Data = dataUrl.split(';base64,')[1];
       if (!base64Data) return;
       const buffer = Buffer.from(base64Data, 'base64');
-      if (!fs.existsSync(targetPublic)) fs.writeFileSync(targetPublic, buffer);
-      if (!fs.existsSync(targetUpload)) fs.writeFileSync(targetUpload, buffer);
+      writeFileToAllUploadDirs(filename, buffer);
     };
 
     for (const [urlPath, dataUrl] of Object.entries(uploadDataUrlsDatabase)) {
@@ -647,6 +716,24 @@ function restoreUploadsFromDatabase(): void {
         }
       }
     }
+
+    // Also mirror any existing disk files in UPLOADS_DIR / PUBLIC_UPLOADS_DIR into $HOME/public_html/uploads on cPanel
+    if (fs.existsSync(PUBLIC_HTML_DIR)) {
+      for (const srcDir of [UPLOADS_DIR, PUBLIC_UPLOADS_DIR]) {
+        if (fs.existsSync(srcDir)) {
+          const files = fs.readdirSync(srcDir);
+          for (const f of files) {
+            const srcFile = path.resolve(srcDir, f);
+            const destFile = path.resolve(PUBLIC_HTML_UPLOADS_DIR, f);
+            try {
+              if (!fs.existsSync(destFile) && fs.statSync(srcFile).isFile()) {
+                fs.copyFileSync(srcFile, destFile);
+              }
+            } catch {}
+          }
+        }
+      }
+    }
   } catch (err) {
     console.warn('[Uploads Restore] Could not restore uploads from database:', err);
   }
@@ -658,14 +745,16 @@ setImmediate(() => {
   restoreUploadsFromDatabase();
 });
 
-// Dynamic fallback for /uploads/:filename if container ephemeral disk was reset on update
-app.get('/uploads/:filename', (req: Request, res: Response, next) => {
+// Dynamic fallback for /uploads/:filename and /api/uploads/:filename on cPanel & Node.js
+app.get(['/uploads/:filename', '/api/uploads/:filename'], (req: Request, res: Response, next) => {
   const filename = path.basename(req.params.filename || '');
   if (!filename) return next();
   const targetUrl = `/uploads/${filename}`;
 
+  const publicHtmlDiskFile = path.resolve(PUBLIC_HTML_UPLOADS_DIR, filename);
   const diskFile = path.resolve(UPLOADS_DIR, filename);
   const publicDiskFile = path.resolve(PUBLIC_UPLOADS_DIR, filename);
+  if (fs.existsSync(publicHtmlDiskFile)) return res.sendFile(publicHtmlDiskFile);
   if (fs.existsSync(diskFile)) return res.sendFile(diskFile);
   if (fs.existsSync(publicDiskFile)) return res.sendFile(publicDiskFile);
 
@@ -697,10 +786,7 @@ app.get('/uploads/:filename', (req: Request, res: Response, next) => {
       if (mimeMatch && mimeMatch[1]) foundMime = mimeMatch[1];
       const base64Data = foundDataUrl.split(';base64,')[1];
       const buffer = Buffer.from(base64Data, 'base64');
-      try {
-        fs.writeFileSync(publicDiskFile, buffer);
-        fs.writeFileSync(diskFile, buffer);
-      } catch {}
+      writeFileToAllUploadDirs(filename, buffer);
       res.setHeader('Content-Type', foundMime);
       res.setHeader('Cache-Control', 'public, max-age=604800');
       return res.send(buffer);
@@ -721,6 +807,9 @@ async function getEmailTransporter(): Promise<{ transporter: any; mode: 'smtp' |
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS,
+        },
+        tls: {
+          rejectUnauthorized: false,
         },
       }),
       mode: 'smtp',
@@ -924,13 +1013,19 @@ app.get(['/api/health', '/health'], (_req: Request, res: Response) => {
   const dataDirWritable = checkWritable(DATA_DIR);
   const uploadsDirWritable = checkWritable(UPLOADS_DIR);
   const publicUploadsWritable = checkWritable(PUBLIC_UPLOADS_DIR);
+  const publicHtmlUploadsWritable = fs.existsSync(PUBLIC_HTML_DIR) ? checkWritable(PUBLIC_HTML_UPLOADS_DIR) : true;
   const databaseFileExists = fs.existsSync(DB_FILE_PATH);
-  const distReady = fs.existsSync(path.resolve(APP_ROOT, 'dist', 'index.html'));
-  const cpanelStartupReady = fs.existsSync(path.resolve(APP_ROOT, 'server.ts')) || fs.existsSync(path.resolve(APP_ROOT, 'app.cjs'));
+  const distReady =
+    fs.existsSync(path.resolve(APP_ROOT, 'dist', 'index.html')) ||
+    fs.existsSync(path.resolve(APP_ROOT, 'cpanel_build', 'index.html'));
+  const cpanelStartupReady =
+    fs.existsSync(path.resolve(APP_ROOT, 'app.js')) ||
+    fs.existsSync(path.resolve(APP_ROOT, 'app.cjs')) ||
+    fs.existsSync(path.resolve(APP_ROOT, 'server.ts'));
 
   res.json({
     status: 'healthy',
-    mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+    mode: process.env.NODE_ENV === 'production' || process.env.CPANEL_MODE === '1' ? 'production' : 'development',
     nodeVersion: process.version,
     serverTime: new Date().toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
@@ -941,6 +1036,7 @@ app.get(['/api/health', '/health'], (_req: Request, res: Response) => {
       dataDirWritable,
       uploadsDirWritable,
       publicUploadsWritable,
+      publicHtmlUploadsWritable,
     },
     services: {
       smtpConfigured: Boolean((process.env.SMTP_HOST || '').trim() && (process.env.SMTP_USER || '').trim()),
@@ -1701,9 +1797,8 @@ app.post('/api/media/upload', (req: Request, res: Response) => {
     const uniqueFilename = `${Date.now()}-${safeBase}.${ext}`;
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // Write to both upload locations for full cPanel compatibility
-    fs.writeFileSync(path.resolve(PUBLIC_UPLOADS_DIR, uniqueFilename), buffer);
-    fs.writeFileSync(path.resolve(UPLOADS_DIR, uniqueFilename), buffer);
+    // Write to all cPanel & app upload locations ($DEPLOYPATH/uploads, $DEPLOYPATH/public/uploads, and $HOME/public_html/uploads)
+    writeFileToAllUploadDirs(uniqueFilename, buffer);
 
     const normalizedDataUrl = data.startsWith('data:')
       ? data
@@ -1757,17 +1852,11 @@ app.delete('/api/media/:id', (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Media asset not found' });
   }
 
-  // If stored in /uploads, delete file from disk
+  // If stored in /uploads, delete file from all cPanel & app upload directories
   if (item.url.startsWith('/uploads/')) {
     const filename = path.basename(item.url);
-    try {
-      const p1 = path.resolve(PUBLIC_UPLOADS_DIR, filename);
-      const p2 = path.resolve(UPLOADS_DIR, filename);
-      if (fs.existsSync(p1)) fs.unlinkSync(p1);
-      if (fs.existsSync(p2)) fs.unlinkSync(p2);
-    } catch (e) {
-      console.warn('[Media Delete File Warning]', e);
-    }
+    deleteFileFromAllUploadDirs(filename);
+    delete uploadDataUrlsDatabase[item.url];
   }
 
   mediaDatabase = mediaDatabase.filter((m) => m.id !== req.params.id);
@@ -2144,7 +2233,7 @@ function escapeHtmlAttr(unsafe: string): string {
 
 function getRequestOrigin(req: Request): string {
   const proto = (req.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim() || req.protocol || 'https';
-  const host = (req.headers['x-forwarded-host'] as string)?.split(',')[0]?.trim() || req.get('host') || 'www.gsmscope.com';
+  const host = (req.headers['x-forwarded-host'] as string)?.split(',')[0]?.trim() || req.get('host') || 'gsmscope.com';
   return `${proto}://${host}`;
 }
 
@@ -2330,7 +2419,8 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
 
   let crawlerBodyHtml = '';
 
-  if (req.path.startsWith('/admin') || tabQuery === 'admin') {
+  const reqPathClean = (req.path || '').toLowerCase().replace(/\/+$/, '');
+  if (reqPathClean === '/admin' || reqPathClean.startsWith('/admin/')) {
     pageTitle = `Admin Dashboard — ${siteName}`;
     robotsDirective = 'noindex, nofollow';
     canonicalUrl = `${origin}/admin`;
@@ -2649,6 +2739,12 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
 
   // In production / cPanel mode, inline compiled CSS directly into <head> and load JS via /api/client-bundle
   // so LiteSpeed Web Server static file rules in public_html can never 404 CSS or JS assets!
+  const isAdminRequest = reqPathClean === '/admin' || reqPathClean.startsWith('/admin/');
+
+  if (isAdminRequest && !html.includes('__GSMSCOPE_FORCE_ADMIN__')) {
+    html = html.replace('</head>', () => `  <script>window.__GSMSCOPE_FORCE_ADMIN__ = true;</script>\n  </head>`);
+  }
+
   const isProdOrCpanel = process.env.npm_lifecycle_event !== 'dev' || process.env.CPANEL_MODE === '1';
   if (isProdOrCpanel) {
     const prodCss = getCompiledProductionCss();
@@ -2788,6 +2884,7 @@ function startServer() {
       app.use(
         express.static(distPath, {
           index: false,
+          redirect: false,
           maxAge: 0,
           etag: true,
         })
@@ -2797,6 +2894,7 @@ function startServer() {
       app.use(
         express.static(cpanelBuildPath, {
           index: false,
+          redirect: false,
           maxAge: 0,
           etag: true,
         })

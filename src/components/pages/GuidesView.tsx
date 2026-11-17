@@ -549,7 +549,7 @@ export default function GuidesView() {
     );
   }
 
-  // Guide Listing View (Matches Second-gsmscope.vercel.app/guides)
+  // Guide Listing View
   return (
     <div className="space-y-8 animate-fadeIn pb-12">
       {/* 1. Header */}

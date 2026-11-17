@@ -16,6 +16,9 @@ deployment:
     - /bin/cp -Rf public $DEPLOYPATH
     - /bin/cp -Rf src $DEPLOYPATH
     - /bin/mkdir -p $HOME/public_html/assets
+    - /bin/mkdir -p $HOME/public_html/admin
+    - /bin/mkdir -p $HOME/public_html/uploads
     - /bin/cp -Rf public/assets/* $HOME/public_html/assets/
     - /bin/cp -Rf cpanel_build/assets/* $HOME/public_html/assets/
+    - /bin/cp -Rf cpanel_build/admin/* $HOME/public_html/admin/
     - /bin/touch $DEPLOYPATH/tmp/restart.txt

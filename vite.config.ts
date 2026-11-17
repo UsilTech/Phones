@@ -510,9 +510,8 @@ export default defineConfig(() => {
           },
         },
         closeBundle() {
-          // Automatically bundle src/server-main.ts into a cPanel/Passenger/LiteSpeed-compatible CommonJS startup file (both app.cjs & app.js),
-          // copy compiled frontend assets into /cpanel_build (so they persist in Git even after `npm run clean` deletes `dist/`),
-          // and sync functions/_seed.js for Cloudflare Workers / Pages Functions
+          // Automatically bundle src/server-main.ts into a cPanel/Passenger/LiteSpeed-compatible CommonJS startup file (both app.cjs & app.js)
+          // and copy compiled frontend assets into /cpanel_build (so they persist in Git even after `npm run clean` deletes `dist/`)
           try {
             const rootDir = path.resolve(import.meta.dirname || '.', '.');
             const distDir = path.resolve(rootDir, 'dist');
@@ -520,16 +519,46 @@ export default defineConfig(() => {
 
             let embeddedCssGzB64 = '';
             let embeddedJsGzB64 = '';
+            let rawCompiledCss = '';
             const builtCssPath = path.resolve(distDir, 'assets', 'app-styles.css');
             const builtJsPath = path.resolve(distDir, 'assets', 'app-bundle.js');
             if (fs.existsSync(builtCssPath)) {
-              embeddedCssGzB64 = zlib.gzipSync(fs.readFileSync(builtCssPath)).toString('base64');
+              const cssBuf = fs.readFileSync(builtCssPath);
+              rawCompiledCss = cssBuf.toString('utf-8');
+              embeddedCssGzB64 = zlib.gzipSync(cssBuf).toString('base64');
             }
             if (fs.existsSync(builtJsPath)) {
               embeddedJsGzB64 = zlib.gzipSync(fs.readFileSync(builtJsPath)).toString('base64');
             }
 
-            // Copy built dist/index.html and dist/assets/* into /cpanel_build so GitHub exports always include the compiled production frontend
+            // Enhance dist/index.html with inlined CSS and dual-fallback bundle loader, and create dist/admin/index.html
+            const distIndexHtmlPath = path.resolve(distDir, 'index.html');
+            if (fs.existsSync(distIndexHtmlPath)) {
+              let indexHtml = fs.readFileSync(distIndexHtmlPath, 'utf-8');
+              if (rawCompiledCss && !indexHtml.includes('id="gsmscope-inline-css"')) {
+                const safeCss = rawCompiledCss.replace(/<\/style/gi, '<\\/style');
+                indexHtml = indexHtml.replace(
+                  '</head>',
+                  () => `  <style id="gsmscope-inline-css">${safeCss}</style>\n  </head>`
+                );
+              }
+              indexHtml = indexHtml.replace(
+                /<script\s+defer\s+src="([^"]+)"><\/script>/i,
+                (_m, origSrc) =>
+                  `<script defer src="/api/client-bundle?v=${buildVersion}" onerror="var s=document.createElement('script');s.src='${origSrc}';document.head.appendChild(s);"></script>`
+              );
+              fs.writeFileSync(distIndexHtmlPath, indexHtml, 'utf-8');
+
+              const adminDir = path.resolve(distDir, 'admin');
+              fs.mkdirSync(adminDir, { recursive: true });
+              const adminHtml = indexHtml.replace(
+                '</head>',
+                () => `  <script>window.__GSMSCOPE_FORCE_ADMIN__ = true;</script>\n  </head>`
+              );
+              fs.writeFileSync(path.resolve(adminDir, 'index.html'), adminHtml, 'utf-8');
+            }
+
+            // Copy built dist/index.html, dist/admin/index.html, and dist/assets/* into /cpanel_build
             if (fs.existsSync(distDir)) {
               fs.rmSync(cpanelBuildDir, { recursive: true, force: true });
               fs.cpSync(distDir, cpanelBuildDir, { recursive: true });
@@ -563,23 +592,11 @@ export default defineConfig(() => {
             fs.copyFileSync(cjsOutPath, path.resolve(rootDir, 'app.js'));
 
             const dbJsonPath = path.resolve(rootDir, 'data', 'database.json');
-            const functionsDir = path.resolve(rootDir, 'functions');
-            if (fs.existsSync(dbJsonPath)) {
-              if (fs.existsSync(cpanelBuildDir)) {
-                fs.copyFileSync(dbJsonPath, path.resolve(cpanelBuildDir, 'seed-database.json'));
-              }
-              if (!fs.existsSync(functionsDir)) {
-                fs.mkdirSync(functionsDir, { recursive: true });
-              }
-              const rawDb = fs.readFileSync(dbJsonPath, 'utf-8');
-              fs.writeFileSync(
-                path.resolve(functionsDir, '_seed.js'),
-                `// Auto-generated from data/database.json for Cloudflare Pages Functions\nexport const SEED_DB = ${rawDb};\n`,
-                'utf-8'
-              );
+            if (fs.existsSync(dbJsonPath) && fs.existsSync(cpanelBuildDir)) {
+              fs.copyFileSync(dbJsonPath, path.resolve(cpanelBuildDir, 'seed-database.json'));
             }
           } catch (err) {
-            console.warn('[cPanel / Cloudflare Bundle Warning]', err);
+            console.warn('[cPanel Bundle Warning]', err);
           }
         },
       },

@@ -1796,20 +1796,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'advertise',
     'privacy',
     'terms',
-    'admin',
   ];
 
   const [activeTab, setActiveTabState] = useState<ActiveTab>(() => {
     if (typeof window !== 'undefined') {
-      const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '');
-      const hash = window.location.hash.toLowerCase();
-      const search = window.location.search.toLowerCase();
+      const rawPath = window.location.pathname.toLowerCase();
+      const pathname = rawPath.replace(/\/+$/, '');
       if (
+        (window as any).__GSMSCOPE_FORCE_ADMIN__ === true ||
         pathname === '/admin' ||
-        hash === '#admin' ||
-        hash === '#/admin' ||
-        search.includes('admin=true')
+        pathname.startsWith('/admin/')
       ) {
+        (window as any).__GSMSCOPE_FORCE_ADMIN__ = false;
         return 'admin';
       }
       const params = new URLSearchParams(window.location.search);
@@ -1939,17 +1937,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (tab === 'admin') {
         const sec = admSec || 'dashboard';
         const sub = admSub || null;
-        const queryParts: string[] = [];
-        if (sec && sec !== 'dashboard') {
-          queryParts.push(`section=${encodeURIComponent(sec)}`);
-        }
-        if (sub) {
-          queryParts.push(`sub=${encodeURIComponent(sub)}`);
-        }
-        const url = queryParts.length > 0 ? `/admin?${queryParts.join('&')}` : '/admin';
         return {
           key: `admin:${sec}:${sub || ''}`,
-          url,
+          url: '/admin',
           activeTab: 'admin',
           selectedPhoneId: null,
           selectedPhoneData: null,
@@ -2215,14 +2205,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       // 2. Fallback: parse current URL or step back in navStackRef
-      const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '');
-      const hash = window.location.hash.toLowerCase();
+      const rawPath = window.location.pathname.toLowerCase();
+      const pathname = rawPath.replace(/\/+$/, '');
       const params = new URLSearchParams(window.location.search);
 
-      if (pathname === '/admin' || hash === '#admin' || hash === '#/admin') {
-        const sec = params.get('section') || 'dashboard';
-        const sub = params.get('sub') || null;
-        const adminSnap = computeNavSnapshot('admin', null, null, null, defaultFilterState, sec, sub);
+      if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+        const adminSnap = computeNavSnapshot('admin', null, null, null, defaultFilterState, 'dashboard', null);
         applyNavSnapshot(adminSnap);
         return;
       }

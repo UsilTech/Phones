@@ -72,7 +72,7 @@ export function useSeoMeta({
     upsertMetaTag('name', 'description', resolvedDescription);
 
     // Robots & Googlebot Rich Snippet directives
-    const isAdminRoute = pathname.startsWith('/admin') || pathname.includes('tab=admin');
+    const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
     const robotsDirective = isAdminRoute
       ? 'noindex, nofollow'
       : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
