@@ -4,9 +4,13 @@ import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import zlib from 'zlib';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
 import type { Phone, Brand, Article, Review, AdSettings, WebsiteContent, MediaItem } from './types/index.ts';
+
+declare const __EMBEDDED_CSS_GZ_B64__: string | undefined;
+declare const __EMBEDDED_JS_GZ_B64__: string | undefined;
 
 import { 
   INITIAL_PHONES, 
@@ -130,12 +134,102 @@ try {
 // Serve uploaded media and static assets with ETag revalidation so rebuilt CSS/JS bundles take effect immediately
 const DIST_ASSETS_DIR = path.resolve(APP_ROOT, 'dist', 'assets');
 const CPANEL_BUILD_ASSETS_DIR = path.resolve(APP_ROOT, 'cpanel_build', 'assets');
+
+let cachedCompiledCss = '';
+let cachedCompiledJs = '';
+
+function getCompiledProductionCss(): string {
+  if (cachedCompiledCss) return cachedCompiledCss;
+  const candidates = [
+    path.resolve(DIST_ASSETS_DIR, 'app-styles.css'),
+    path.resolve(CPANEL_BUILD_ASSETS_DIR, 'app-styles.css'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) {
+      try {
+        cachedCompiledCss = fs.readFileSync(c, 'utf-8');
+        if (cachedCompiledCss) return cachedCompiledCss;
+      } catch {}
+    }
+  }
+  try {
+    if (typeof __EMBEDDED_CSS_GZ_B64__ === 'string' && __EMBEDDED_CSS_GZ_B64__) {
+      cachedCompiledCss = zlib.gunzipSync(Buffer.from(__EMBEDDED_CSS_GZ_B64__, 'base64')).toString('utf-8');
+      return cachedCompiledCss;
+    }
+  } catch {}
+  return '';
+}
+
+function getCompiledProductionJs(): string {
+  if (cachedCompiledJs) return cachedCompiledJs;
+  const candidates = [
+    path.resolve(DIST_ASSETS_DIR, 'app-bundle.js'),
+    path.resolve(CPANEL_BUILD_ASSETS_DIR, 'app-bundle.js'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) {
+      try {
+        cachedCompiledJs = fs.readFileSync(c, 'utf-8');
+        if (cachedCompiledJs) return cachedCompiledJs;
+      } catch {}
+    }
+  }
+  try {
+    if (typeof __EMBEDDED_JS_GZ_B64__ === 'string' && __EMBEDDED_JS_GZ_B64__) {
+      cachedCompiledJs = zlib.gunzipSync(Buffer.from(__EMBEDDED_JS_GZ_B64__, 'base64')).toString('utf-8');
+      return cachedCompiledJs;
+    }
+  } catch {}
+  return '';
+}
+
+// Extensionless /api/ routes & /assets/ fallbacks so LiteSpeed Web Server on cPanel never 404s CSS or JS
+app.get(['/api/client-styles', '/assets/app-styles.css'], (_req: Request, res: Response, next) => {
+  const css = getCompiledProductionCss();
+  if (css) {
+    res.setHeader('Content-Type', 'text/css; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.send(css);
+  }
+  next();
+});
+
+app.get(['/api/client-bundle', '/assets/app-bundle.js'], (_req: Request, res: Response, next) => {
+  const js = getCompiledProductionJs();
+  if (js) {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.send(js);
+  }
+  next();
+});
+
 app.use('/assets', express.static(DIST_ASSETS_DIR, { maxAge: 0, etag: true, lastModified: true }));
 app.use('/assets', express.static(CPANEL_BUILD_ASSETS_DIR, { maxAge: 0, etag: true, lastModified: true }));
 app.use('/uploads', express.static(PUBLIC_UPLOADS_DIR, { maxAge: '7d', etag: true }));
 app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d', etag: true }));
 app.use('/assets', express.static(path.resolve(APP_ROOT, 'public', 'assets'), { maxAge: '7d', etag: true }));
 app.use('/src/assets', express.static(path.resolve(APP_ROOT, 'src', 'assets'), { maxAge: '7d', etag: true }));
+
+// Fallback if browser requests any hashed /assets/index-*.js or /assets/index-*.css
+app.get('/assets/:assetFile', (req: Request, res: Response, next) => {
+  const assetFile = String(req.params.assetFile || '');
+  if (assetFile.endsWith('.js')) {
+    const js = getCompiledProductionJs();
+    if (js) {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      return res.send(js);
+    }
+  } else if (assetFile.endsWith('.css')) {
+    const css = getCompiledProductionCss();
+    if (css) {
+      res.setHeader('Content-Type', 'text/css; charset=utf-8');
+      return res.send(css);
+    }
+  }
+  next();
+});
 
 // Persistent JSON File Storage (survives Phusion Passenger restarts on cPanel)
 const DATA_DIR = path.resolve(APP_ROOT, 'data');
@@ -2550,8 +2644,31 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
   // Replace noscript snapshot
   html = html.replace(
     /<noscript\s+id="seo-crawler-snapshot">[\s\S]*?<\/noscript>/i,
-    fullNoscriptSnapshot
+    () => fullNoscriptSnapshot
   );
+
+  // In production / cPanel mode, inline compiled CSS directly into <head> and load JS via /api/client-bundle
+  // so LiteSpeed Web Server static file rules in public_html can never 404 CSS or JS assets!
+  const isProdOrCpanel = process.env.npm_lifecycle_event !== 'dev' || process.env.CPANEL_MODE === '1';
+  if (isProdOrCpanel) {
+    const prodCss = getCompiledProductionCss();
+    if (prodCss && !html.includes('id="gsmscope-inline-css"')) {
+      const safeCss = prodCss.replace(/<\/style/gi, '<\\/style');
+      html = html.replace('</head>', () => `  <style id="gsmscope-inline-css">${safeCss}</style>\n  </head>`);
+    }
+    const bundleScriptTag = `<script defer src="/api/client-bundle?v=cpanel" onerror="var s=document.createElement('script');s.src='/assets/app-bundle.js';document.head.appendChild(s);"></script>`;
+    if (/<script\s+type="module"\s+src="\/src\/main\.tsx"><\/script>/i.test(html)) {
+      html = html.replace(
+        /<script\s+type="module"\s+src="\/src\/main\.tsx"><\/script>/i,
+        () => bundleScriptTag
+      );
+    } else if (/<script\s+defer\s+src="\/assets\/[^"]+"><\/script>/i.test(html)) {
+      html = html.replace(
+        /<script\s+defer\s+src="\/assets\/[^"]+"><\/script>/i,
+        () => bundleScriptTag
+      );
+    }
+  }
 
   return html;
 }

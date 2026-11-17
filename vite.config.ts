@@ -6,6 +6,7 @@ import * as lightningcss from 'lightningcss';
 import path from 'path';
 import postcss from 'postcss';
 import { defineConfig } from 'vite';
+import zlib from 'zlib';
 
 function transformModernSelectors(selector: string): string {
   let s = selector;
@@ -433,14 +434,24 @@ export default defineConfig(() => {
         // In production build, convert all CSS assets (unwrap @layer + convert oklch to hex/rgba)
         // and compile the JS bundle into a universal classic IIFE script that runs on Chrome 55/59/79+ AND modern browsers without <script type="module">
         generateBundle(_options, bundle) {
+          let compiledCssText = '';
           for (const [fileName, asset] of Object.entries(bundle)) {
             if (fileName.endsWith('.css') && asset.type === 'asset') {
               const rawSource =
                 typeof asset.source === 'string'
                   ? asset.source
                   : Buffer.from(asset.source).toString('utf-8');
-              asset.source = transformCssForAllBrowsers(rawSource, fileName);
+              const transformedCss = transformCssForAllBrowsers(rawSource, fileName);
+              asset.source = transformedCss;
+              compiledCssText += transformedCss + '\n';
             }
+          }
+          if (compiledCssText) {
+            this.emitFile({
+              type: 'asset',
+              fileName: 'assets/app-styles.css',
+              source: compiledCssText,
+            });
           }
 
           // Build a self-contained classic IIFE bundle (no ES module import/export syntax) so browsers without <script type="module"> (like Chrome 59) run it directly
@@ -504,6 +515,26 @@ export default defineConfig(() => {
           // and sync functions/_seed.js for Cloudflare Workers / Pages Functions
           try {
             const rootDir = path.resolve(import.meta.dirname || '.', '.');
+            const distDir = path.resolve(rootDir, 'dist');
+            const cpanelBuildDir = path.resolve(rootDir, 'cpanel_build');
+
+            let embeddedCssGzB64 = '';
+            let embeddedJsGzB64 = '';
+            const builtCssPath = path.resolve(distDir, 'assets', 'app-styles.css');
+            const builtJsPath = path.resolve(distDir, 'assets', 'app-bundle.js');
+            if (fs.existsSync(builtCssPath)) {
+              embeddedCssGzB64 = zlib.gzipSync(fs.readFileSync(builtCssPath)).toString('base64');
+            }
+            if (fs.existsSync(builtJsPath)) {
+              embeddedJsGzB64 = zlib.gzipSync(fs.readFileSync(builtJsPath)).toString('base64');
+            }
+
+            // Copy built dist/index.html and dist/assets/* into /cpanel_build so GitHub exports always include the compiled production frontend
+            if (fs.existsSync(distDir)) {
+              fs.rmSync(cpanelBuildDir, { recursive: true, force: true });
+              fs.cpSync(distDir, cpanelBuildDir, { recursive: true });
+            }
+
             const cjsOutPath = path.resolve(rootDir, 'app.cjs');
             esbuild.buildSync({
               entryPoints: [path.resolve(rootDir, 'src/server-main.ts')],
@@ -523,19 +554,13 @@ export default defineConfig(() => {
               ],
               define: {
                 'process.env.CPANEL_MODE': '"1"',
+                '__EMBEDDED_CSS_GZ_B64__': JSON.stringify(embeddedCssGzB64),
+                '__EMBEDDED_JS_GZ_B64__': JSON.stringify(embeddedJsGzB64),
               },
               logLevel: 'silent',
             });
             // Copy identical self-contained CommonJS bundle to app.js so cPanel default startup file (app.js) works with require()
             fs.copyFileSync(cjsOutPath, path.resolve(rootDir, 'app.js'));
-
-            // Copy built dist/index.html and dist/assets/* into /cpanel_build so GitHub exports always include the compiled production frontend
-            const distDir = path.resolve(rootDir, 'dist');
-            const cpanelBuildDir = path.resolve(rootDir, 'cpanel_build');
-            if (fs.existsSync(distDir)) {
-              fs.rmSync(cpanelBuildDir, { recursive: true, force: true });
-              fs.cpSync(distDir, cpanelBuildDir, { recursive: true });
-            }
 
             const dbJsonPath = path.resolve(rootDir, 'data', 'database.json');
             const functionsDir = path.resolve(rootDir, 'functions');
