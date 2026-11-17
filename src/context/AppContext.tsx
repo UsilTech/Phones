@@ -589,27 +589,24 @@ const SEED_PHONE_IMAGE_MAP = new Map<string, string>(
   INITIAL_PHONES.map((p) => [p.id, p.image])
 );
 
+function isCurrentSessionAdmin(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return (
+      localStorage.getItem('gsmscope_admin_auth') === 'true' ||
+      sessionStorage.getItem('gsmscope_admin_auth') === 'true'
+    );
+  } catch {
+    return false;
+  }
+}
+
 function mergePhonesAndSync(
   localPhones: Phone[],
   apiPhones: Phone[],
   mediaItems?: MediaItem[]
 ): Phone[] {
-  const deletedPhoneIds = getDeletedPhoneIds();
-  const normalizedLocal = localPhones
-    .filter((p) => p && !deletedPhoneIds.has(p.id))
-    .map(normalizePhoneRecord);
-  const normalizedApi: Phone[] = [];
-  for (const rawApiPhone of apiPhones) {
-    if (!rawApiPhone) continue;
-    if (deletedPhoneIds.has(rawApiPhone.id)) {
-      deletePhoneApi(rawApiPhone.id).catch(() => {});
-      continue;
-    }
-    normalizedApi.push(normalizePhoneRecord(rawApiPhone));
-  }
-
-  const apiById = new Map(normalizedApi.map((p) => [p.id, p]));
-  const localById = new Map(normalizedLocal.map((p) => [p.id, p]));
+  const isAdmin = isCurrentSessionAdmin();
 
   // Map of latest user-uploaded media assigned to a phone
   const assignedMediaByPhoneId = new Map<string, string>();
@@ -627,12 +624,69 @@ function mergePhonesAndSync(
     }
   }
 
+  // For public visitors (!isAdmin), server apiPhones is 100% authoritative — never overwrite server data with visitor localStorage
+  if (!isAdmin) {
+    const serverPhones = apiPhones
+      .filter(Boolean)
+      .map((raw) => {
+        const norm = normalizePhoneRecord(raw);
+        const assignedUrl = assignedMediaByPhoneId.get(norm.id);
+        const seedImg = SEED_PHONE_IMAGE_MAP.get(norm.id);
+        if (assignedUrl && (!norm.image || norm.image === seedImg)) {
+          return normalizePhoneRecord({
+            ...norm,
+            image: assignedUrl,
+            images: [assignedUrl, ...(norm.images || []).filter((u) => u !== assignedUrl)],
+          });
+        }
+        return norm;
+      });
+
+    const customServerPhones: Phone[] = [];
+    const remainingServerPhones: Phone[] = [];
+    const seen = new Set<string>();
+    for (const p of serverPhones) {
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
+      if (!SEED_PHONE_IDS.has(p.id)) {
+        customServerPhones.push(p);
+      } else {
+        remainingServerPhones.push(p);
+      }
+    }
+    customServerPhones.sort((a, b) => {
+      const tsB = getRecordTimestamp(b);
+      const tsA = getRecordTimestamp(a);
+      if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+      return 0;
+    });
+    const finalVisitorPhones = [...customServerPhones, ...remainingServerPhones];
+    safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(finalVisitorPhones));
+    return finalVisitorPhones;
+  }
+
+  const deletedPhoneIds = getDeletedPhoneIds();
+  const normalizedLocal = localPhones
+    .filter((p) => p && !deletedPhoneIds.has(p.id))
+    .map(normalizePhoneRecord);
+  const normalizedApi: Phone[] = [];
+  for (const rawApiPhone of apiPhones) {
+    if (!rawApiPhone) continue;
+    if (deletedPhoneIds.has(rawApiPhone.id)) {
+      deletePhoneApi(rawApiPhone.id).catch(() => {});
+      continue;
+    }
+    normalizedApi.push(normalizePhoneRecord(rawApiPhone));
+  }
+
+  const apiById = new Map(normalizedApi.map((p) => [p.id, p]));
+  const localById = new Map(normalizedLocal.map((p) => [p.id, p]));
   const mergedById = new Map<string, Phone>();
 
   for (const localPhone of normalizedLocal) {
     const apiPhone = apiById.get(localPhone.id);
     if (!apiPhone) {
-      // Locally created phone not yet on backend -> push to backend
+      // Locally created phone in Admin browser not yet on backend -> push to backend
       createPhoneApi(localPhone).catch(() => {});
       mergedById.set(localPhone.id, localPhone);
       continue;
@@ -671,7 +725,6 @@ function mergePhonesAndSync(
       featuredAt: (localPhone as any).featuredAt || (apiPhone as any).featuredAt,
     });
 
-    // If local state has a newer/custom image, specs, or featured status not yet reflected on the backend, push to backend
     if (JSON.stringify(mergedPhone) !== JSON.stringify(apiPhone)) {
       updatePhoneApi(mergedPhone.id, mergedPhone).catch(() => {});
     }
@@ -686,9 +739,6 @@ function mergePhonesAndSync(
     }
   }
 
-  // Order:
-  // 1. Newly added custom phones (not in SEED_PHONE_IDS) first, sorted newest-first
-  // 2. Remaining seed phones in local/API order
   const customPhones: Phone[] = [];
   const seenIds = new Set<string>();
 
@@ -765,6 +815,13 @@ function saveDeletedBrandKeys(keysSet: Set<string>): void {
 }
 
 function mergeBrandsAndSync(localBrands: Brand[], apiBrands: Brand[]): Brand[] {
+  const isAdmin = isCurrentSessionAdmin();
+  if (!isAdmin) {
+    const cleanApiBrands = apiBrands.filter(Boolean);
+    safeSetLocalStorage('gsmscope_brands_v3', JSON.stringify(cleanApiBrands));
+    return cleanApiBrands;
+  }
+
   const result: Brand[] = [];
   const seenKeys = new Set<string>();
   const deletedKeys = getDeletedBrandKeys();
@@ -813,7 +870,6 @@ function mergeBrandsAndSync(localBrands: Brand[], apiBrands: Brand[]): Brand[] {
     }
   }
 
-  // Also include any custom brands present in localBrands that weren't in apiBrands (e.g. after container restart)
   for (const lb of localBrands) {
     if (!lb) continue;
     const keys = getBrandKeys(lb);
@@ -897,22 +953,7 @@ function mergeArticlesAndSync(
   apiArticles: Article[],
   mediaItems?: MediaItem[]
 ): Article[] {
-  const deletedIds = getDeletedArticleIds();
-  const normalizedLocal = localArticles
-    .filter((a) => a && !deletedIds.has(a.id))
-    .map(normalizeArticleRecord);
-  const normalizedApi: Article[] = [];
-  for (const rawApiArt of apiArticles) {
-    if (!rawApiArt) continue;
-    if (deletedIds.has(rawApiArt.id)) {
-      deleteArticleApi(rawApiArt.id).catch(() => {});
-      continue;
-    }
-    normalizedApi.push(normalizeArticleRecord(rawApiArt));
-  }
-
-  const apiById = new Map(normalizedApi.map((a) => [a.id, a]));
-  const localById = new Map(normalizedLocal.map((a) => [a.id, a]));
+  const isAdmin = isCurrentSessionAdmin();
 
   const assignedMediaByArticleId = new Map<string, string>();
   if (Array.isArray(mediaItems)) {
@@ -929,6 +970,57 @@ function mergeArticlesAndSync(
     }
   }
 
+  // For public visitors (!isAdmin), server apiArticles is 100% authoritative
+  if (!isAdmin) {
+    const serverArticles = apiArticles
+      .filter(Boolean)
+      .map((raw) => {
+        const norm = normalizeArticleRecord(raw);
+        const assignedUrl = assignedMediaByArticleId.get(norm.id);
+        if (assignedUrl && (!norm.coverImage || norm.coverImage === FALLBACK_ARTICLE_IMAGE)) {
+          return normalizeArticleRecord({ ...norm, coverImage: assignedUrl });
+        }
+        return norm;
+      });
+    const customServerArts: Article[] = [];
+    const seedServerArts: Article[] = [];
+    const seen = new Set<string>();
+    for (const a of serverArticles) {
+      if (seen.has(a.id)) continue;
+      seen.add(a.id);
+      if (!SEED_ARTICLE_IDS.has(a.id)) {
+        customServerArts.push(a);
+      } else {
+        seedServerArts.push(a);
+      }
+    }
+    customServerArts.sort((a, b) => {
+      const tsB = getRecordTimestamp(b);
+      const tsA = getRecordTimestamp(a);
+      if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+      return 0;
+    });
+    const finalVisitorArts = [...customServerArts, ...seedServerArts];
+    safeSetLocalStorage('gsmscope_articles_v2', JSON.stringify(finalVisitorArts));
+    return finalVisitorArts;
+  }
+
+  const deletedIds = getDeletedArticleIds();
+  const normalizedLocal = localArticles
+    .filter((a) => a && !deletedIds.has(a.id))
+    .map(normalizeArticleRecord);
+  const normalizedApi: Article[] = [];
+  for (const rawApiArt of apiArticles) {
+    if (!rawApiArt) continue;
+    if (deletedIds.has(rawApiArt.id)) {
+      deleteArticleApi(rawApiArt.id).catch(() => {});
+      continue;
+    }
+    normalizedApi.push(normalizeArticleRecord(rawApiArt));
+  }
+
+  const apiById = new Map(normalizedApi.map((a) => [a.id, a]));
+  const localById = new Map(normalizedLocal.map((a) => [a.id, a]));
   const mergedById = new Map<string, Article>();
 
   for (const localArt of normalizedLocal) {
@@ -974,7 +1066,6 @@ function mergeArticlesAndSync(
     }
   }
 
-  // Ensure any seed articles/guides from INITIAL_ARTICLES not yet in mergedById (unless deleted) are included
   try {
     for (const seedArt of INITIAL_ARTICLES) {
       if (!mergedById.has(seedArt.id) && !deletedIds.has(seedArt.id)) {
@@ -985,9 +1076,6 @@ function mergeArticlesAndSync(
     }
   } catch {}
 
-  // Order:
-  // 1. Newly added/published custom articles (!SEED_ARTICLE_IDS) first, sorted newest-first
-  // 2. Seed articles in order
   const customArticles: Article[] = [];
   const seedArticles: Article[] = [];
   const seenIds = new Set<string>();
@@ -1039,6 +1127,20 @@ function mergeArticlesAndSync(
 }
 
 function mergeReviewsAndSync(localReviews: Review[], apiReviews: Review[]): Review[] {
+  const isAdmin = isCurrentSessionAdmin();
+  if (!isAdmin) {
+    const apiIds = new Set(apiReviews.filter(Boolean).map((r) => r.id));
+    const visitorCustomUnsubmitted = localReviews.filter(
+      (r) => r && !SEED_REVIEW_IDS.has(r.id) && !apiIds.has(r.id)
+    );
+    for (const rev of visitorCustomUnsubmitted) {
+      submitReviewApi(rev as any).catch(() => {});
+    }
+    const combinedVisitor = [...visitorCustomUnsubmitted, ...apiReviews.filter(Boolean)];
+    safeSetLocalStorage('gsmscope_reviews_v2', JSON.stringify(combinedVisitor));
+    return combinedVisitor;
+  }
+
   const deletedReviewIds = getDeletedReviewIds();
   const filteredLocal = localReviews.filter((r) => r && !deletedReviewIds.has(r.id));
   const filteredApi: Review[] = [];
@@ -1524,6 +1626,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     apiRaw: Partial<AdSettings> | null | undefined,
     mediaItems?: MediaItem[]
   ): AdSettings => {
+    const isAdmin = isCurrentSessionAdmin();
+    const apiNorm = normalizeAdSettings(apiRaw || INITIAL_AD_SETTINGS, mediaItems);
+
+    if (!isAdmin && apiRaw) {
+      safeSetLocalStorage('gsmscope_ads_v3', JSON.stringify(apiNorm));
+      return apiNorm;
+    }
+
     let savedLocalParsed: Partial<AdSettings> | null = null;
     let wasLocallySavedByAdmin = false;
     try {
@@ -1536,7 +1646,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const localNorm = normalizeAdSettings(savedLocalParsed || currentState || INITIAL_AD_SETTINGS, mediaItems);
     const stateNorm = normalizeAdSettings(currentState || localNorm, mediaItems);
-    const apiNorm = normalizeAdSettings(apiRaw || INITIAL_AD_SETTINGS, mediaItems);
 
     // Pick whichever local source (React state vs localStorage) is newer or has active edits
     const effectiveLocal =
@@ -1618,18 +1727,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         updatedAt:
           (useLocalGlobal ? effectiveLocal.updatedAt : apiNorm.updatedAt) ||
           effectiveLocal.updatedAt ||
-          apiNorm.updatedAt ||
-          new Date().toISOString(),
+          apiNorm.updatedAt,
       },
       mediaItems
     );
 
     safeSetLocalStorage('gsmscope_ads_v3', JSON.stringify(mergedAds));
-    if (localHasCustomizations) {
+    if (localHasCustomizations && isAdmin) {
       safeSetLocalStorage('gsmscope_ads_admin_saved_v1', 'true');
     }
 
-    if (needsServerPush && localHasCustomizations) {
+    if (needsServerPush && localHasCustomizations && isAdmin) {
       updateAdSettingsApi(mergedAds).catch(() => {});
     }
 
@@ -1670,6 +1778,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     currentState: Partial<WebsiteContent> | null | undefined,
     apiRaw: Partial<WebsiteContent> | null | undefined
   ): WebsiteContent => {
+    const isAdmin = isCurrentSessionAdmin();
+    const apiNorm = normalizeWebsiteContent(apiRaw);
+
+    if (!isAdmin && apiRaw) {
+      safeSetLocalStorage('gsmscope_website_content_v1', JSON.stringify(apiNorm));
+      return apiNorm;
+    }
+
     let savedLocal: Partial<WebsiteContent> | null = null;
     let wasAdminSaved = false;
     try {
@@ -1680,7 +1796,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {}
 
-    const apiNorm = normalizeWebsiteContent(apiRaw);
     const localSource = savedLocal || currentState || {};
     const localUpdatedAt = (localSource as any)?.updatedAt as string | undefined;
     const apiUpdatedAt = (apiRaw as any)?.updatedAt as string | undefined;
@@ -1693,13 +1808,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     (Object.keys(localSource) as Array<keyof WebsiteContent>).forEach((key) => {
       const localVal = (localSource as any)[key];
       const defaultVal = (INITIAL_WEBSITE_CONTENT as any)[key];
-      const apiVal = (apiNorm as any)[key];
       if (localVal !== undefined && localVal !== null && localVal !== '') {
         if (preferLocal || JSON.stringify(localVal) !== JSON.stringify(defaultVal)) {
           (customOverrides as any)[key] = localVal;
-          if (JSON.stringify(localVal) !== JSON.stringify(apiVal)) {
-            // Will trigger server sync below
-          }
         }
       }
     });
@@ -1714,7 +1825,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     safeSetLocalStorage('gsmscope_website_content_v1', JSON.stringify(merged));
 
-    if (JSON.stringify(merged) !== JSON.stringify(apiNorm)) {
+    if (isAdmin && JSON.stringify(merged) !== JSON.stringify(apiNorm)) {
       updateWebsiteContentApi(merged).catch(() => {});
     }
 
@@ -2453,14 +2564,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     safeSetLocalStorage('gsmscope_media_library_v1', JSON.stringify(mediaLibrary));
   }, [mediaLibrary]);
 
-  // Synchronize state with IndexedDB vault + full-stack Express backend APIs on mount without losing any admin edits or uploaded images
+  // Synchronize state with IndexedDB vault + full-stack backend APIs on mount without losing any admin edits or uploaded images
   useEffect(() => {
     let isMounted = true;
     async function loadBackendData() {
       try {
-        // 1. Hydrate from high-capacity IndexedDB vault first (recovers data even if localStorage hit its 5MB limit)
+        const isAdmin = isCurrentSessionAdmin();
+
+        // 1. Hydrate from high-capacity IndexedDB vault first when in Admin session (recovers data even if localStorage hit its 5MB limit)
         const idbVault = await loadVaultFromIndexedDB();
-        if (isMounted && idbVault && Object.keys(idbVault).length > 0) {
+        if (isMounted && isAdmin && idbVault && Object.keys(idbVault).length > 0) {
           const idbMedia: MediaItem[] | undefined = Array.isArray(idbVault.mediaLibrary)
             ? idbVault.mediaLibrary
             : undefined;
@@ -2520,12 +2633,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // 2. Sync cached uploadDataUrls & mediaLibrary to the Express server so /uploads/... files self-heal after republish
-        const cachedUploads = getAllCachedUploadDataUrls();
-        if (Object.keys(cachedUploads).length > 0) {
-          await syncVaultWithServerApi({
-            uploadDataUrls: cachedUploads,
-          });
+        // 2. Sync cached uploadDataUrls & mediaLibrary to the backend server when in Admin session
+        if (isAdmin) {
+          const cachedUploads = getAllCachedUploadDataUrls();
+          if (Object.keys(cachedUploads).length > 0) {
+            await syncVaultWithServerApi({
+              uploadDataUrls: cachedUploads,
+            });
+          }
         }
 
         // 3. Fetch and merge with backend API
@@ -2562,15 +2677,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setMediaLibraryState(prev => {
               const apiIds = new Set(apiMedia.map(m => m.id));
               const apiUrls = new Set(apiMedia.map(m => m.url));
-              const localOnly = prev.filter(
-                m =>
-                  !apiIds.has(m.id) &&
-                  !apiUrls.has(m.url) &&
-                  typeof m.url === 'string' &&
-                  !m.url.includes('/assets/aistudio/IMG_') &&
-                  !m.url.includes('phone_galaxy_s24_ultra.png')
-              );
-              // Re-sync any local uploaded media back to the backend if the container restarted
+              const localOnly = isAdmin
+                ? prev.filter(
+                    m =>
+                      !apiIds.has(m.id) &&
+                      !apiUrls.has(m.url) &&
+                      typeof m.url === 'string' &&
+                      !m.url.includes('/assets/aistudio/IMG_') &&
+                      !m.url.includes('phone_galaxy_s24_ultra.png')
+                  )
+                : [];
               for (const localItem of localOnly) {
                 if (localItem.dataUrl && localItem.url.startsWith('/uploads/')) {
                   registerUploadDataUrl(localItem.url, localItem.dataUrl);
@@ -2823,6 +2939,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       } catch {}
       adminLoginApi(username, password).catch(() => {});
+      syncVaultWithServerApi({ uploadDataUrls: getAllCachedUploadDataUrls() }).catch(() => {});
+      setTimeout(() => {
+        refreshData().catch(() => {});
+      }, 50);
       return {
         success: true,
         message: matchedCustomUser
@@ -2859,6 +2979,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('gsmscope_admin_auth', 'true');
       } catch {}
       adminVerifyOtpApi(trimmed).catch(() => {});
+      syncVaultWithServerApi({ uploadDataUrls: getAllCachedUploadDataUrls() }).catch(() => {});
+      setTimeout(() => {
+        refreshData().catch(() => {});
+      }, 50);
       return { success: true, message: 'OTP verified successfully. Administrator session activated.' };
     }
     return { success: false, message: 'Incorrect 6-digit OTP code. Please check and try again.' };

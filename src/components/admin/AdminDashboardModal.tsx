@@ -984,6 +984,17 @@ export default function AdminDashboardModal() {
 
   useEffect(() => {
     syncLiveAdminCollections();
+    const intervalId = setInterval(() => {
+      if (document.visibilityState !== 'hidden') {
+        syncLiveAdminCollections();
+      }
+    }, 15000);
+    const handleWindowFocus = () => syncLiveAdminCollections();
+    window.addEventListener('focus', handleWindowFocus);
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
   }, [syncLiveAdminCollections, isAdminAuthenticated, activeTab, section]);
 
   useEffect(() => {

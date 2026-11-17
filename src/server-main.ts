@@ -416,6 +416,18 @@ let deletedReviewIdsDatabase = new Set<string>();
 let deletedBrandKeysDatabase = new Set<string>(['nothing', 'brand-nothing']);
 let deletedInquiryIdsDatabase = new Set<string>();
 let cachedEtherealTransporter: any = null;
+let lastLoadedDbMtimeMs = 0;
+let lastLoadedDbSize = 0;
+
+function updateLastLoadedDbStat(): void {
+  try {
+    if (fs.existsSync(DB_FILE_PATH)) {
+      const st = fs.statSync(DB_FILE_PATH);
+      lastLoadedDbMtimeMs = st.mtimeMs;
+      lastLoadedDbSize = st.size;
+    }
+  } catch {}
+}
 
 function saveDatabaseToDisk(): void {
   try {
@@ -447,6 +459,7 @@ function saveDatabaseToDisk(): void {
     const tempFile = `${DB_FILE_PATH}.tmp`;
     fs.writeFileSync(tempFile, serialized, 'utf-8');
     fs.renameSync(tempFile, DB_FILE_PATH);
+    updateLastLoadedDbStat();
     try {
       if (!fs.existsSync(HOME_BACKUP_DATA_DIR)) {
         fs.mkdirSync(HOME_BACKUP_DATA_DIR, { recursive: true });
@@ -482,6 +495,7 @@ function saveDatabaseToDisk(): void {
         2
       );
       fs.writeFileSync(DB_FILE_PATH, fallbackSerialized, 'utf-8');
+      updateLastLoadedDbStat();
       try {
         if (!fs.existsSync(HOME_BACKUP_DATA_DIR)) {
           fs.mkdirSync(HOME_BACKUP_DATA_DIR, { recursive: true });
@@ -494,12 +508,20 @@ function saveDatabaseToDisk(): void {
   }
 }
 
-function loadDatabaseFromDisk(): void {
+function loadDatabaseFromDisk(silent = false): void {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    if (!fs.existsSync(DB_FILE_PATH)) {
+    if (fs.existsSync(HOME_BACKUP_DB_PATH) && fs.existsSync(DB_FILE_PATH)) {
+      try {
+        const backupStat = fs.statSync(HOME_BACKUP_DB_PATH);
+        const mainStat = fs.statSync(DB_FILE_PATH);
+        if (backupStat.mtimeMs > mainStat.mtimeMs + 50 && backupStat.size > 100) {
+          fs.copyFileSync(HOME_BACKUP_DB_PATH, DB_FILE_PATH);
+        }
+      } catch {}
+    } else if (!fs.existsSync(DB_FILE_PATH)) {
       if (fs.existsSync(HOME_BACKUP_DB_PATH)) {
         try {
           fs.copyFileSync(HOME_BACKUP_DB_PATH, DB_FILE_PATH);
@@ -516,6 +538,7 @@ function loadDatabaseFromDisk(): void {
     if (fs.existsSync(DB_FILE_PATH)) {
       const raw = fs.readFileSync(DB_FILE_PATH, 'utf-8');
       const parsed = JSON.parse(raw) as Partial<PersistentDatabaseSchema>;
+      updateLastLoadedDbStat();
       if (parsed.uploadDataUrls && typeof parsed.uploadDataUrls === 'object') {
         uploadDataUrlsDatabase = { ...parsed.uploadDataUrls };
       }
@@ -663,14 +686,45 @@ function loadDatabaseFromDisk(): void {
       if (Array.isArray(parsed.confirmationEmailsLog)) {
         confirmationEmailsLog = parsed.confirmationEmailsLog;
       }
-      console.log(`[Database Persistence] Loaded ${phonesDatabase.length} phones, ${articlesDatabase.length} articles, ${mediaDatabase.length} media items from data/database.json`);
+      if (!silent) {
+        console.log(`[Database Persistence] Loaded ${phonesDatabase.length} phones, ${articlesDatabase.length} articles, ${mediaDatabase.length} media items from data/database.json`);
+      }
     } else {
       saveDatabaseToDisk();
-      console.log('[Database Persistence] Initialized new data/database.json with seed data');
+      if (!silent) {
+        console.log('[Database Persistence] Initialized new data/database.json with seed data');
+      }
     }
   } catch (err) {
-    console.warn('[Database Persistence] Could not read data/database.json, using default seed data:', err);
+    if (!silent) {
+      console.warn('[Database Persistence] Could not read data/database.json, using default seed data:', err);
+    }
   }
+}
+
+function syncDatabaseFromDiskIfChanged(): void {
+  try {
+    let shouldReload = false;
+    if (fs.existsSync(HOME_BACKUP_DB_PATH) && fs.existsSync(DB_FILE_PATH)) {
+      try {
+        const backupStat = fs.statSync(HOME_BACKUP_DB_PATH);
+        const mainStat = fs.statSync(DB_FILE_PATH);
+        if (backupStat.mtimeMs > mainStat.mtimeMs + 50 && backupStat.size > 100) {
+          fs.copyFileSync(HOME_BACKUP_DB_PATH, DB_FILE_PATH);
+          shouldReload = true;
+        }
+      } catch {}
+    }
+    if (fs.existsSync(DB_FILE_PATH)) {
+      const st = fs.statSync(DB_FILE_PATH);
+      if (st.mtimeMs !== lastLoadedDbMtimeMs || st.size !== lastLoadedDbSize) {
+        shouldReload = true;
+      }
+    }
+    if (shouldReload) {
+      loadDatabaseFromDisk(true);
+    }
+  } catch {}
 }
 
 function restoreUploadsFromDatabase(): void {
@@ -743,6 +797,17 @@ function restoreUploadsFromDatabase(): void {
 loadDatabaseFromDisk();
 setImmediate(() => {
   restoreUploadsFromDatabase();
+});
+
+// Synchronize database state across multiple cPanel LiteSpeed Node.js workers & PHP API gateway on every /api/* request
+app.use('/api', (req: Request, res: Response, next) => {
+  const p = req.path || '';
+  if (p !== '/client-styles' && p !== '/client-bundle' && !p.startsWith('/uploads/')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    syncDatabaseFromDiskIfChanged();
+  }
+  next();
 });
 
 // Dynamic fallback for /uploads/:filename and /api/uploads/:filename on cPanel & Node.js
@@ -1879,7 +1944,7 @@ app.post('/api/contact', (req: Request, res: Response) => {
     subject: (subject || 'General Inquiry').trim(),
     message: String(message).trim(),
     createdAt: createdAt || new Date().toISOString(),
-    status: (status === 'unread' || status === 'replied' ? status : 'read') as 'unread' | 'read' | 'replied',
+    status: (status === 'read' || status === 'replied' ? status : 'unread') as 'unread' | 'read' | 'replied',
     ...(replied !== undefined ? { replied: Boolean(replied) } : {}),
     ...(repliedAt ? { repliedAt: String(repliedAt) } : {}),
     ...(replySubject ? { replySubject: String(replySubject) } : {}),

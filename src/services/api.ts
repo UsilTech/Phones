@@ -405,7 +405,7 @@ export async function submitContactInquiryApi(data: {
     subject: (data.subject || 'General Inquiry').trim(),
     message: (data.message || '').trim(),
     createdAt: new Date().toISOString(),
-    status: 'read'
+    status: 'unread'
   };
 
   const persistInquiryLocally = (inquiryToSave: ContactInquiry) => {
@@ -427,7 +427,8 @@ export async function submitContactInquiryApi(data: {
       body: JSON.stringify({
         ...data,
         id: fallbackInquiry.id,
-        createdAt: fallbackInquiry.createdAt
+        createdAt: fallbackInquiry.createdAt,
+        status: 'unread'
       })
     });
     const json = await res.json().catch(() => null);
@@ -703,18 +704,24 @@ export async function syncContactInquiriesWithServer(
 ): Promise<ContactInquiry[]> {
   let localList: ContactInquiry[] = [];
   let deletedIds = new Set<string>();
+  let isAdmin = false;
 
   if (typeof window !== 'undefined') {
     try {
+      isAdmin =
+        localStorage.getItem('gsmscope_admin_auth') === 'true' ||
+        sessionStorage.getItem('gsmscope_admin_auth') === 'true';
       const localRaw = localStorage.getItem('gsmscope_contact_inquiries_v1');
       if (localRaw) {
         const parsed = JSON.parse(localRaw);
         if (Array.isArray(parsed)) localList = parsed.filter((i) => i && i.id);
       }
-      const deletedRaw = localStorage.getItem('gsmscope_deleted_inquiry_ids_v1');
-      if (deletedRaw) {
-        const parsedDel = JSON.parse(deletedRaw);
-        if (Array.isArray(parsedDel)) deletedIds = new Set<string>(parsedDel);
+      if (isAdmin) {
+        const deletedRaw = localStorage.getItem('gsmscope_deleted_inquiry_ids_v1');
+        if (deletedRaw) {
+          const parsedDel = JSON.parse(deletedRaw);
+          if (Array.isArray(parsedDel)) deletedIds = new Set<string>(parsedDel);
+        }
       }
     } catch {}
   }
@@ -729,7 +736,7 @@ export async function syncContactInquiriesWithServer(
   const serverById = new Map<string, ContactInquiry>();
   for (const sItem of serverData) {
     if (!sItem || !sItem.id) continue;
-    if (deletedIds.has(sItem.id)) {
+    if (isAdmin && deletedIds.has(sItem.id)) {
       fetch(`/api/contact/${encodeURIComponent(sItem.id)}`, { method: 'DELETE' }).catch(() => {});
       continue;
     }
@@ -739,23 +746,29 @@ export async function syncContactInquiriesWithServer(
   const mergedById = new Map<string, ContactInquiry>();
 
   for (const locItem of localList) {
-    if (!locItem || !locItem.id || deletedIds.has(locItem.id)) continue;
+    if (!locItem || !locItem.id || (isAdmin && deletedIds.has(locItem.id))) continue;
     const srvItem = serverById.get(locItem.id);
     if (!srvItem) {
-      // Local message missing on server (e.g. after publish/container restart) -> re-sync to server
+      // Local message missing on server -> push to server
+      const toPush: ContactInquiry = {
+        ...locItem,
+        status: locItem.replied ? 'replied' : 'unread',
+      };
       fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(locItem),
+        body: JSON.stringify(toPush),
       }).catch(() => {});
-      mergedById.set(locItem.id, locItem);
-    } else {
+      mergedById.set(toPush.id, toPush);
+    } else if (isAdmin) {
       const merged: ContactInquiry = {
         ...srvItem,
         ...locItem,
         status:
           locItem.replied || srvItem.replied
             ? 'replied'
+            : srvItem.status === 'unread'
+            ? 'unread'
             : locItem.status === 'read' || srvItem.status === 'read'
             ? 'read'
             : 'unread',
@@ -772,6 +785,8 @@ export async function syncContactInquiriesWithServer(
         }).catch(() => {});
       }
       mergedById.set(merged.id, merged);
+    } else {
+      mergedById.set(srvItem.id, srvItem);
     }
   }
 
@@ -787,7 +802,7 @@ export async function syncContactInquiriesWithServer(
     return tsB - tsA;
   });
 
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && isAdmin) {
     try {
       safeSetLocalStorage('gsmscope_contact_inquiries_v1', JSON.stringify(combined));
     } catch {}
