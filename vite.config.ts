@@ -540,6 +540,9 @@ export default defineConfig(() => {
             const dbJsonPath = path.resolve(rootDir, 'data', 'database.json');
             const functionsDir = path.resolve(rootDir, 'functions');
             if (fs.existsSync(dbJsonPath)) {
+              if (fs.existsSync(cpanelBuildDir)) {
+                fs.copyFileSync(dbJsonPath, path.resolve(cpanelBuildDir, 'seed-database.json'));
+              }
               if (!fs.existsSync(functionsDir)) {
                 fs.mkdirSync(functionsDir, { recursive: true });
               }

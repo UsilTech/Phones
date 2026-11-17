@@ -346,6 +346,14 @@ function loadDatabaseFromDisk(): void {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
+    if (!fs.existsSync(DB_FILE_PATH)) {
+      const seedDbFallback = path.resolve(APP_ROOT, 'cpanel_build', 'seed-database.json');
+      if (fs.existsSync(seedDbFallback)) {
+        try {
+          fs.copyFileSync(seedDbFallback, DB_FILE_PATH);
+        } catch {}
+      }
+    }
     if (fs.existsSync(DB_FILE_PATH)) {
       const raw = fs.readFileSync(DB_FILE_PATH, 'utf-8');
       const parsed = JSON.parse(raw) as Partial<PersistentDatabaseSchema>;
