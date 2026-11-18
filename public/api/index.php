@@ -182,7 +182,7 @@ function loadDatabase() {
             'deletedPhoneIds' => array(),
             'deletedArticleIds' => array(),
             'deletedReviewIds' => array(),
-            'deletedBrandKeys' => array('nothing', 'brand-nothing'),
+            'deletedBrandKeys' => array(),
             'deletedInquiryIds' => array()
         );
     }
@@ -203,13 +203,37 @@ function loadDatabase() {
         'deletedPhoneIds' => array(),
         'deletedArticleIds' => array(),
         'deletedReviewIds' => array(),
-        'deletedBrandKeys' => array('nothing', 'brand-nothing'),
+        'deletedBrandKeys' => array(),
         'deletedInquiryIds' => array()
     );
     foreach ($defaults as $k => $v) {
         if (!isset($db[$k]) || !is_array($db[$k])) {
             $db[$k] = $v;
         }
+    }
+
+    $db['deletedBrandKeys'] = array_values(array_diff($db['deletedBrandKeys'], array('nothing', 'brand-nothing')));
+
+    $hasNothing = false;
+    foreach ($db['brands'] as $b) {
+        if ((isset($b['slug']) && strtolower($b['slug']) === 'nothing') || (isset($b['name']) && strtolower($b['name']) === 'nothing')) {
+            $hasNothing = true;
+            break;
+        }
+    }
+    if (!$hasNothing) {
+        $db['brands'][] = array(
+            'id' => 'brand-nothing',
+            'name' => 'Nothing',
+            'slug' => 'nothing',
+            'country' => 'United Kingdom (London)',
+            'description' => 'Design-first consumer technology brand iconic for transparent hardware aesthetics, the Glyph Interface LED notification system, and clean Nothing OS.',
+            'globalPresence' => 'Available across Europe, North America, Asia, Middle East, and authorized global retail partners.',
+            'popularSeries' => array('Phone (2) / Phone (3) Flagships', 'Phone (2a) / (2a) Plus Series', 'CMF by Nothing'),
+            'warrantyPartner' => 'Nothing Official Support & Authorized Service Partners',
+            'logoLetter' => 'N',
+            'accentBg' => 'bg-zinc-900'
+        );
     }
 
     if (!file_exists($DB_FILE)) {

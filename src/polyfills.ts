@@ -235,16 +235,22 @@
     if (typeof origElScrollBy === 'function') {
       Element.prototype.scrollBy = function (this: Element, arg1?: any, arg2?: any) {
         try {
-          if (arg1 && typeof arg1 === 'object' && arg1.behavior === 'instant') {
-            if (typeof arg1.top === 'number') this.scrollTop += arg1.top;
-            if (typeof arg1.left === 'number') this.scrollLeft += arg1.left;
-            return;
+          if (arg1 && typeof arg1 === 'object') {
+            if (arg1.behavior === 'instant') {
+              if (typeof arg1.top === 'number') this.scrollTop += arg1.top;
+              if (typeof arg1.left === 'number') this.scrollLeft += arg1.left;
+              return;
+            }
+            return origElScrollBy.call(this, arg1);
           }
-          return origElScrollBy.call(this, arg1, arg2);
+          return origElScrollBy.call(this, arg1 || 0, arg2 || 0);
         } catch {
           if (arg1 && typeof arg1 === 'object') {
             if (typeof arg1.top === 'number') this.scrollTop += arg1.top;
             if (typeof arg1.left === 'number') this.scrollLeft += arg1.left;
+          } else {
+            if (typeof arg1 === 'number') this.scrollLeft += arg1;
+            if (typeof arg2 === 'number') this.scrollTop += arg2;
           }
         }
       } as any;

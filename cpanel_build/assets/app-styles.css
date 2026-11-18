@@ -221,6 +221,7 @@
   --color-slate-900: #0f172b;
   --color-slate-950: #020618;
   --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
   --color-black: #000;
   --color-white: #fff;
   --spacing: .25rem;
@@ -356,6 +357,7 @@
   --color-slate-900: #0f172b;
   --color-slate-950: #020618;
   --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
   --color-black: #000;
   --color-white: #fff;
   --spacing: .25rem;
@@ -2774,6 +2776,10 @@ button:active:not(:disabled) {
 
 .bg-zinc-800 {
   background-color: var(--color-zinc-800);
+}
+
+.bg-zinc-900 {
+  background-color: var(--color-zinc-900);
 }
 
 .bg-gradient-to-b {

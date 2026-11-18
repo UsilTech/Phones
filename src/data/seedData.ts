@@ -276,6 +276,18 @@ export const INITIAL_BRANDS: Brand[] = [
     warrantyPartner: 'ZTE / nubia Authorized Customer Care Network',
     logoLetter: 'Z',
     accentBg: 'bg-blue-900'
+  },
+  {
+    id: 'brand-nothing',
+    name: 'Nothing',
+    slug: 'nothing',
+    country: 'United Kingdom (London)',
+    description: 'Design-first consumer technology brand iconic for transparent hardware aesthetics, the Glyph Interface LED notification system, and clean Nothing OS.',
+    globalPresence: 'Available across Europe, North America, Asia, Middle East, and authorized global retail partners.',
+    popularSeries: ['Phone (2) / Phone (3) Flagships', 'Phone (2a) / (2a) Plus Series', 'CMF by Nothing'],
+    warrantyPartner: 'Nothing Official Support & Authorized Service Partners',
+    logoLetter: 'N',
+    accentBg: 'bg-zinc-900'
   }
 ];
 

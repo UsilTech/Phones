@@ -413,7 +413,7 @@ let uploadDataUrlsDatabase: Record<string, string> = {};
 let deletedPhoneIdsDatabase = new Set<string>();
 let deletedArticleIdsDatabase = new Set<string>();
 let deletedReviewIdsDatabase = new Set<string>();
-let deletedBrandKeysDatabase = new Set<string>(['nothing', 'brand-nothing']);
+let deletedBrandKeysDatabase = new Set<string>();
 let deletedInquiryIdsDatabase = new Set<string>();
 let cachedEtherealTransporter: any = null;
 let lastLoadedDbMtimeMs = 0;
@@ -552,7 +552,9 @@ function loadDatabaseFromDisk(silent = false): void {
         deletedReviewIdsDatabase = new Set(parsed.deletedReviewIds);
       }
       if (Array.isArray(parsed.deletedBrandKeys)) {
-        deletedBrandKeysDatabase = new Set(['nothing', 'brand-nothing', ...parsed.deletedBrandKeys]);
+        deletedBrandKeysDatabase = new Set(
+          parsed.deletedBrandKeys.filter((k) => k && k !== 'nothing' && k !== 'brand-nothing')
+        );
       }
       if (Array.isArray(parsed.deletedInquiryIds)) {
         deletedInquiryIdsDatabase = new Set(parsed.deletedInquiryIds);
@@ -582,13 +584,27 @@ function loadDatabaseFromDisk(silent = false): void {
         phonesDatabase = loadedPhones;
       }
       if (Array.isArray(parsed.brands) && parsed.brands.length > 0) {
-        brandsDatabase = parsed.brands.filter(
+        const loadedBrands = parsed.brands.filter(
           (b) =>
             b &&
             !deletedBrandKeysDatabase.has(String(b.name || '').trim().toLowerCase()) &&
             !deletedBrandKeysDatabase.has(String(b.slug || '').trim().toLowerCase()) &&
             !deletedBrandKeysDatabase.has(String(b.id || '').trim().toLowerCase())
         );
+        const existingBrandKeys = new Set<string>();
+        for (const b of loadedBrands) {
+          if (b.id) existingBrandKeys.add(b.id.toLowerCase());
+          if (b.slug) existingBrandKeys.add(b.slug.toLowerCase());
+          if (b.name) existingBrandKeys.add(b.name.toLowerCase());
+        }
+        for (const seedBrand of INITIAL_BRANDS) {
+          const sKeys = [seedBrand.id.toLowerCase(), seedBrand.slug.toLowerCase(), seedBrand.name.toLowerCase()];
+          if (!sKeys.some((k) => existingBrandKeys.has(k) || deletedBrandKeysDatabase.has(k))) {
+            loadedBrands.push({ ...seedBrand });
+            sKeys.forEach((k) => existingBrandKeys.add(k));
+          }
+        }
+        brandsDatabase = loadedBrands;
       }
       if (Array.isArray(parsed.articles) && parsed.articles.length > 0) {
         const loadedArticles = parsed.articles

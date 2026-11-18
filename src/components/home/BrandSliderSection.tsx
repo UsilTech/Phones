@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import BrandLogo from '../common/BrandLogo';
@@ -10,7 +10,7 @@ interface NotableBrand {
 
 // Ordered strictly with user requested top 10 first:
 // Apple, Google, Xiaomi, OnePlus, Honor, Oppo, TCL, Huawei, Samsung, Motorola
-// Followed by the remaining catalog brands
+// Followed by Nothing and the remaining catalog brands
 const NOTABLE_BRANDS: NotableBrand[] = [
   { name: 'Apple', slug: 'apple' },
   { name: 'Google', slug: 'google' },
@@ -22,6 +22,7 @@ const NOTABLE_BRANDS: NotableBrand[] = [
   { name: 'Huawei', slug: 'huawei' },
   { name: 'Samsung', slug: 'samsung' },
   { name: 'Motorola', slug: 'motorola' },
+  { name: 'Nothing', slug: 'nothing' },
   // Remaining brands
   { name: 'Alcatel', slug: 'alcatel' },
   { name: 'Asus', slug: 'asus' },
@@ -50,8 +51,9 @@ export default function BrandSliderSection() {
     triggerNavigation
   } = useApp();
   const sliderRef = useRef<HTMLDivElement>(null);
+  const [rotationOffset, setRotationOffset] = useState(0);
 
-  // Merge live brands from AppContext with NOTABLE_BRANDS priority order so any newly added 24th+ brand in Admin Dashboard is immediately shown
+  // Merge live brands from AppContext with NOTABLE_BRANDS priority order so any newly added brand in Admin Dashboard is immediately shown
   const defaultBrandSlugs = new Set(
     NOTABLE_BRANDS.map((nb) => (nb.slug || nb.name).toLowerCase())
   );
@@ -59,7 +61,7 @@ export default function BrandSliderSection() {
     NOTABLE_BRANDS.map((nb) => nb.name.toLowerCase())
   );
 
-  // Custom brands added via Admin Dashboard (beyond the initial 23 seed brands)
+  // Custom brands added via Admin Dashboard (beyond the initial seed brands)
   const customAddedBrands = brands.filter(
     (b) =>
       !defaultBrandNames.has(b.name.toLowerCase()) &&
@@ -82,7 +84,13 @@ export default function BrandSliderSection() {
     };
   }).filter((b): b is NonNullable<typeof b> => Boolean(b));
 
-  const sliderBrands = [...activeNotableBrands, ...customAddedBrands];
+  const baseSliderBrands = [...activeNotableBrands, ...customAddedBrands];
+  const totalCount = baseSliderBrands.length;
+  const normalizedOffset = totalCount > 0 ? ((rotationOffset % totalCount) + totalCount) % totalCount : 0;
+  const sliderBrands =
+    normalizedOffset > 0
+      ? [...baseSliderBrands.slice(normalizedOffset), ...baseSliderBrands.slice(0, normalizedOffset)]
+      : baseSliderBrands;
 
   const handleBrandClick = (bName: string) => {
     triggerNavigation(() => {
@@ -112,18 +120,40 @@ export default function BrandSliderSection() {
   };
 
   const scroll = (direction: 'left' | 'right') => {
-    if (!sliderRef.current) return;
-    const scrollAmount = direction === 'left' ? -260 : 260;
-    sliderRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    const el = sliderRef.current;
+    if (!el) return;
+
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    if (maxScroll > 8) {
+      const step = Math.max(280, Math.round(el.clientWidth * 0.55));
+      const current = el.scrollLeft;
+      let targetLeft: number;
+
+      if (direction === 'right') {
+        targetLeft = current >= maxScroll - 8 ? 0 : Math.min(maxScroll, current + step);
+      } else {
+        targetLeft = current <= 8 ? maxScroll : Math.max(0, current - step);
+      }
+
+      try {
+        el.scrollTo({ left: targetLeft, behavior: 'smooth' });
+      } catch {
+        el.scrollLeft = targetLeft;
+      }
+    } else if (totalCount > 1) {
+      // On ultra-wide PC monitors where all items fit without scrollbar overflow, rotate items so arrows always slide
+      setRotationOffset((prev) => (direction === 'right' ? prev + 3 : prev - 3));
+    }
   };
 
   return (
-    <div className="w-full bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-xs relative select-none">
-      <div className="w-full max-w-full px-2 sm:px-4 py-2 flex items-center gap-1.5">
+    <div className="w-full bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-xs relative select-none overflow-hidden">
+      <div className="w-full max-w-full px-2 sm:px-4 py-2 flex items-center gap-1.5 overflow-hidden">
         {/* Left Arrow Button */}
         <button
+          type="button"
           onClick={() => scroll('left')}
-          className="hidden sm:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+          className="hidden sm:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer z-10"
           aria-label="Scroll left brands"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -132,7 +162,7 @@ export default function BrandSliderSection() {
         {/* Horizontal Slider Track - Brand Logos + Names */}
         <div
           ref={sliderRef}
-          className="flex-1 flex items-center gap-4 sm:gap-6 overflow-x-auto no-scrollbar scroll-smooth px-2 py-0.5"
+          className="flex-1 min-w-0 flex items-center gap-4 sm:gap-6 overflow-x-auto no-scrollbar scroll-smooth px-2 py-0.5"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {sliderBrands.map((b) => {
@@ -141,6 +171,7 @@ export default function BrandSliderSection() {
               selectedBrand?.name.toLowerCase() === b.name.toLowerCase();
             return (
               <button
+                type="button"
                 key={b.id || b.name}
                 onClick={() => handleBrandClick(b.name)}
                 className={`shrink-0 flex items-center gap-2 py-1 px-2.5 rounded-lg transition-all cursor-pointer font-extrabold text-sm sm:text-[15px] font-['Space_Grotesk'] tracking-tight whitespace-nowrap ${
@@ -158,8 +189,9 @@ export default function BrandSliderSection() {
 
         {/* Right Arrow Button */}
         <button
+          type="button"
           onClick={() => scroll('right')}
-          className="hidden sm:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+          className="hidden sm:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer z-10"
           aria-label="Scroll right brands"
         >
           <ChevronRight className="w-4 h-4" />

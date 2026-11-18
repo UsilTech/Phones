@@ -803,19 +803,23 @@ function mergePhonesAndSync(
 }
 
 function getDeletedBrandKeys(): Set<string> {
-  const defaults = ['nothing', 'brand-nothing'];
-  if (typeof window === 'undefined') return new Set(defaults);
+  if (typeof window === 'undefined') return new Set();
   try {
     const raw = localStorage.getItem('gsmscope_deleted_brand_keys_v1');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return new Set(parsed.map((k) => String(k || '').toLowerCase()).filter(Boolean));
+        const cleaned = parsed
+          .map((k) => String(k || '').toLowerCase())
+          .filter((k) => k && k !== 'nothing' && k !== 'brand-nothing');
+        if (cleaned.length !== parsed.length) {
+          safeSetLocalStorage('gsmscope_deleted_brand_keys_v1', JSON.stringify(cleaned));
+        }
+        return new Set(cleaned);
       }
     }
-    safeSetLocalStorage('gsmscope_deleted_brand_keys_v1', JSON.stringify(defaults));
   } catch {}
-  return new Set(defaults);
+  return new Set();
 }
 
 function saveDeletedBrandKeys(keysSet: Set<string>): void {
@@ -827,6 +831,12 @@ function mergeBrandsAndSync(localBrands: Brand[], apiBrands: Brand[]): Brand[] {
   const isAdmin = isCurrentSessionAdmin();
   if (!isAdmin) {
     const cleanApiBrands = apiBrands.filter(Boolean);
+    const seenSlugs = new Set(cleanApiBrands.map((b) => (b.slug || b.name || '').toLowerCase()));
+    for (const seedBrand of INITIAL_BRANDS) {
+      if (!seenSlugs.has(seedBrand.slug.toLowerCase()) && !seenSlugs.has(seedBrand.name.toLowerCase())) {
+        cleanApiBrands.push(seedBrand);
+      }
+    }
     safeSetLocalStorage('gsmscope_brands_v3', JSON.stringify(cleanApiBrands));
     return cleanApiBrands;
   }
@@ -879,7 +889,7 @@ function mergeBrandsAndSync(localBrands: Brand[], apiBrands: Brand[]): Brand[] {
     }
   }
 
-  for (const lb of localBrands) {
+  for (const lb of [...localBrands, ...INITIAL_BRANDS]) {
     if (!lb) continue;
     const keys = getBrandKeys(lb);
     if (keys.some((k) => deletedKeys.has(k))) continue;
@@ -1462,13 +1472,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const deletedKeys = getDeletedBrandKeys();
       const saved = localStorage.getItem('gsmscope_brands_v3');
       const parsed: Brand[] = saved ? JSON.parse(saved) : INITIAL_BRANDS;
-      return (Array.isArray(parsed) ? parsed : INITIAL_BRANDS).filter(
+      const baseList = (Array.isArray(parsed) ? parsed : INITIAL_BRANDS).filter(
         (b) =>
           b &&
           !deletedKeys.has(String(b.id || '').toLowerCase()) &&
           !deletedKeys.has(String(b.slug || '').toLowerCase()) &&
           !deletedKeys.has(String(b.name || '').toLowerCase())
       );
+      const existingKeys = new Set<string>();
+      for (const b of baseList) {
+        if (b.id) existingKeys.add(b.id.toLowerCase());
+        if (b.slug) existingKeys.add(b.slug.toLowerCase());
+        if (b.name) existingKeys.add(b.name.toLowerCase());
+      }
+      for (const seedBrand of INITIAL_BRANDS) {
+        const sKeys = [seedBrand.id.toLowerCase(), seedBrand.slug.toLowerCase(), seedBrand.name.toLowerCase()];
+        if (!sKeys.some((k) => existingKeys.has(k) || deletedKeys.has(k))) {
+          baseList.push(seedBrand);
+          sKeys.forEach((k) => existingKeys.add(k));
+        }
+      }
+      return baseList;
     } catch {
       return INITIAL_BRANDS;
     }

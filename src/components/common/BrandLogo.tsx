@@ -225,6 +225,26 @@ export default function BrandLogo({ name, logoUrl, className = 'w-5 h-5' }: Bran
         </svg>
       );
 
+    case 'nothing':
+      return (
+        <svg viewBox="0 0 24 24" className={`${className} shrink-0 rounded-[4px] overflow-hidden`}>
+          <rect width="24" height="24" rx="4" fill="#111827" />
+          <g fill="#FFFFFF">
+            <circle cx="6.5" cy="6.5" r="1.35" />
+            <circle cx="6.5" cy="10.2" r="1.35" />
+            <circle cx="6.5" cy="13.8" r="1.35" />
+            <circle cx="6.5" cy="17.5" r="1.35" />
+            <circle cx="9.8" cy="9.2" r="1.35" />
+            <circle cx="12.2" cy="12" r="1.35" />
+            <circle cx="14.5" cy="14.8" r="1.35" />
+            <circle cx="17.5" cy="6.5" r="1.35" />
+            <circle cx="17.5" cy="10.2" r="1.35" />
+            <circle cx="17.5" cy="13.8" r="1.35" />
+            <circle cx="17.5" cy="17.5" r="1.35" />
+          </g>
+        </svg>
+      );
+
     default:
       return (
         <div className={`${className} shrink-0 rounded-lg bg-emerald-600 text-white font-bold text-xs flex items-center justify-center uppercase shadow-xs`}>
