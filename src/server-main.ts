@@ -801,6 +801,13 @@ setImmediate(() => {
 
 // Synchronize database state across multiple cPanel LiteSpeed Node.js workers & PHP API gateway on every /api/* request
 app.use('/api', (req: Request, res: Response, next) => {
+  if (typeof req.query?._route === 'string' && req.query._route) {
+    const cleanRoute = req.query._route.replace(/^\/+/, '');
+    const qsParams = new URLSearchParams(req.query as Record<string, string>);
+    qsParams.delete('_route');
+    const qsStr = qsParams.toString();
+    req.url = '/' + cleanRoute + (qsStr ? `?${qsStr}` : '');
+  }
   const p = req.path || '';
   if (p !== '/client-styles' && p !== '/client-bundle' && !p.startsWith('/uploads/')) {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');

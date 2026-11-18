@@ -496,15 +496,15 @@ export default defineConfig(() => {
           order: 'post' as const,
           handler(html) {
             // Replace <script type="module" crossorigin src="/assets/index-....js"></script>
-            // with a standard <script defer src="/assets/index-....js?v=..."></script> and bust stale CSS cache
+            // with stable <script defer src="/assets/app-bundle.js?v=..."></script> and bust stale CSS cache
             return html
               .replace(
                 /<script\s+type="module"\s+crossorigin\s+src="([^"]+)"><\/script>/gi,
-                `<script defer src="$1?v=${buildVersion}"></script>`
+                `<script defer src="/assets/app-bundle.js?v=${buildVersion}"></script>`
               )
               .replace(
                 /<link\s+rel="stylesheet"\s+crossorigin\s+href="([^"]+)">/gi,
-                `<link rel="stylesheet" href="$1?v=${buildVersion}">`
+                `<link rel="stylesheet" href="/assets/app-styles.css?v=${buildVersion}">`
               )
               .replace(/<link\s+rel="modulepreload"[^>]*>/gi, '');
           },
@@ -544,8 +544,8 @@ export default defineConfig(() => {
               }
               indexHtml = indexHtml.replace(
                 /<script\s+defer\s+src="([^"]+)"><\/script>/i,
-                (_m, origSrc) =>
-                  `<script defer src="/api/client-bundle?v=${buildVersion}" onerror="var s=document.createElement('script');s.src='${origSrc}';document.head.appendChild(s);"></script>`
+                () =>
+                  `<script defer src="/assets/app-bundle.js?v=${buildVersion}" onerror="var s=document.createElement('script');s.src='/api/client-bundle?v=${buildVersion}';document.head.appendChild(s);"></script>`
               );
               fs.writeFileSync(distIndexHtmlPath, indexHtml, 'utf-8');
 
@@ -560,8 +560,8 @@ export default defineConfig(() => {
 
             // Copy built dist/index.html, dist/admin/index.html, and dist/assets/* into /cpanel_build
             if (fs.existsSync(distDir)) {
-              fs.rmSync(cpanelBuildDir, { recursive: true, force: true });
-              fs.cpSync(distDir, cpanelBuildDir, { recursive: true });
+              fs.mkdirSync(cpanelBuildDir, { recursive: true });
+              fs.cpSync(distDir, cpanelBuildDir, { recursive: true, force: true });
             }
 
             const cjsOutPath = path.resolve(rootDir, 'app.cjs');

@@ -592,9 +592,15 @@ const SEED_PHONE_IMAGE_MAP = new Map<string, string>(
 function isCurrentSessionAdmin(): boolean {
   if (typeof window === 'undefined') return false;
   try {
+    const pathname = (window.location.pathname || '').toLowerCase();
     return (
       localStorage.getItem('gsmscope_admin_auth') === 'true' ||
-      sessionStorage.getItem('gsmscope_admin_auth') === 'true'
+      sessionStorage.getItem('gsmscope_admin_auth') === 'true' ||
+      localStorage.getItem('gsmscope_admin_browser_v1') === 'true' ||
+      localStorage.getItem('gsmscope_ads_admin_saved_v1') === 'true' ||
+      localStorage.getItem('gsmscope_website_content_admin_saved_v1') === 'true' ||
+      pathname === '/admin' ||
+      pathname.startsWith('/admin/')
     );
   } catch {
     return false;
@@ -606,7 +612,11 @@ function mergePhonesAndSync(
   apiPhones: Phone[],
   mediaItems?: MediaItem[]
 ): Phone[] {
-  const isAdmin = isCurrentSessionAdmin();
+  const deletedPhoneIds = getDeletedPhoneIds();
+  const hasLocalCustomPhones = localPhones.some(
+    (p) => p && p.id && !SEED_PHONE_IDS.has(p.id) && !deletedPhoneIds.has(p.id)
+  );
+  const isAdmin = isCurrentSessionAdmin() || hasLocalCustomPhones;
 
   // Map of latest user-uploaded media assigned to a phone
   const assignedMediaByPhoneId = new Map<string, string>();
@@ -624,7 +634,7 @@ function mergePhonesAndSync(
     }
   }
 
-  // For public visitors (!isAdmin), server apiPhones is 100% authoritative — never overwrite server data with visitor localStorage
+  // For public visitors (!isAdmin), server apiPhones is 100% authoritative — never overwrite server data with visitor seed localStorage
   if (!isAdmin) {
     const serverPhones = apiPhones
       .filter(Boolean)
@@ -665,7 +675,6 @@ function mergePhonesAndSync(
     return finalVisitorPhones;
   }
 
-  const deletedPhoneIds = getDeletedPhoneIds();
   const normalizedLocal = localPhones
     .filter((p) => p && !deletedPhoneIds.has(p.id))
     .map(normalizePhoneRecord);
@@ -953,7 +962,11 @@ function mergeArticlesAndSync(
   apiArticles: Article[],
   mediaItems?: MediaItem[]
 ): Article[] {
-  const isAdmin = isCurrentSessionAdmin();
+  const deletedIds = getDeletedArticleIds();
+  const hasLocalCustomArticles = localArticles.some(
+    (a) => a && a.id && !SEED_ARTICLE_IDS.has(a.id) && !deletedIds.has(a.id)
+  );
+  const isAdmin = isCurrentSessionAdmin() || hasLocalCustomArticles;
 
   const assignedMediaByArticleId = new Map<string, string>();
   if (Array.isArray(mediaItems)) {
@@ -1005,7 +1018,6 @@ function mergeArticlesAndSync(
     return finalVisitorArts;
   }
 
-  const deletedIds = getDeletedArticleIds();
   const normalizedLocal = localArticles
     .filter((a) => a && !deletedIds.has(a.id))
     .map(normalizeArticleRecord);
@@ -2719,6 +2731,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               return combined;
             });
           }
+
+          if (isAdmin) {
+            setTimeout(() => {
+              try {
+                const phonesRaw = localStorage.getItem('gsmscope_phones_v3');
+                const brandsRaw = localStorage.getItem('gsmscope_brands_v3');
+                const articlesRaw = localStorage.getItem('gsmscope_articles_v2');
+                const reviewsRaw = localStorage.getItem('gsmscope_reviews_v2');
+                const adsRaw = localStorage.getItem('gsmscope_ads_v3');
+                const contentRaw = localStorage.getItem('gsmscope_website_content_v1');
+                const mediaRaw = localStorage.getItem('gsmscope_media_library_v1');
+                importDatabaseApi({
+                  phones: phonesRaw ? JSON.parse(phonesRaw) : undefined,
+                  brands: brandsRaw ? JSON.parse(brandsRaw) : undefined,
+                  articles: articlesRaw ? JSON.parse(articlesRaw) : undefined,
+                  reviews: reviewsRaw ? JSON.parse(reviewsRaw) : undefined,
+                  adSettings: adsRaw ? JSON.parse(adsRaw) : undefined,
+                  websiteContent: contentRaw ? JSON.parse(contentRaw) : undefined,
+                  mediaLibrary: mediaRaw ? JSON.parse(mediaRaw) : undefined,
+                }).catch(() => {});
+              } catch {}
+            }, 300);
+          }
         }
       } catch (err) {
         console.warn('Backend synchronization warning:', err);
@@ -2930,6 +2965,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsAdminAuthenticated(true);
       try {
         sessionStorage.setItem('gsmscope_admin_auth', 'true');
+        localStorage.setItem('gsmscope_admin_browser_v1', 'true');
         if (rememberMe !== false) {
           localStorage.setItem('gsmscope_admin_auth', 'true');
           localStorage.setItem('gsmscope_admin_remember_user', trimmedUser);
@@ -3050,6 +3086,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setPhones(prev => {
       const next = [normalized, ...prev.filter(p => p.id !== normalized.id)];
       safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(next));
+      safeSetLocalStorage('gsmscope_admin_browser_v1', 'true');
       return next;
     });
     createPhoneApi(normalized).catch(console.warn);
@@ -3210,6 +3247,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setArticles(prev => {
       const next = [normalized, ...prev.filter(a => a.id !== normalized.id)];
       safeSetLocalStorage('gsmscope_articles_v2', JSON.stringify(next));
+      safeSetLocalStorage('gsmscope_admin_browser_v1', 'true');
       return next;
     });
     createArticleApi(normalized).catch(console.warn);
@@ -3360,6 +3398,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAdSettings(normalized);
     safeSetLocalStorage('gsmscope_ads_v3', JSON.stringify(normalized));
     safeSetLocalStorage('gsmscope_ads_admin_saved_v1', 'true');
+    safeSetLocalStorage('gsmscope_admin_browser_v1', 'true');
     updateAdSettingsApi(normalized)
       .then((serverSaved) => {
         if (serverSaved && typeof serverSaved === 'object') {

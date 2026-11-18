@@ -112,6 +112,19 @@ function restoreUploadsFromDb(&$db) {
             }
         }
     }
+    if (!empty($db['adSettings']['placements']) && is_array($db['adSettings']['placements'])) {
+        foreach ($db['adSettings']['placements'] as $pl) {
+            if (!empty($pl['imageUrl']) && !empty($pl['imageDataUrl']) && strpos($pl['imageUrl'], '/uploads/') === 0 && strpos($pl['imageDataUrl'], ';base64,') !== false) {
+                $parts = explode(';base64,', $pl['imageDataUrl'], 2);
+                if (isset($parts[1])) {
+                    $bin = base64_decode($parts[1]);
+                    if ($bin !== false) {
+                        writeUploadFileToAllDirs(basename(parse_url($pl['imageUrl'], PHP_URL_PATH)), $bin);
+                    }
+                }
+            }
+        }
+    }
 }
 
 function loadDatabase() {
@@ -245,13 +258,92 @@ function sendJson($data, $status = 200) {
     exit;
 }
 
-$requestUri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/api/health';
-$parsedPath = parse_url($requestUri, PHP_URL_PATH);
-$route = preg_replace('#^/api/?#', '', $parsedPath);
+$rawRoute = '';
+if (!empty($_GET['_route'])) {
+    $rawRoute = $_GET['_route'];
+} elseif (!empty($_SERVER['REDIRECT_URL'])) {
+    $rawRoute = $_SERVER['REDIRECT_URL'];
+} elseif (!empty($_SERVER['REQUEST_URI'])) {
+    $rawRoute = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+}
+$route = preg_replace('#^/?(api/)?(index\.php/?)?#i', '', (string)$rawRoute);
 $route = trim($route, '/');
 $method = $_SERVER['REQUEST_METHOD'];
 
+// 0. Static Client Bundle & Styles Fallback (/api/client-bundle, /api/client-styles)
+if ($route === 'client-bundle' && $method === 'GET') {
+    $jsCandidates = array(
+        dirname(__DIR__) . '/assets/app-bundle.js',
+        $PUBLIC_HTML_DIR . '/assets/app-bundle.js',
+        $APP_DIR . '/cpanel_build/assets/app-bundle.js',
+        $APP_DIR . '/dist/assets/app-bundle.js'
+    );
+    foreach ($jsCandidates as $jsFile) {
+        if (file_exists($jsFile)) {
+            header('Content-Type: application/javascript; charset=utf-8');
+            header('Cache-Control: public, max-age=3600');
+            readfile($jsFile);
+            exit;
+        }
+    }
+}
+
+if ($route === 'client-styles' && $method === 'GET') {
+    $cssCandidates = array(
+        dirname(__DIR__) . '/assets/app-styles.css',
+        $PUBLIC_HTML_DIR . '/assets/app-styles.css',
+        $APP_DIR . '/cpanel_build/assets/app-styles.css',
+        $APP_DIR . '/dist/assets/app-styles.css'
+    );
+    foreach ($cssCandidates as $cssFile) {
+        if (file_exists($cssFile)) {
+            header('Content-Type: text/css; charset=utf-8');
+            header('Cache-Control: public, max-age=3600');
+            readfile($cssFile);
+            exit;
+        }
+    }
+}
+
 $db = loadDatabase();
+
+// 0b. Uploaded Media Binary Fallback (/api/uploads/:filename)
+if (preg_match('#^uploads/([^/]+)$#', $route, $um) && $method === 'GET') {
+    $fname = basename(urldecode($um[1]));
+    foreach ($UPLOAD_DIRS as $uDir) {
+        $candidate = $uDir . '/' . $fname;
+        if (file_exists($candidate)) {
+            $ext = strtolower(pathinfo($fname, PATHINFO_EXTENSION));
+            $mime = ($ext === 'png') ? 'image/png' : (($ext === 'webp') ? 'image/webp' : (($ext === 'svg') ? 'image/svg+xml' : (($ext === 'gif') ? 'image/gif' : 'image/jpeg')));
+            header('Content-Type: ' . $mime);
+            header('Cache-Control: public, max-age=86400');
+            readfile($candidate);
+            exit;
+        }
+    }
+    $targetUrl = '/uploads/' . $fname;
+    $dataUrl = isset($db['uploadDataUrls'][$targetUrl]) ? $db['uploadDataUrls'][$targetUrl] : null;
+    if (!$dataUrl && !empty($db['mediaLibrary'])) {
+        foreach ($db['mediaLibrary'] as $mItem) {
+            if (isset($mItem['url']) && $mItem['url'] === $targetUrl && !empty($mItem['dataUrl'])) {
+                $dataUrl = $mItem['dataUrl'];
+                break;
+            }
+        }
+    }
+    if ($dataUrl && strpos($dataUrl, ';base64,') !== false) {
+        $parts = explode(';base64,', $dataUrl, 2);
+        $mime = str_replace('data:', '', $parts[0]);
+        $bin = base64_decode($parts[1]);
+        if ($bin !== false) {
+            writeUploadFileToAllDirs($fname, $bin);
+            header('Content-Type: ' . ($mime ?: 'image/jpeg'));
+            header('Cache-Control: public, max-age=86400');
+            echo $bin;
+            exit;
+        }
+    }
+}
 
 // 1. GET /api/health
 if ($route === 'health' && $method === 'GET') {
@@ -1097,18 +1189,73 @@ if ($route === 'database/export' && $method === 'GET') {
 
 if ($route === 'database/import' && $method === 'POST') {
     $body = getJsonBody();
-    if (isset($body['phones']) && is_array($body['phones'])) $db['phones'] = $body['phones'];
+    if (isset($body['phones']) && is_array($body['phones'])) {
+        $byId = array();
+        foreach ($body['phones'] as $p) {
+            if (!empty($p['id'])) $byId[$p['id']] = $p;
+        }
+        foreach ($db['phones'] as $sp) {
+            if (!empty($sp['id']) && !isset($byId[$sp['id']]) && !in_array($sp['id'], $db['deletedPhoneIds'])) {
+                $byId[$sp['id']] = $sp;
+            }
+        }
+        $db['phones'] = array_values($byId);
+    }
     if (isset($body['brands']) && is_array($body['brands'])) $db['brands'] = $body['brands'];
-    if (isset($body['articles']) && is_array($body['articles'])) $db['articles'] = $body['articles'];
-    if (isset($body['reviews']) && is_array($body['reviews'])) $db['reviews'] = $body['reviews'];
+    if (isset($body['articles']) && is_array($body['articles'])) {
+        $byId = array();
+        foreach ($body['articles'] as $a) {
+            if (!empty($a['id'])) $byId[$a['id']] = $a;
+        }
+        foreach ($db['articles'] as $sa) {
+            if (!empty($sa['id']) && !isset($byId[$sa['id']]) && !in_array($sa['id'], $db['deletedArticleIds'])) {
+                $byId[$sa['id']] = $sa;
+            }
+        }
+        $db['articles'] = array_values($byId);
+    }
+    if (isset($body['reviews']) && is_array($body['reviews'])) {
+        $byId = array();
+        foreach ($body['reviews'] as $r) {
+            if (!empty($r['id'])) $byId[$r['id']] = $r;
+        }
+        foreach ($db['reviews'] as $sr) {
+            if (!empty($sr['id']) && !isset($byId[$sr['id']]) && !in_array($sr['id'], $db['deletedReviewIds'])) {
+                $byId[$sr['id']] = $sr;
+            }
+        }
+        $db['reviews'] = array_values($byId);
+    }
     if (isset($body['adSettings']) && is_array($body['adSettings'])) {
         $db['adSettings'] = array_merge($db['adSettings'], $body['adSettings']);
     }
     if (isset($body['websiteContent']) && is_array($body['websiteContent'])) {
         $db['websiteContent'] = array_merge($db['websiteContent'], $body['websiteContent']);
     }
-    if (isset($body['mediaLibrary']) && is_array($body['mediaLibrary'])) $db['mediaLibrary'] = $body['mediaLibrary'];
-    if (isset($body['contactInquiries']) && is_array($body['contactInquiries'])) $db['contactInquiries'] = $body['contactInquiries'];
+    if (isset($body['mediaLibrary']) && is_array($body['mediaLibrary'])) {
+        $byUrl = array();
+        foreach ($body['mediaLibrary'] as $m) {
+            if (!empty($m['url'])) $byUrl[$m['url']] = $m;
+        }
+        foreach ($db['mediaLibrary'] as $sm) {
+            if (!empty($sm['url']) && !isset($byUrl[$sm['url']])) {
+                $byUrl[$sm['url']] = $sm;
+            }
+        }
+        $db['mediaLibrary'] = array_values($byUrl);
+    }
+    if (isset($body['contactInquiries']) && is_array($body['contactInquiries'])) {
+        $byId = array();
+        foreach ($db['contactInquiries'] as $si) {
+            if (!empty($si['id'])) $byId[$si['id']] = $si;
+        }
+        foreach ($body['contactInquiries'] as $bi) {
+            if (!empty($bi['id']) && !in_array($bi['id'], $db['deletedInquiryIds'])) {
+                $byId[$bi['id']] = isset($byId[$bi['id']]) ? array_merge($byId[$bi['id']], $bi) : $bi;
+            }
+        }
+        $db['contactInquiries'] = array_values($byId);
+    }
     restoreUploadsFromDb($db);
     saveDatabase($db);
     sendJson(array('success' => true));
