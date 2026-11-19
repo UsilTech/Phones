@@ -88,17 +88,31 @@ export async function createPhoneApi(phone: Phone): Promise<Phone | null> {
 }
 
 export async function updatePhoneApi(id: string, phone: Partial<Phone>): Promise<Phone | null> {
+  const payload = { ...phone, id, updatedAt: (phone as any).updatedAt || Date.now() };
   try {
     const res = await fetch(`/api/phones/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(phone)
+      body: JSON.stringify(payload)
     });
-    if (!res.ok) return null;
-    const data = await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      return data.phone || null;
+    }
+  } catch (err) {
+    console.warn('API PUT updatePhone failed, retrying with POST:', err);
+  }
+  try {
+    const fallbackRes = await fetch(`/api/phones/${encodeURIComponent(id)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!fallbackRes.ok) return null;
+    const data = await fallbackRes.json();
     return data.phone || null;
   } catch (err) {
-    console.warn('API updatePhone failed:', err);
+    console.warn('API POST updatePhone fallback failed:', err);
     return null;
   }
 }
@@ -161,17 +175,31 @@ export async function createArticleApi(article: Article): Promise<Article | null
 }
 
 export async function updateArticleApi(id: string, article: Partial<Article>): Promise<Article | null> {
+  const payload = { ...article, id, updatedAt: (article as any).updatedAt || Date.now() };
   try {
     const res = await fetch(`/api/articles/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(article)
+      body: JSON.stringify(payload)
     });
-    if (!res.ok) return null;
-    const data = await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      return data.article || null;
+    }
+  } catch (err) {
+    console.warn('API PUT updateArticle failed, retrying with POST:', err);
+  }
+  try {
+    const fallbackRes = await fetch(`/api/articles/${encodeURIComponent(id)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!fallbackRes.ok) return null;
+    const data = await fallbackRes.json();
     return data.article || null;
   } catch (err) {
-    console.warn('API updateArticle failed:', err);
+    console.warn('API POST updateArticle fallback failed:', err);
     return null;
   }
 }
@@ -222,11 +250,24 @@ export async function updateBrandApi(id: string, brand: Partial<Brand>): Promise
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(brand)
     });
-    if (!res.ok) return null;
-    const data = await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      return data.brand || null;
+    }
+  } catch (err) {
+    console.warn('API PUT updateBrand failed, retrying with POST:', err);
+  }
+  try {
+    const fallbackRes = await fetch(`/api/brands/${encodeURIComponent(id)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(brand)
+    });
+    if (!fallbackRes.ok) return null;
+    const data = await fallbackRes.json();
     return data.brand || null;
   } catch (err) {
-    console.warn('API updateBrand failed:', err);
+    console.warn('API POST updateBrand fallback failed:', err);
     return null;
   }
 }

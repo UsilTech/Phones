@@ -527,6 +527,7 @@ function normalizePhoneRecord(raw: any): Phone {
       ),
     },
     ...(raw?.createdAt ? { createdAt: raw.createdAt } : {}),
+    ...(raw?.updatedAt ? { updatedAt: Number(raw.updatedAt) || raw.updatedAt } : {}),
     ...(raw?.featuredAt ? { featuredAt: raw.featuredAt } : {}),
   } as Phone;
 }
@@ -613,10 +614,7 @@ function mergePhonesAndSync(
   mediaItems?: MediaItem[]
 ): Phone[] {
   const deletedPhoneIds = getDeletedPhoneIds();
-  const hasLocalCustomPhones = localPhones.some(
-    (p) => p && p.id && !SEED_PHONE_IDS.has(p.id) && !deletedPhoneIds.has(p.id)
-  );
-  const isAdmin = isCurrentSessionAdmin() || hasLocalCustomPhones;
+  const isAdmin = isCurrentSessionAdmin();
 
   // Map of latest user-uploaded media assigned to a phone
   const assignedMediaByPhoneId = new Map<string, string>();
@@ -701,40 +699,50 @@ function mergePhonesAndSync(
       continue;
     }
 
+    const localUpdated = Number((localPhone as any).updatedAt || 0);
+    const apiUpdated = Number((apiPhone as any).updatedAt || 0);
+    const localIsNewer = localUpdated > apiUpdated;
+
     const seedImg = SEED_PHONE_IMAGE_MAP.get(localPhone.id);
     const localHasCustomImg = Boolean(localPhone.image && localPhone.image !== seedImg);
     const apiHasCustomImg = Boolean(apiPhone.image && apiPhone.image !== seedImg);
     const assignedMediaUrl = assignedMediaByPhoneId.get(localPhone.id);
 
-    let chosenImage = localPhone.image;
-    if (localHasCustomImg && !apiHasCustomImg) {
+    let chosenImage = apiPhone.image;
+    if (localIsNewer && localPhone.image) {
       chosenImage = localPhone.image;
-    } else if (apiHasCustomImg && !localHasCustomImg) {
+    } else if (apiHasCustomImg) {
       chosenImage = apiPhone.image;
-    } else if (assignedMediaUrl && !localHasCustomImg && !apiHasCustomImg) {
+    } else if (localHasCustomImg) {
+      chosenImage = localPhone.image;
+    } else if (assignedMediaUrl) {
       chosenImage = assignedMediaUrl;
     } else {
-      chosenImage = localPhone.image || apiPhone.image;
+      chosenImage = apiPhone.image || localPhone.image;
     }
+
+    const primaryPhone = localIsNewer ? localPhone : apiPhone;
+    const secondaryPhone = localIsNewer ? apiPhone : localPhone;
 
     const combinedGallery = Array.from(
       new Set([
         chosenImage,
-        ...(localPhone.images || []),
-        ...(apiPhone.images || []),
+        ...(primaryPhone.images || []),
+        ...(secondaryPhone.images || []),
       ].filter(Boolean))
     );
 
     const mergedPhone: Phone = normalizePhoneRecord({
-      ...apiPhone,
-      ...localPhone,
+      ...secondaryPhone,
+      ...primaryPhone,
       image: chosenImage,
       images: combinedGallery,
-      createdAt: (localPhone as any).createdAt || (apiPhone as any).createdAt,
-      featuredAt: (localPhone as any).featuredAt || (apiPhone as any).featuredAt,
+      createdAt: (apiPhone as any).createdAt || (localPhone as any).createdAt,
+      updatedAt: Math.max(localUpdated, apiUpdated) || undefined,
+      featuredAt: (primaryPhone as any).featuredAt || (secondaryPhone as any).featuredAt,
     });
 
-    if (JSON.stringify(mergedPhone) !== JSON.stringify(apiPhone)) {
+    if (localIsNewer && JSON.stringify(mergedPhone) !== JSON.stringify(apiPhone)) {
       updatePhoneApi(mergedPhone.id, mergedPhone).catch(() => {});
     }
 
@@ -964,6 +972,7 @@ function normalizeArticleRecord(raw: any): Article {
     ...(raw?.seoKeywords ? { seoKeywords: raw.seoKeywords } : {}),
     ...(raw?.seoDescription ? { seoDescription: raw.seoDescription } : {}),
     ...(raw?.createdAt ? { createdAt: raw.createdAt } : {}),
+    ...(raw?.updatedAt ? { updatedAt: Number(raw.updatedAt) || raw.updatedAt } : {}),
   } as Article;
 }
 
@@ -973,10 +982,7 @@ function mergeArticlesAndSync(
   mediaItems?: MediaItem[]
 ): Article[] {
   const deletedIds = getDeletedArticleIds();
-  const hasLocalCustomArticles = localArticles.some(
-    (a) => a && a.id && !SEED_ARTICLE_IDS.has(a.id) && !deletedIds.has(a.id)
-  );
-  const isAdmin = isCurrentSessionAdmin() || hasLocalCustomArticles;
+  const isAdmin = isCurrentSessionAdmin();
 
   const assignedMediaByArticleId = new Map<string, string>();
   if (Array.isArray(mediaItems)) {
@@ -1055,26 +1061,38 @@ function mergeArticlesAndSync(
       continue;
     }
 
+    const localUpdated = Number((localArt as any).updatedAt || 0);
+    const apiUpdated = Number((apiArt as any).updatedAt || 0);
+    const localIsNewer = localUpdated > apiUpdated;
+
+    const primaryArt = localIsNewer ? localArt : apiArt;
+    const secondaryArt = localIsNewer ? apiArt : localArt;
+
     const chosenCover =
-      (localArt.coverImage && localArt.coverImage !== FALLBACK_ARTICLE_IMAGE
-        ? localArt.coverImage
-        : apiArt.coverImage && apiArt.coverImage !== FALLBACK_ARTICLE_IMAGE
-        ? apiArt.coverImage
-        : assignedUrl || localArt.coverImage || apiArt.coverImage) || FALLBACK_ARTICLE_IMAGE;
+      (primaryArt.coverImage && primaryArt.coverImage !== FALLBACK_ARTICLE_IMAGE
+        ? primaryArt.coverImage
+        : secondaryArt.coverImage && secondaryArt.coverImage !== FALLBACK_ARTICLE_IMAGE
+        ? secondaryArt.coverImage
+        : assignedUrl || primaryArt.coverImage || secondaryArt.coverImage) || FALLBACK_ARTICLE_IMAGE;
 
     const mergedArt: Article = normalizeArticleRecord({
-      ...apiArt,
-      ...localArt,
+      ...secondaryArt,
+      ...primaryArt,
       coverImage: chosenCover,
-      createdAt: (localArt as any).createdAt || (apiArt as any).createdAt,
+      createdAt: (apiArt as any).createdAt || (localArt as any).createdAt,
+      updatedAt: Math.max(localUpdated, apiUpdated) || undefined,
     });
 
     if (
-      mergedArt.coverImage !== apiArt.coverImage ||
-      mergedArt.title !== apiArt.title ||
-      mergedArt.category !== apiArt.category ||
-      mergedArt.summary !== apiArt.summary ||
-      mergedArt.content !== apiArt.content
+      localIsNewer &&
+      (mergedArt.coverImage !== apiArt.coverImage ||
+        mergedArt.title !== apiArt.title ||
+        mergedArt.category !== apiArt.category ||
+        mergedArt.summary !== apiArt.summary ||
+        mergedArt.content !== apiArt.content ||
+        mergedArt.seoTitle !== apiArt.seoTitle ||
+        mergedArt.seoKeywords !== apiArt.seoKeywords ||
+        mergedArt.seoDescription !== apiArt.seoDescription)
     ) {
       updateArticleApi(mergedArt.id, mergedArt).catch(() => {});
     }
@@ -2022,6 +2040,70 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return null;
   });
 
+  // Automatically keep selectedPhone, selectedArticle, and selectedBrand reactive whenever phones, articles, or brands state updates
+  useEffect(() => {
+    setSelectedPhoneState((prev) => {
+      if (prev) {
+        const latest = phones.find((p) => p.id === prev.id);
+        if (latest && JSON.stringify(latest) !== JSON.stringify(prev)) {
+          return latest;
+        }
+        return prev;
+      }
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const phoneParam = params.get('phone');
+        if (phoneParam) {
+          const lower = phoneParam.toLowerCase();
+          const matched = phones.find(
+            (p) =>
+              p.id.toLowerCase() === lower ||
+              ((p as any).slug && String((p as any).slug).toLowerCase() === lower)
+          );
+          if (matched) return matched;
+        }
+      }
+      return prev;
+    });
+  }, [phones]);
+
+  useEffect(() => {
+    setSelectedArticleState((prev) => {
+      if (prev) {
+        const latest = articles.find((a) => a.id === prev.id);
+        if (latest && JSON.stringify(latest) !== JSON.stringify(prev)) {
+          return latest;
+        }
+        return prev;
+      }
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const articleParam = params.get('article');
+        if (articleParam) {
+          const lower = articleParam.toLowerCase();
+          const matched = articles.find(
+            (a) =>
+              a.id.toLowerCase() === lower ||
+              (a.slug && a.slug.toLowerCase() === lower)
+          );
+          if (matched) return matched;
+        }
+      }
+      return prev;
+    });
+  }, [articles]);
+
+  useEffect(() => {
+    setSelectedBrandState((prev) => {
+      if (!prev) return prev;
+      const latest = brands.find((b) => b.id === prev.id || b.slug === prev.slug);
+      if (latest && JSON.stringify(latest) !== JSON.stringify(prev)) {
+        return latest;
+      }
+      return prev;
+    });
+  }, [brands]);
+
   const [filterState, setFilterStateInternal] = useState<FilterState>(defaultFilterState);
 
   const [adminSection, setAdminSectionState] = useState<string>(() => {
@@ -2755,29 +2837,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               return combined;
             });
           }
-
-          if (isAdmin) {
-            setTimeout(() => {
-              try {
-                const phonesRaw = localStorage.getItem('gsmscope_phones_v3');
-                const brandsRaw = localStorage.getItem('gsmscope_brands_v3');
-                const articlesRaw = localStorage.getItem('gsmscope_articles_v2');
-                const reviewsRaw = localStorage.getItem('gsmscope_reviews_v2');
-                const adsRaw = localStorage.getItem('gsmscope_ads_v3');
-                const contentRaw = localStorage.getItem('gsmscope_website_content_v1');
-                const mediaRaw = localStorage.getItem('gsmscope_media_library_v1');
-                importDatabaseApi({
-                  phones: phonesRaw ? JSON.parse(phonesRaw) : undefined,
-                  brands: brandsRaw ? JSON.parse(brandsRaw) : undefined,
-                  articles: articlesRaw ? JSON.parse(articlesRaw) : undefined,
-                  reviews: reviewsRaw ? JSON.parse(reviewsRaw) : undefined,
-                  adSettings: adsRaw ? JSON.parse(adsRaw) : undefined,
-                  websiteContent: contentRaw ? JSON.parse(contentRaw) : undefined,
-                  mediaLibrary: mediaRaw ? JSON.parse(mediaRaw) : undefined,
-                }).catch(() => {});
-              } catch {}
-            }, 300);
-          }
         }
       } catch (err) {
         console.warn('Backend synchronization warning:', err);
@@ -3105,6 +3164,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const normalized = normalizePhoneRecord({
       ...newPhone,
       createdAt: (newPhone as any).createdAt || nowTs,
+      updatedAt: nowTs,
       ...(newPhone.isFeatured ? { featuredAt: (newPhone as any).featuredAt || nowTs } : {}),
     });
     setPhones(prev => {
@@ -3125,6 +3185,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...existing,
         ...updated,
         createdAt: (updated as any).createdAt || (existing as any)?.createdAt || nowTs,
+        updatedAt: nowTs,
         featuredAt: justFeatured
           ? nowTs
           : updated.isFeatured
@@ -3138,6 +3199,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ? [normalized, ...prev.filter(p => p.id !== normalized.id)]
         : prev.map(p => p.id === normalized.id ? normalized : p);
       safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(next));
+      safeSetLocalStorage('gsmscope_admin_browser_v1', 'true');
       setSelectedPhoneState(sel => (sel && sel.id === normalized.id ? normalized : sel));
       updatePhoneApi(normalized.id, normalized).catch(console.warn);
       return next;
@@ -3163,27 +3225,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updatePhonePrice = (id: string, newPriceNGN: number, newPriceUSD?: number, notes?: string) => {
+    const nowTs = Date.now();
     const updatedFields = {
       priceNGN: newPriceNGN,
       priceUSD: newPriceUSD || Math.round(newPriceNGN / 1500),
-      nairaPriceNotes: notes
+      nairaPriceNotes: notes,
+      updatedAt: nowTs,
     };
     setPhones(prev => {
+      let updatedPhoneObj: Phone | null = null;
       const next = prev.map(p => {
         if (p.id === id) {
-          return {
+          updatedPhoneObj = normalizePhoneRecord({
             ...p,
             oldPriceNGN: p.priceNGN,
             ...updatedFields,
-            nairaPriceNotes: notes || p.nairaPriceNotes
-          };
+            nairaPriceNotes: notes || p.nairaPriceNotes,
+            updatedAt: nowTs,
+          });
+          return updatedPhoneObj;
         }
         return p;
       });
       safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(next));
+      if (updatedPhoneObj) {
+        const finalObj = updatedPhoneObj;
+        setSelectedPhoneState(sel => (sel && sel.id === id ? finalObj : sel));
+        updatePhoneApi(id, finalObj).catch(console.warn);
+      } else {
+        updatePhoneApi(id, updatedFields).catch(console.warn);
+      }
       return next;
     });
-    updatePhoneApi(id, updatedFields).catch(console.warn);
   };
 
   const addBrand = (brand: Brand) => {
@@ -3267,6 +3340,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const normalized = normalizeArticleRecord({
       ...article,
       createdAt: (article as any).createdAt || nowTs,
+      updatedAt: nowTs,
     });
     setArticles(prev => {
       const next = [normalized, ...prev.filter(a => a.id !== normalized.id)];
@@ -3278,21 +3352,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateArticle = (updated: Article) => {
+    const nowTs = Date.now();
     setArticles(prev => {
       const existing = prev.find(a => a.id === updated.id);
       const normalized = normalizeArticleRecord({
         ...existing,
         ...updated,
-        createdAt: (updated as any).createdAt || (existing as any)?.createdAt || Date.now(),
+        createdAt: (updated as any).createdAt || (existing as any)?.createdAt || nowTs,
+        updatedAt: nowTs,
       });
       const exists = Boolean(existing);
       const next = exists
         ? prev.map(a => a.id === normalized.id ? normalized : a)
         : [normalized, ...prev];
       safeSetLocalStorage('gsmscope_articles_v2', JSON.stringify(next));
-      if (selectedArticle?.id === normalized.id) {
-        setSelectedArticle(normalized);
-      }
+      safeSetLocalStorage('gsmscope_admin_browser_v1', 'true');
+      setSelectedArticleState(sel => (sel && sel.id === normalized.id ? normalized : sel));
       updateArticleApi(normalized.id, normalized).catch(console.warn);
       return next;
     });

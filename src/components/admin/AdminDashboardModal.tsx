@@ -475,6 +475,7 @@ export default function AdminDashboardModal() {
     theme,
     toggleTheme,
     setSelectedPhone,
+    setSelectedArticle,
     resetFilters,
     startGlobalLoading,
     stopGlobalLoading,
@@ -1157,6 +1158,16 @@ export default function AdminDashboardModal() {
     }, 250);
   };
 
+  // View an article directly on the public website
+  const handleViewArticleOnPublicSite = (art: Article) => {
+    startGlobalLoading();
+    setSelectedArticle(art);
+    setTimeout(() => {
+      stopGlobalLoading();
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }, 250);
+  };
+
   // Handlers for 1. Phones (Complete Form with ALL fields)
   const openCreatePhoneForm = () => {
     const empty = createEmptyPhoneForm(brands[0]?.name || 'Samsung');
@@ -1279,7 +1290,8 @@ export default function AdminDashboardModal() {
           storageVariants: storageArr,
         },
       },
-    };
+      updatedAt: Date.now(),
+    } as Phone;
 
     if (editingPhoneId) {
       runWithProgress(() => {
@@ -1366,13 +1378,42 @@ export default function AdminDashboardModal() {
       .map((s) => s.trim())
       .filter(Boolean);
 
+    const priceNGN = Number(specPhoneDraft.priceNGN) || 0;
+    const priceUSD = Number(specPhoneDraft.priceUSD) || Math.round(priceNGN / 1500);
+    const computedPriceRange: Phone['priceRange'] =
+      priceNGN < 100000
+        ? 'under100k'
+        : priceNGN <= 200000
+        ? '100k-200k'
+        : priceNGN <= 350000
+        ? '200k-350k'
+        : priceNGN <= 600000
+        ? '350k-600k'
+        : priceNGN <= 1200000
+        ? '600k-1.2m'
+        : 'flagship';
+
+    const yearMatch = (specPhoneDraft.releaseDate || '').match(/\b(19\d{2}|20\d{2})\b/);
+    const derivedReleaseYear = yearMatch
+      ? Number(yearMatch[1])
+      : Number(specPhoneDraft.releaseYear) || new Date().getFullYear();
+
     const primaryImg = (specPhoneDraft.image || '').trim();
     const updated: Phone = {
       ...specPhoneDraft,
+      priceNGN,
+      priceUSD,
+      priceRange: computedPriceRange,
+      releaseYear: derivedReleaseYear,
       image: primaryImg,
       images: primaryImg
         ? [primaryImg, ...(specPhoneDraft.images || []).filter((u) => u !== primaryImg)]
         : specPhoneDraft.images,
+      keyHighlights: {
+        ...specPhoneDraft.keyHighlights,
+        ram: specPhoneDraft.keyHighlights.ram || ramArr.join(' / ') || '',
+        storage: specPhoneDraft.keyHighlights.storage || storageArr.join(' / ') || '',
+      },
       detailedSpecs: {
         ...specPhoneDraft.detailedSpecs,
         memory: {
@@ -1381,7 +1422,8 @@ export default function AdminDashboardModal() {
           storageVariants: storageArr.length > 0 ? storageArr : ['256GB'],
         },
       },
-    };
+      updatedAt: Date.now(),
+    } as Phone;
     runWithProgress(() => {
       updatePhone(updated);
     }, `Saved all specifications, image & SEO for ${updated.name}.`);
@@ -1556,7 +1598,8 @@ export default function AdminDashboardModal() {
           name: articleForm.authorName || existing.author.name,
           role: articleForm.authorRole || existing.author.role,
         },
-      };
+        updatedAt: Date.now(),
+      } as Article;
       runWithProgress(() => {
         updateArticle(updated);
         setEditingArticleId(null);
@@ -4207,7 +4250,8 @@ export default function AdminDashboardModal() {
 
                 {/* Brands Table */}
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <div className="w-full overflow-x-auto touch-pan-x">
+                    <table className="w-full min-w-[600px] text-left border-collapse text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-[11px] font-mono uppercase text-slate-500">
                         <th className="py-3 px-4">Brand</th>
@@ -4282,6 +4326,7 @@ export default function AdminDashboardModal() {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4897,96 +4942,111 @@ export default function AdminDashboardModal() {
                       ))}
                     </div>
                   </div>
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-[11px] font-mono uppercase text-slate-500">
-                        <th className="py-3 px-4">Article / Guide &amp; SEO</th>
-                        <th className="py-3 px-3">Category</th>
-                        <th className="py-3 px-3">Date</th>
-                        <th className="py-3 px-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                      {articles
-                        .filter((art) => {
-                          if (articleCategoryFilter === 'all') return true;
-                          const c = String(art.category || '').toLowerCase();
-                          const isGuide =
-                            c.includes('guide') ||
-                            ['frp & servicing tools', 'charging & battery', 'tips & security'].includes(c);
-                          const isReview = c.includes('review');
-                          if (articleCategoryFilter === 'guides') return isGuide;
-                          if (articleCategoryFilter === 'reviews') return isReview;
-                          return !isGuide && !isReview;
-                        })
-                        .map((art) => (
-                        <tr key={art.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30">
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={art.coverImage}
-                                alt={art.title}
-                                className="w-11 h-11 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0"
-                              />
-                              <div className="min-w-0">
-                                <div className="font-bold text-slate-900 dark:text-white line-clamp-1">{art.title}</div>
-                                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                                  {art.featured && (
-                                    <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
-                                      ★ Featured
-                                    </span>
-                                  )}
-                                  {(art.seoTitle || art.seoKeywords) && (
-                                    <span className="px-1.5 py-0.2 rounded bg-sky-500/15 text-sky-600 dark:text-sky-400 text-[10px] font-mono">
-                                      SEO Configured
-                                    </span>
-                                  )}
+                  <div className="w-full overflow-x-auto touch-pan-x">
+                    <table className="w-full min-w-[620px] text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-[11px] font-mono uppercase text-slate-500">
+                          <th className="py-3 px-4">Article / Guide &amp; SEO</th>
+                          <th className="py-3 px-3 whitespace-nowrap">Category</th>
+                          <th className="py-3 px-3 whitespace-nowrap">Date</th>
+                          <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                        {articles
+                          .filter((art) => {
+                            if (articleCategoryFilter === 'all') return true;
+                            const c = String(art.category || '').toLowerCase();
+                            const isGuide =
+                              c.includes('guide') ||
+                              ['frp & servicing tools', 'charging & battery', 'tips & security'].includes(c);
+                            const isReview = c.includes('review');
+                            if (articleCategoryFilter === 'guides') return isGuide;
+                            if (articleCategoryFilter === 'reviews') return isReview;
+                            return !isGuide && !isReview;
+                          })
+                          .map((art) => (
+                          <tr key={art.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30">
+                            <td className="py-3 px-4 min-w-[230px]">
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={art.coverImage}
+                                  alt={art.title}
+                                  className="w-11 h-11 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0"
+                                />
+                                <div className="min-w-0">
+                                  <div className="font-bold text-slate-900 dark:text-white line-clamp-1">{art.title}</div>
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                    {art.featured && (
+                                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                                        ★ Featured
+                                      </span>
+                                    )}
+                                    {(art.seoTitle || art.seoKeywords) && (
+                                      <span className="px-1.5 py-0.2 rounded bg-sky-500/15 text-sky-600 dark:text-sky-400 text-[10px] font-mono">
+                                        SEO Configured
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3">{art.category}</td>
-                          <td className="py-3 px-3 font-mono text-slate-400">{art.date}</td>
-                          <td className="py-3 px-4 text-right">
-                            <div className="inline-flex gap-1.5">
-                              <button
-                                onClick={() => {
-                                  setEditingArticleId(art.id);
-                                  setArticleForm({
-                                    title: art.title,
-                                    category: art.category,
-                                    summary: art.summary,
-                                    content: art.content,
-                                    coverImage: art.coverImage,
-                                    readTime: art.readTime,
-                                    tags: (art.tags || []).join(', '),
-                                    featured: Boolean(art.featured),
-                                    relatedPhoneId: art.relatedPhoneIds?.[0] || '',
-                                    authorName: art.author?.name || 'GsmScope Editorial',
-                                    authorRole: art.author?.role || 'Senior Editor',
-                                    seoTitle: art.seoTitle || '',
-                                    seoKeywords: art.seoKeywords || '',
-                                    seoDescription: art.seoDescription || '',
-                                  });
-                                }}
-                                className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-emerald-600 hover:text-white text-xs font-semibold cursor-pointer"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() =>
-                                  runWithProgress(() => deleteArticle(art.id), `Deleted article.`)
-                                }
-                                className="p-1 rounded bg-rose-500/10 hover:bg-rose-600 text-rose-500 hover:text-white cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap">{art.category}</td>
+                            <td className="py-3 px-3 font-mono text-slate-400 whitespace-nowrap">{art.date}</td>
+                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                              <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewArticleOnPublicSite(art)}
+                                  className="px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-600 text-emerald-600 dark:text-emerald-400 hover:text-white text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                                  title="View Article on Public Site"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>View</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingArticleId(art.id);
+                                    setArticleForm({
+                                      title: art.title,
+                                      category: art.category,
+                                      summary: art.summary,
+                                      content: art.content,
+                                      coverImage: art.coverImage,
+                                      readTime: art.readTime,
+                                      tags: (art.tags || []).join(', '),
+                                      featured: Boolean(art.featured),
+                                      relatedPhoneId: art.relatedPhoneIds?.[0] || '',
+                                      authorName: art.author?.name || 'GsmScope Editorial',
+                                      authorRole: art.author?.role || 'Senior Editor',
+                                      seoTitle: art.seoTitle || '',
+                                      seoKeywords: art.seoKeywords || '',
+                                      seoDescription: art.seoDescription || '',
+                                    });
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                  }}
+                                  className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-emerald-600 hover:text-white text-xs font-semibold cursor-pointer"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    runWithProgress(() => deleteArticle(art.id), `Deleted article.`)
+                                  }
+                                  className="p-1.5 rounded bg-rose-500/10 hover:bg-rose-600 text-rose-500 hover:text-white cursor-pointer"
+                                  title="Delete Article"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -7194,7 +7254,8 @@ export default function AdminDashboardModal() {
                 </form>
 
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <div className="w-full overflow-x-auto touch-pan-x">
+                    <table className="w-full min-w-[560px] text-left border-collapse text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-[11px] font-mono uppercase text-slate-500">
                         <th className="py-3 px-4">User</th>
@@ -7263,6 +7324,7 @@ export default function AdminDashboardModal() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </div>
             </div>

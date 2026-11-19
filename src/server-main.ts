@@ -1278,8 +1278,8 @@ app.post('/api/phones', (req: Request, res: Response) => {
   res.status(201).json({ success: true, phone: newPhone });
 });
 
-// Admin: Update Phone
-app.put('/api/phones/:id', (req: Request, res: Response) => {
+// Admin: Update Phone (supports both PUT and POST for cPanel firewall compatibility)
+const handleUpdatePhone = (req: Request, res: Response) => {
   const index = phonesDatabase.findIndex(p => p.id === req.params.id);
   const nowTs = Date.now();
   if (index === -1) {
@@ -1288,6 +1288,7 @@ app.put('/api/phones/:id', (req: Request, res: Response) => {
         ...req.body,
         id: req.params.id,
         createdAt: (req.body as any)?.createdAt || nowTs,
+        updatedAt: (req.body as any)?.updatedAt || nowTs,
         ...(req.body?.isFeatured ? { featuredAt: (req.body as any)?.featuredAt || nowTs } : {}),
         images: req.body.image
           ? [req.body.image, ...(Array.isArray(req.body.images) ? req.body.images.filter((u: string) => u !== req.body.image) : [])]
@@ -1304,6 +1305,7 @@ app.put('/api/phones/:id', (req: Request, res: Response) => {
   const mergedPhone: Phone = {
     ...previousPhone,
     ...req.body,
+    updatedAt: (req.body as any)?.updatedAt || nowTs,
     ...(justFeatured ? { featuredAt: nowTs } : {}),
   } as any;
   if (mergedPhone.image) {
@@ -1321,7 +1323,9 @@ app.put('/api/phones/:id', (req: Request, res: Response) => {
   }
   saveDatabaseToDisk();
   res.json({ success: true, phone: mergedPhone });
-});
+};
+app.put('/api/phones/:id', handleUpdatePhone);
+app.post('/api/phones/:id', handleUpdatePhone);
 
 // Admin: Delete Phone
 app.delete('/api/phones/:id', (req: Request, res: Response) => {
@@ -1359,7 +1363,7 @@ app.post('/api/brands', (req: Request, res: Response) => {
   res.status(201).json({ success: true, brand: newBrand });
 });
 
-app.put('/api/brands/:id', (req: Request, res: Response) => {
+const handleUpdateBrand = (req: Request, res: Response) => {
   const index = brandsDatabase.findIndex(
     b => b.id === req.params.id || b.slug === req.params.id || b.name.toLowerCase() === req.params.id.toLowerCase()
   );
@@ -1375,7 +1379,9 @@ app.put('/api/brands/:id', (req: Request, res: Response) => {
   brandsDatabase[index] = { ...brandsDatabase[index], ...req.body };
   saveDatabaseToDisk();
   res.json({ success: true, brand: brandsDatabase[index] });
-});
+};
+app.put('/api/brands/:id', handleUpdateBrand);
+app.post('/api/brands/:id', handleUpdateBrand);
 
 app.delete('/api/brands/:id', (req: Request, res: Response) => {
   const target = decodeURIComponent(req.params.id || '').trim().toLowerCase();
@@ -1445,8 +1451,9 @@ app.post('/api/articles', (req: Request, res: Response) => {
   res.status(201).json({ success: true, article: newArticle });
 });
 
-app.put('/api/articles/:id', (req: Request, res: Response) => {
+const handleUpdateArticle = (req: Request, res: Response) => {
   const index = articlesDatabase.findIndex(a => a.id === req.params.id);
+  const nowTs = Date.now();
   if (index === -1) {
     const created: Article = {
       id: req.params.id,
@@ -1462,7 +1469,8 @@ app.put('/api/articles/:id', (req: Request, res: Response) => {
       tags: Array.isArray(req.body.tags) ? req.body.tags : ['News'],
       featured: Boolean(req.body.featured),
       relatedPhoneIds: Array.isArray(req.body.relatedPhoneIds) ? req.body.relatedPhoneIds : [],
-      createdAt: (req.body as any)?.createdAt || Date.now(),
+      createdAt: (req.body as any)?.createdAt || nowTs,
+      updatedAt: (req.body as any)?.updatedAt || nowTs,
       ...(req.body.seoTitle ? { seoTitle: req.body.seoTitle } : {}),
       ...(req.body.seoKeywords ? { seoKeywords: req.body.seoKeywords } : {}),
       ...(req.body.seoDescription ? { seoDescription: req.body.seoDescription } : {}),
@@ -1471,10 +1479,16 @@ app.put('/api/articles/:id', (req: Request, res: Response) => {
     saveDatabaseToDisk();
     return res.json({ success: true, article: created });
   }
-  articlesDatabase[index] = { ...articlesDatabase[index], ...req.body };
+  articlesDatabase[index] = {
+    ...articlesDatabase[index],
+    ...req.body,
+    updatedAt: (req.body as any)?.updatedAt || nowTs,
+  };
   saveDatabaseToDisk();
   res.json({ success: true, article: articlesDatabase[index] });
-});
+};
+app.put('/api/articles/:id', handleUpdateArticle);
+app.post('/api/articles/:id', handleUpdateArticle);
 
 app.delete('/api/articles/:id', (req: Request, res: Response) => {
   deletedArticleIdsDatabase.add(req.params.id);

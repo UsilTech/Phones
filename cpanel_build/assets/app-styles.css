@@ -18,7 +18,7 @@
   --tw-inset-shadow-alpha: 100%;
   --tw-ring-shadow: 0 0 rgba(0, 0, 0, 0);
   --tw-inset-ring-shadow: 0 0 rgba(0, 0, 0, 0);
-  --tw-ring-offset-width: 0px;
+  --tw-ring-offset-width: 0;
   --tw-ring-offset-color: #fff;
   --tw-ring-offset-shadow: 0 0 rgba(0, 0, 0, 0);
   --tw-outline-style: solid;
@@ -26,50 +26,6 @@
   --tw-scale-x: 1;
   --tw-scale-y: 1;
   --tw-scale-z: 1;
-  --tw-rotate-x: initial;
-  --tw-rotate-y: initial;
-  --tw-rotate-z: initial;
-  --tw-skew-x: initial;
-  --tw-skew-y: initial;
-  --tw-gradient-position: initial;
-  --tw-gradient-stops: initial;
-  --tw-gradient-via-stops: initial;
-  --tw-leading: initial;
-  --tw-font-weight: initial;
-  --tw-tracking: initial;
-  --tw-ordinal: initial;
-  --tw-slashed-zero: initial;
-  --tw-numeric-figure: initial;
-  --tw-numeric-spacing: initial;
-  --tw-numeric-fraction: initial;
-  --tw-shadow-color: initial;
-  --tw-inset-shadow-color: initial;
-  --tw-ring-color: initial;
-  --tw-inset-ring-color: initial;
-  --tw-ring-inset: initial;
-  --tw-blur: initial;
-  --tw-brightness: initial;
-  --tw-contrast: initial;
-  --tw-grayscale: initial;
-  --tw-hue-rotate: initial;
-  --tw-invert: initial;
-  --tw-opacity: initial;
-  --tw-saturate: initial;
-  --tw-sepia: initial;
-  --tw-drop-shadow: initial;
-  --tw-drop-shadow-color: initial;
-  --tw-drop-shadow-size: initial;
-  --tw-backdrop-blur: initial;
-  --tw-backdrop-brightness: initial;
-  --tw-backdrop-contrast: initial;
-  --tw-backdrop-grayscale: initial;
-  --tw-backdrop-hue-rotate: initial;
-  --tw-backdrop-invert: initial;
-  --tw-backdrop-opacity: initial;
-  --tw-backdrop-saturate: initial;
-  --tw-backdrop-sepia: initial;
-  --tw-duration: initial;
-  --tw-ease: initial;
 }
 
 ::backdrop {
@@ -92,7 +48,7 @@
   --tw-inset-shadow-alpha: 100%;
   --tw-ring-shadow: 0 0 rgba(0, 0, 0, 0);
   --tw-inset-ring-shadow: 0 0 rgba(0, 0, 0, 0);
-  --tw-ring-offset-width: 0px;
+  --tw-ring-offset-width: 0;
   --tw-ring-offset-color: #fff;
   --tw-ring-offset-shadow: 0 0 rgba(0, 0, 0, 0);
   --tw-outline-style: solid;
@@ -100,14 +56,33 @@
   --tw-scale-x: 1;
   --tw-scale-y: 1;
   --tw-scale-z: 1;
+}
+
+*, :before, :after {
+  --tw-translate-x: 0;
+  --tw-translate-y: 0;
+  --tw-translate-z: 0;
   --tw-rotate-x: initial;
   --tw-rotate-y: initial;
   --tw-rotate-z: initial;
   --tw-skew-x: initial;
   --tw-skew-y: initial;
+  --tw-pan-x: initial;
+  --tw-pan-y: initial;
+  --tw-pinch-zoom: initial;
+  --tw-scroll-snap-strictness: proximity;
+  --tw-space-y-reverse: 0;
+  --tw-divide-y-reverse: 0;
+  --tw-border-style: solid;
   --tw-gradient-position: initial;
+  --tw-gradient-from: rgba(0, 0, 0, 0);
+  --tw-gradient-via: rgba(0, 0, 0, 0);
+  --tw-gradient-to: rgba(0, 0, 0, 0);
   --tw-gradient-stops: initial;
   --tw-gradient-via-stops: initial;
+  --tw-gradient-from-position: 0%;
+  --tw-gradient-via-position: 50%;
+  --tw-gradient-to-position: 100%;
   --tw-leading: initial;
   --tw-font-weight: initial;
   --tw-tracking: initial;
@@ -116,11 +91,21 @@
   --tw-numeric-figure: initial;
   --tw-numeric-spacing: initial;
   --tw-numeric-fraction: initial;
+  --tw-shadow: 0 0 rgba(0, 0, 0, 0);
   --tw-shadow-color: initial;
+  --tw-shadow-alpha: 100%;
+  --tw-inset-shadow: 0 0 rgba(0, 0, 0, 0);
   --tw-inset-shadow-color: initial;
+  --tw-inset-shadow-alpha: 100%;
   --tw-ring-color: initial;
+  --tw-ring-shadow: 0 0 rgba(0, 0, 0, 0);
   --tw-inset-ring-color: initial;
+  --tw-inset-ring-shadow: 0 0 rgba(0, 0, 0, 0);
   --tw-ring-inset: initial;
+  --tw-ring-offset-width: 0px;
+  --tw-ring-offset-color: #fff;
+  --tw-ring-offset-shadow: 0 0 rgba(0, 0, 0, 0);
+  --tw-outline-style: solid;
   --tw-blur: initial;
   --tw-brightness: initial;
   --tw-contrast: initial;
@@ -132,6 +117,7 @@
   --tw-sepia: initial;
   --tw-drop-shadow: initial;
   --tw-drop-shadow-color: initial;
+  --tw-drop-shadow-alpha: 100%;
   --tw-drop-shadow-size: initial;
   --tw-backdrop-blur: initial;
   --tw-backdrop-brightness: initial;
@@ -144,11 +130,94 @@
   --tw-backdrop-sepia: initial;
   --tw-duration: initial;
   --tw-ease: initial;
+  --tw-scale-x: 1;
+  --tw-scale-y: 1;
+  --tw-scale-z: 1;
+}
+
+::backdrop {
+  --tw-translate-x: 0;
+  --tw-translate-y: 0;
+  --tw-translate-z: 0;
+  --tw-rotate-x: initial;
+  --tw-rotate-y: initial;
+  --tw-rotate-z: initial;
+  --tw-skew-x: initial;
+  --tw-skew-y: initial;
+  --tw-pan-x: initial;
+  --tw-pan-y: initial;
+  --tw-pinch-zoom: initial;
+  --tw-scroll-snap-strictness: proximity;
+  --tw-space-y-reverse: 0;
+  --tw-divide-y-reverse: 0;
+  --tw-border-style: solid;
+  --tw-gradient-position: initial;
+  --tw-gradient-from: rgba(0, 0, 0, 0);
+  --tw-gradient-via: rgba(0, 0, 0, 0);
+  --tw-gradient-to: rgba(0, 0, 0, 0);
+  --tw-gradient-stops: initial;
+  --tw-gradient-via-stops: initial;
+  --tw-gradient-from-position: 0%;
+  --tw-gradient-via-position: 50%;
+  --tw-gradient-to-position: 100%;
+  --tw-leading: initial;
+  --tw-font-weight: initial;
+  --tw-tracking: initial;
+  --tw-ordinal: initial;
+  --tw-slashed-zero: initial;
+  --tw-numeric-figure: initial;
+  --tw-numeric-spacing: initial;
+  --tw-numeric-fraction: initial;
+  --tw-shadow: 0 0 rgba(0, 0, 0, 0);
+  --tw-shadow-color: initial;
+  --tw-shadow-alpha: 100%;
+  --tw-inset-shadow: 0 0 rgba(0, 0, 0, 0);
+  --tw-inset-shadow-color: initial;
+  --tw-inset-shadow-alpha: 100%;
+  --tw-ring-color: initial;
+  --tw-ring-shadow: 0 0 rgba(0, 0, 0, 0);
+  --tw-inset-ring-color: initial;
+  --tw-inset-ring-shadow: 0 0 rgba(0, 0, 0, 0);
+  --tw-ring-inset: initial;
+  --tw-ring-offset-width: 0px;
+  --tw-ring-offset-color: #fff;
+  --tw-ring-offset-shadow: 0 0 rgba(0, 0, 0, 0);
+  --tw-outline-style: solid;
+  --tw-blur: initial;
+  --tw-brightness: initial;
+  --tw-contrast: initial;
+  --tw-grayscale: initial;
+  --tw-hue-rotate: initial;
+  --tw-invert: initial;
+  --tw-opacity: initial;
+  --tw-saturate: initial;
+  --tw-sepia: initial;
+  --tw-drop-shadow: initial;
+  --tw-drop-shadow-color: initial;
+  --tw-drop-shadow-alpha: 100%;
+  --tw-drop-shadow-size: initial;
+  --tw-backdrop-blur: initial;
+  --tw-backdrop-brightness: initial;
+  --tw-backdrop-contrast: initial;
+  --tw-backdrop-grayscale: initial;
+  --tw-backdrop-hue-rotate: initial;
+  --tw-backdrop-invert: initial;
+  --tw-backdrop-opacity: initial;
+  --tw-backdrop-saturate: initial;
+  --tw-backdrop-sepia: initial;
+  --tw-duration: initial;
+  --tw-ease: initial;
+  --tw-scale-x: 1;
+  --tw-scale-y: 1;
+  --tw-scale-z: 1;
 }
 
 :root {
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+      "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+      "Segoe UI Symbol", "Noto Color Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
   --color-red-600: #e40014;
   --color-red-700: #bf000f;
   --color-red-800: #9f0712;
@@ -283,8 +352,11 @@
 }
 
 :host {
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+      "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+      "Segoe UI Symbol", "Noto Color Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
   --color-red-600: #e40014;
   --color-red-700: #bf000f;
   --color-red-800: #9f0712;
@@ -486,7 +558,6 @@ h1, h2, h3, h4, h5, h6 {
 
 a {
   color: inherit;
-  -webkit-text-decoration: inherit;
   -webkit-text-decoration: inherit;
   -webkit-text-decoration: inherit;
   -webkit-text-decoration: inherit;
@@ -710,13 +781,13 @@ input[type="button"] {
   appearance: button;
 }
 
-input[type="reset"] {
+[type="reset"] {
   -webkit-appearance: button;
   -moz-appearance: button;
   appearance: button;
 }
 
-input[type="submit"] {
+[type="submit"] {
   -webkit-appearance: button;
   -moz-appearance: button;
   appearance: button;
@@ -1714,6 +1785,22 @@ button:active:not(:disabled) {
   min-width: 220px;
 }
 
+.min-w-\[230px\] {
+  min-width: 230px;
+}
+
+.min-w-\[560px\] {
+  min-width: 560px;
+}
+
+.min-w-\[600px\] {
+  min-width: 600px;
+}
+
+.min-w-\[620px\] {
+  min-width: 620px;
+}
+
 .flex-1 {
   flex: 1;
 }
@@ -1749,11 +1836,11 @@ button:active:not(:disabled) {
 }
 
 .-rotate-90 {
-  transform: rotate(-90deg) rotate(-90deg);
+  transform: rotate(-90deg) rotate3d(0, 0, 1, -90deg);
 }
 
 .rotate-180 {
-  transform: rotate(180deg) rotate(180deg);
+  transform: rotate(180deg) rotate3d(0, 0, 1, 180deg);
 }
 
 .transform {
@@ -1770,6 +1857,11 @@ button:active:not(:disabled) {
 
 .cursor-pointer {
   cursor: pointer;
+}
+
+.touch-pan-x {
+  --tw-pan-x: pan-x;
+  touch-action: var(--tw-pan-x, ) var(--tw-pan-y, ) var(--tw-pinch-zoom, );
 }
 
 .resize {
@@ -3759,7 +3851,6 @@ button:active:not(:disabled) {
   -webkit-text-decoration-color: var(--color-emerald-500);
   -webkit-text-decoration-color: var(--color-emerald-500);
   -webkit-text-decoration-color: var(--color-emerald-500);
-  -webkit-text-decoration-color: var(--color-emerald-500);
   text-decoration-color: var(--color-emerald-500);
 }
 
@@ -4574,7 +4665,7 @@ button:active:not(:disabled) {
 }
 
 .active\:scale-\[0\.98\]:active {
-  transform: scale(.98) scale(.98);
+  transform: scale(.98) scale3d(.98, .98, 1);
 }
 
 .active\:bg-emerald-700:active {
@@ -5863,7 +5954,7 @@ body::-webkit-scrollbar {
 }
 
 @keyframes compare-pulse {
-  0%, to {
+  0%, 100% {
     transform: scale(1);
     box-shadow: 0 0 rgba(16, 185, 129, .55);
   }
@@ -5885,7 +5976,7 @@ body::-webkit-scrollbar {
 }
 
 @keyframes ping {
-  75%, to {
+  75%, 100% {
     opacity: 0;
     transform: scale(2);
   }

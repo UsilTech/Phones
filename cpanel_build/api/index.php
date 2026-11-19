@@ -461,6 +461,7 @@ if ($route === 'phones' && $method === 'POST') {
     $nowTs = round(microtime(true) * 1000);
     if (empty($body['id'])) $body['id'] = 'phone-' . $nowTs;
     if (empty($body['createdAt'])) $body['createdAt'] = $nowTs;
+    if (empty($body['updatedAt'])) $body['updatedAt'] = $nowTs;
     if (!empty($body['isFeatured']) && empty($body['featuredAt'])) $body['featuredAt'] = $nowTs;
 
     $db['deletedPhoneIds'] = array_values(array_diff($db['deletedPhoneIds'], array($body['id'])));
@@ -474,6 +475,7 @@ if ($route === 'phones' && $method === 'POST') {
     }
     if ($existingIdx !== -1) {
         $updated = array_merge($db['phones'][$existingIdx], $body);
+        $updated['updatedAt'] = !empty($body['updatedAt']) ? $body['updatedAt'] : $nowTs;
         array_splice($db['phones'], $existingIdx, 1);
         array_unshift($db['phones'], $updated);
         saveDatabase($db);
@@ -506,7 +508,7 @@ if (preg_match('#^phones/([^/]+)$#', $route, $m)) {
         }
         sendJson(array('error' => 'Phone not found'), 404);
     }
-    if ($method === 'PUT') {
+    if ($method === 'PUT' || $method === 'POST') {
         $body = getJsonBody();
         $nowTs = round(microtime(true) * 1000);
         foreach ($db['phones'] as $idx => $p) {
@@ -514,6 +516,7 @@ if (preg_match('#^phones/([^/]+)$#', $route, $m)) {
                 $justFeatured = !empty($body['isFeatured']) && empty($p['isFeatured']);
                 $merged = array_merge($p, $body);
                 $merged['id'] = $id;
+                $merged['updatedAt'] = !empty($body['updatedAt']) ? $body['updatedAt'] : $nowTs;
                 if ($justFeatured) $merged['featuredAt'] = $nowTs;
                 if (!empty($merged['image'])) {
                     $imgs = isset($merged['images']) && is_array($merged['images']) ? $merged['images'] : array();
@@ -534,6 +537,7 @@ if (preg_match('#^phones/([^/]+)$#', $route, $m)) {
         if (!empty($body['name'])) {
             $body['id'] = $id;
             if (empty($body['createdAt'])) $body['createdAt'] = $nowTs;
+            if (empty($body['updatedAt'])) $body['updatedAt'] = $nowTs;
             array_unshift($db['phones'], $body);
             saveDatabase($db);
             sendJson(array('success' => true, 'phone' => $body));
@@ -591,7 +595,7 @@ if ($route === 'brands' && $method === 'POST') {
 if (preg_match('#^brands/([^/]+)$#', $route, $m)) {
     $id = urldecode($m[1]);
     $targetLower = strtolower(trim($id));
-    if ($method === 'PUT') {
+    if ($method === 'PUT' || $method === 'POST') {
         $body = getJsonBody();
         foreach ($db['brands'] as $idx => $b) {
             if (
@@ -646,6 +650,7 @@ if ($route === 'articles' && $method === 'POST') {
     $nowTs = round(microtime(true) * 1000);
     if (empty($body['id'])) $body['id'] = 'art-' . $nowTs;
     if (empty($body['createdAt'])) $body['createdAt'] = $nowTs;
+    if (empty($body['updatedAt'])) $body['updatedAt'] = $nowTs;
 
     $db['deletedArticleIds'] = array_values(array_diff($db['deletedArticleIds'], array($body['id'])));
 
@@ -658,6 +663,7 @@ if ($route === 'articles' && $method === 'POST') {
     }
     if ($existingIdx !== -1) {
         $db['articles'][$existingIdx] = array_merge($db['articles'][$existingIdx], $body);
+        $db['articles'][$existingIdx]['updatedAt'] = !empty($body['updatedAt']) ? $body['updatedAt'] : $nowTs;
         $saved = $db['articles'][$existingIdx];
     } else {
         array_unshift($db['articles'], $body);
@@ -688,18 +694,21 @@ if (preg_match('#^articles/([^/]+)$#', $route, $m)) {
         }
         sendJson(array('error' => 'Article not found'), 404);
     }
-    if ($method === 'PUT') {
+    if ($method === 'PUT' || $method === 'POST') {
         $body = getJsonBody();
+        $nowTs = round(microtime(true) * 1000);
         foreach ($db['articles'] as $idx => $a) {
             if (isset($a['id']) && $a['id'] === $id) {
                 $db['articles'][$idx] = array_merge($a, $body);
                 $db['articles'][$idx]['id'] = $id;
+                $db['articles'][$idx]['updatedAt'] = !empty($body['updatedAt']) ? $body['updatedAt'] : $nowTs;
                 saveDatabase($db);
                 sendJson(array('success' => true, 'article' => $db['articles'][$idx]));
             }
         }
         $body['id'] = $id;
-        if (empty($body['createdAt'])) $body['createdAt'] = round(microtime(true) * 1000);
+        if (empty($body['createdAt'])) $body['createdAt'] = $nowTs;
+        if (empty($body['updatedAt'])) $body['updatedAt'] = $nowTs;
         array_unshift($db['articles'], $body);
         saveDatabase($db);
         sendJson(array('success' => true, 'article' => $body));
@@ -1219,8 +1228,16 @@ if ($route === 'database/import' && $method === 'POST') {
             if (!empty($p['id'])) $byId[$p['id']] = $p;
         }
         foreach ($db['phones'] as $sp) {
-            if (!empty($sp['id']) && !isset($byId[$sp['id']]) && !in_array($sp['id'], $db['deletedPhoneIds'])) {
-                $byId[$sp['id']] = $sp;
+            if (!empty($sp['id']) && !in_array($sp['id'], $db['deletedPhoneIds'])) {
+                if (!isset($byId[$sp['id']])) {
+                    $byId[$sp['id']] = $sp;
+                } else {
+                    $srvUpdated = floatval($sp['updatedAt'] ?? 0);
+                    $incUpdated = floatval($byId[$sp['id']]['updatedAt'] ?? 0);
+                    if ($srvUpdated > $incUpdated) {
+                        $byId[$sp['id']] = $sp;
+                    }
+                }
             }
         }
         $db['phones'] = array_values($byId);
@@ -1232,8 +1249,16 @@ if ($route === 'database/import' && $method === 'POST') {
             if (!empty($a['id'])) $byId[$a['id']] = $a;
         }
         foreach ($db['articles'] as $sa) {
-            if (!empty($sa['id']) && !isset($byId[$sa['id']]) && !in_array($sa['id'], $db['deletedArticleIds'])) {
-                $byId[$sa['id']] = $sa;
+            if (!empty($sa['id']) && !in_array($sa['id'], $db['deletedArticleIds'])) {
+                if (!isset($byId[$sa['id']])) {
+                    $byId[$sa['id']] = $sa;
+                } else {
+                    $srvUpdated = floatval($sa['updatedAt'] ?? 0);
+                    $incUpdated = floatval($byId[$sa['id']]['updatedAt'] ?? 0);
+                    if ($srvUpdated > $incUpdated) {
+                        $byId[$sa['id']] = $sa;
+                    }
+                }
             }
         }
         $db['articles'] = array_values($byId);
