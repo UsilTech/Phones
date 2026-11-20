@@ -338,6 +338,29 @@ interface PersistentDatabaseSchema {
   deletedReviewIds?: string[];
   deletedBrandKeys?: string[];
   deletedInquiryIds?: string[];
+  websiteStats?: {
+    allTimeViews: number;
+    dailyViews: Record<string, number>;
+    hourlyViews: Record<string, Record<string, number>>;
+    pageViews: Record<
+      string,
+      {
+        path: string;
+        title: string;
+        type: 'article' | 'phone' | 'page';
+        entityId?: string;
+        views: number;
+        lastViewedAt: string;
+      }
+    >;
+    referrers: Record<string, number>;
+    searchEngines: Record<string, number>;
+    socialSources: Record<string, number>;
+    countries: Record<string, number>;
+    browsers: Record<string, number>;
+    operatingSystems: Record<string, number>;
+    updatedAt: string;
+  };
 }
 
 function getDefaultPhones(revs: Review[]): Phone[] {
@@ -415,6 +438,19 @@ let deletedArticleIdsDatabase = new Set<string>();
 let deletedReviewIdsDatabase = new Set<string>();
 let deletedBrandKeysDatabase = new Set<string>();
 let deletedInquiryIdsDatabase = new Set<string>();
+let websiteStatsDatabase: NonNullable<PersistentDatabaseSchema['websiteStats']> = {
+  allTimeViews: 0,
+  dailyViews: {},
+  hourlyViews: {},
+  pageViews: {},
+  referrers: {},
+  searchEngines: {},
+  socialSources: {},
+  countries: {},
+  browsers: {},
+  operatingSystems: {},
+  updatedAt: new Date().toISOString(),
+};
 let cachedEtherealTransporter: any = null;
 let lastLoadedDbMtimeMs = 0;
 let lastLoadedDbSize = 0;
@@ -454,6 +490,7 @@ function saveDatabaseToDisk(): void {
       deletedReviewIds: Array.from(deletedReviewIdsDatabase),
       deletedBrandKeys: Array.from(deletedBrandKeysDatabase),
       deletedInquiryIds: Array.from(deletedInquiryIdsDatabase),
+      websiteStats: websiteStatsDatabase,
     };
     const serialized = JSON.stringify(payload, null, 2);
     const tempFile = `${DB_FILE_PATH}.tmp`;
@@ -490,6 +527,7 @@ function saveDatabaseToDisk(): void {
           deletedReviewIds: Array.from(deletedReviewIdsDatabase),
           deletedBrandKeys: Array.from(deletedBrandKeysDatabase),
           deletedInquiryIds: Array.from(deletedInquiryIdsDatabase),
+          websiteStats: websiteStatsDatabase,
         },
         null,
         2
@@ -701,6 +739,23 @@ function loadDatabaseFromDisk(silent = false): void {
       }
       if (Array.isArray(parsed.confirmationEmailsLog)) {
         confirmationEmailsLog = parsed.confirmationEmailsLog;
+      }
+      if (parsed.websiteStats && typeof parsed.websiteStats === 'object') {
+        const ws = parsed.websiteStats;
+        websiteStatsDatabase = {
+          allTimeViews: typeof ws.allTimeViews === 'number' ? ws.allTimeViews : 0,
+          dailyViews: ws.dailyViews && typeof ws.dailyViews === 'object' ? { ...ws.dailyViews } : {},
+          hourlyViews: ws.hourlyViews && typeof ws.hourlyViews === 'object' ? { ...ws.hourlyViews } : {},
+          pageViews: ws.pageViews && typeof ws.pageViews === 'object' ? { ...ws.pageViews } : {},
+          referrers: ws.referrers && typeof ws.referrers === 'object' ? { ...ws.referrers } : {},
+          searchEngines: ws.searchEngines && typeof ws.searchEngines === 'object' ? { ...ws.searchEngines } : {},
+          socialSources: ws.socialSources && typeof ws.socialSources === 'object' ? { ...ws.socialSources } : {},
+          countries: ws.countries && typeof ws.countries === 'object' ? { ...ws.countries } : {},
+          browsers: ws.browsers && typeof ws.browsers === 'object' ? { ...ws.browsers } : {},
+          operatingSystems:
+            ws.operatingSystems && typeof ws.operatingSystems === 'object' ? { ...ws.operatingSystems } : {},
+          updatedAt: typeof ws.updatedAt === 'string' ? ws.updatedAt : new Date().toISOString(),
+        };
       }
       if (!silent) {
         console.log(`[Database Persistence] Loaded ${phonesDatabase.length} phones, ${articlesDatabase.length} articles, ${mediaDatabase.length} media items from data/database.json`);
@@ -2302,17 +2357,146 @@ app.post('/api/admin/verify-otp', (req: Request, res: Response) => {
   });
 });
 
-// 10. System Stats Dashboard API
+// 10. System Stats & Blogger-Style Website Stats Dashboard API
+function resolveServerCountryName(req: Request, clientCountry?: string): string {
+  const isoHeader = (
+    (req.headers['cf-ipcountry'] as string) ||
+    (req.headers['x-vercel-ip-country'] as string) ||
+    (req.headers['x-country-code'] as string) ||
+    (req.headers['x-appengine-country'] as string) ||
+    ''
+  )
+    .trim()
+    .toUpperCase();
+  if (isoHeader && isoHeader.length === 2 && isoHeader !== 'XX' && isoHeader !== 'ZZ') {
+    try {
+      const dn = new Intl.DisplayNames(['en'], { type: 'region' });
+      const resolved = dn.of(isoHeader);
+      if (resolved && resolved !== isoHeader) return resolved;
+    } catch {}
+  }
+  const cleanClient = String(clientCountry || '').trim();
+  return cleanClient || 'Unknown';
+}
+
 app.get('/api/stats', (_req: Request, res: Response) => {
-  const totalViews = phonesDatabase.reduce((acc, p) => acc + (p.viewsCount || 0), 0);
+  syncDatabaseFromDiskIfChanged();
+  const totalPhoneViews = phonesDatabase.reduce((acc, p) => acc + (p.viewsCount || 0), 0);
+  const totalArticleViews = articlesDatabase.reduce((acc, a) => acc + (a.viewsCount || 0), 0);
+  const sumDaily = Object.values(websiteStatsDatabase.dailyViews || {}).reduce(
+    (acc, v) => acc + (Number(v) || 0),
+    0
+  );
+  const effectiveAllTime = Math.max(
+    websiteStatsDatabase.allTimeViews || 0,
+    sumDaily,
+    totalPhoneViews + totalArticleViews
+  );
   res.json({
     totalPhones: phonesDatabase.length,
     totalBrands: brandsDatabase.length,
     totalArticles: articlesDatabase.length,
     totalReviews: reviewsDatabase.length,
-    totalViews,
+    totalViews: effectiveAllTime,
     newsletterSubscribersCount: newsletterSubscribers.length,
-    contactInquiriesCount: contactInquiries.length
+    contactInquiriesCount: contactInquiries.length,
+    websiteStats: {
+      ...websiteStatsDatabase,
+      allTimeViews: effectiveAllTime,
+    },
+  });
+});
+
+app.post('/api/stats/track', (req: Request, res: Response) => {
+  syncDatabaseFromDiskIfChanged();
+  const body = req.body || {};
+  const rawPath = String(body.path || '/').trim();
+  if (rawPath.startsWith('/admin') || rawPath.includes('tab=admin')) {
+    return res.json({ success: true, ignored: true, websiteStats: websiteStatsDatabase });
+  }
+
+  const now = new Date();
+  const defaultDateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+    now.getDate()
+  ).padStart(2, '0')}`;
+  const defaultHourKey = String(now.getHours()).padStart(2, '0');
+
+  const dateKey =
+    typeof body.dateKey === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.dateKey)
+      ? body.dateKey
+      : defaultDateKey;
+  const hourKey =
+    typeof body.hourKey === 'string' && /^\d{2}$/.test(body.hourKey) ? body.hourKey : defaultHourKey;
+  const title = String(body.title || 'Home').trim().slice(0, 220);
+  const pageType: 'article' | 'phone' | 'page' =
+    body.type === 'article' || body.type === 'phone' ? body.type : 'page';
+  const entityId = typeof body.entityId === 'string' ? body.entityId.trim() : undefined;
+
+  websiteStatsDatabase.allTimeViews = (websiteStatsDatabase.allTimeViews || 0) + 1;
+  websiteStatsDatabase.dailyViews[dateKey] = (websiteStatsDatabase.dailyViews[dateKey] || 0) + 1;
+
+  if (!websiteStatsDatabase.hourlyViews[dateKey]) {
+    websiteStatsDatabase.hourlyViews[dateKey] = {};
+  }
+  websiteStatsDatabase.hourlyViews[dateKey][hourKey] =
+    (websiteStatsDatabase.hourlyViews[dateKey][hourKey] || 0) + 1;
+
+  // Keep hourlyViews trimmed to the most recent 10 days so database.json remains compact
+  const hourDays = Object.keys(websiteStatsDatabase.hourlyViews).sort();
+  if (hourDays.length > 10) {
+    for (const oldDay of hourDays.slice(0, hourDays.length - 10)) {
+      delete websiteStatsDatabase.hourlyViews[oldDay];
+    }
+  }
+
+  const existingPage = websiteStatsDatabase.pageViews[rawPath];
+  websiteStatsDatabase.pageViews[rawPath] = {
+    path: rawPath,
+    title: title || existingPage?.title || rawPath,
+    type: pageType,
+    entityId: entityId || existingPage?.entityId,
+    views: (existingPage?.views || 0) + 1,
+    lastViewedAt: now.toISOString(),
+  };
+
+  const referrer = String(body.referrer || '').trim().slice(0, 200);
+  if (referrer) {
+    websiteStatsDatabase.referrers[referrer] = (websiteStatsDatabase.referrers[referrer] || 0) + 1;
+  }
+
+  const searchEngine = String(body.searchEngine || '').trim().slice(0, 80);
+  if (searchEngine) {
+    websiteStatsDatabase.searchEngines[searchEngine] =
+      (websiteStatsDatabase.searchEngines[searchEngine] || 0) + 1;
+  }
+
+  const socialSource = String(body.socialSource || '').trim().slice(0, 80);
+  if (socialSource) {
+    websiteStatsDatabase.socialSources[socialSource] =
+      (websiteStatsDatabase.socialSources[socialSource] || 0) + 1;
+  }
+
+  const country = resolveServerCountryName(req, body.country);
+  if (country) {
+    websiteStatsDatabase.countries[country] = (websiteStatsDatabase.countries[country] || 0) + 1;
+  }
+
+  const browser = String(body.browser || '').trim().slice(0, 60);
+  if (browser) {
+    websiteStatsDatabase.browsers[browser] = (websiteStatsDatabase.browsers[browser] || 0) + 1;
+  }
+
+  const os = String(body.os || '').trim().slice(0, 60);
+  if (os) {
+    websiteStatsDatabase.operatingSystems[os] = (websiteStatsDatabase.operatingSystems[os] || 0) + 1;
+  }
+
+  websiteStatsDatabase.updatedAt = now.toISOString();
+  saveDatabaseToDisk();
+
+  res.json({
+    success: true,
+    websiteStats: websiteStatsDatabase,
   });
 });
 

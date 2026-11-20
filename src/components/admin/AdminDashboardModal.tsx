@@ -75,10 +75,13 @@ import {
   PhoneCall,
   Clock,
   Sparkles,
+  BarChart3,
 } from 'lucide-react';
+import WebsiteStatsDashboard, { StatsTabId } from './WebsiteStatsDashboard';
 
 type AdminSection =
   | 'dashboard'
+  | 'stats'
   | 'phones'
   | 'specs'
   | 'pricing'
@@ -345,6 +348,7 @@ export default function AdminDashboardModal() {
 
   const VALID_ADMIN_SECTIONS: AdminSection[] = [
     'dashboard',
+    'stats',
     'phones',
     'specs',
     'pricing',
@@ -367,6 +371,7 @@ export default function AdminDashboardModal() {
   const setSection = (nextSec: AdminSection) => {
     setAdminSection(nextSec);
   };
+  const [statsTab, setStatsTab] = useState<StatsTabId>('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
@@ -1658,6 +1663,46 @@ export default function AdminDashboardModal() {
   }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'CORE' },
     {
+      id: 'stats',
+      label: 'Stats',
+      icon: BarChart3,
+      group: 'CORE',
+      subItems: [
+        {
+          label: 'Overview',
+          onClick: () => {
+            setSection('stats');
+            setStatsTab('overview');
+          },
+          active: section === 'stats' && statsTab === 'overview',
+        },
+        {
+          label: 'Posts',
+          onClick: () => {
+            setSection('stats');
+            setStatsTab('posts');
+          },
+          active: section === 'stats' && statsTab === 'posts',
+        },
+        {
+          label: 'Traffic Sources',
+          onClick: () => {
+            setSection('stats');
+            setStatsTab('sources');
+          },
+          active: section === 'stats' && statsTab === 'sources',
+        },
+        {
+          label: 'Audience',
+          onClick: () => {
+            setSection('stats');
+            setStatsTab('audience');
+          },
+          active: section === 'stats' && statsTab === 'audience',
+        },
+      ],
+    },
+    {
       id: 'phones',
       label: 'Phones Catalog',
       icon: Smartphone,
@@ -2287,6 +2332,15 @@ export default function AdminDashboardModal() {
 
 
           <button
+            onClick={() => setSection('stats')}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-slate-800 text-xs text-slate-300 cursor-pointer"
+            title="Website Stats"
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-[#00a950]" />
+            <span>Stats</span>
+          </button>
+
+          <button
             onClick={() => setSection('reviews')}
             className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-slate-800 text-xs text-slate-300 cursor-pointer"
           >
@@ -2449,6 +2503,14 @@ export default function AdminDashboardModal() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
+                    onClick={() => setSection('stats')}
+                    className="px-3.5 py-2 rounded-lg text-white text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: '#00a950' }}
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    <span>Website Stats</span>
+                  </button>
+                  <button
                     onClick={openCreatePhoneForm}
                     className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
                   >
@@ -2550,7 +2612,22 @@ export default function AdminDashboardModal() {
                   </div>
                 </div>
 
-
+                <div
+                  onClick={() => setSection('stats')}
+                  className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-[#00a950] shadow-sm cursor-pointer transition-all"
+                >
+                  <div className="flex items-center justify-between text-slate-400 text-xs">
+                    <span>Website Stats</span>
+                    <BarChart3 className="w-4 h-4 text-[#00a950]" />
+                  </div>
+                  <div className="text-xl font-bold text-slate-900 dark:text-white mt-1.5 font-mono">
+                    {phones.reduce((s, p) => s + (Number(p.viewsCount) || 0), 0) +
+                      articles.reduce((s, a) => s + (Number(a.viewsCount) || 0), 0)}
+                  </div>
+                  <div className="text-[10px] text-[#00a950] mt-1 truncate">
+                    Traffic, Posts & Audience
+                  </div>
+                </div>
               </div>
 
               {/* Recent Published Phones Quick Table */}
@@ -2601,6 +2678,7 @@ export default function AdminDashboardModal() {
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {[
+                    { id: 'stats', title: 'Website Stats Dashboard', desc: 'Blogger-style traffic overview, popular posts, traffic sources & audience', icon: BarChart3 },
                     { id: 'phones', title: 'Add / Edit / Delete Phones', desc: 'Full device publisher with all 12 spec tables & gallery', icon: Smartphone },
                     { id: 'specs', title: 'Add & Update Specifications', desc: 'Edit every hardware spec field across all 12 tables', icon: Sliders },
                     { id: 'pricing', title: 'Update Phone Prices', desc: 'Instant USD ($), NGN (₦), old price & price notes', icon: DollarSign },
@@ -2640,6 +2718,32 @@ export default function AdminDashboardModal() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* =================================================================
+              SECTION 0B: WEBSITE STATS DASHBOARD (BLOGGER-STYLE STATS)
+          ================================================================= */}
+          {section === 'stats' && (
+            <WebsiteStatsDashboard
+              phones={phones}
+              articles={articles}
+              initialTab={statsTab}
+              onTabChange={setStatsTab}
+              onOpenArticleInPublic={(articleId) => {
+                const found = articles.find((a) => a.id === articleId);
+                if (found) {
+                  setSelectedPhone(null);
+                  setSelectedArticle(found);
+                  setActiveTab('news');
+                }
+              }}
+              onOpenPhoneInPublic={(phoneId) => {
+                const found = phones.find((p) => p.id === phoneId);
+                if (found) {
+                  handleViewPhoneOnPublicSite(found);
+                }
+              }}
+            />
           )}
 
           {/* =================================================================

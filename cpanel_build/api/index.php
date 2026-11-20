@@ -204,12 +204,34 @@ function loadDatabase() {
         'deletedArticleIds' => array(),
         'deletedReviewIds' => array(),
         'deletedBrandKeys' => array(),
-        'deletedInquiryIds' => array()
+        'deletedInquiryIds' => array(),
+        'websiteStats' => array(
+            'allTimeViews' => 0,
+            'dailyViews' => array(),
+            'hourlyViews' => array(),
+            'pageViews' => array(),
+            'referrers' => array(),
+            'searchEngines' => array(),
+            'socialSources' => array(),
+            'countries' => array(),
+            'browsers' => array(),
+            'operatingSystems' => array(),
+            'updatedAt' => gmdate('c')
+        )
     );
     foreach ($defaults as $k => $v) {
         if (!isset($db[$k]) || !is_array($db[$k])) {
             $db[$k] = $v;
         }
+    }
+    $wsKeys = array('dailyViews', 'hourlyViews', 'pageViews', 'referrers', 'searchEngines', 'socialSources', 'countries', 'browsers', 'operatingSystems');
+    foreach ($wsKeys as $wk) {
+        if (!isset($db['websiteStats'][$wk]) || !is_array($db['websiteStats'][$wk])) {
+            $db['websiteStats'][$wk] = array();
+        }
+    }
+    if (!isset($db['websiteStats']['allTimeViews'])) {
+        $db['websiteStats']['allTimeViews'] = 0;
     }
 
     $db['deletedBrandKeys'] = array_values(array_diff($db['deletedBrandKeys'], array('nothing', 'brand-nothing')));
@@ -1385,19 +1407,103 @@ if ($route === 'admin/verify-otp' && $method === 'POST') {
 }
 
 if ($route === 'stats' && $method === 'GET') {
-    $totalViews = 0;
+    $totalPhoneViews = 0;
     foreach ($db['phones'] as $p) {
-        $totalViews += isset($p['viewsCount']) ? intval($p['viewsCount']) : 0;
+        $totalPhoneViews += isset($p['viewsCount']) ? intval($p['viewsCount']) : 0;
     }
+    $totalArticleViews = 0;
+    foreach ($db['articles'] as $a) {
+        $totalArticleViews += isset($a['viewsCount']) ? intval($a['viewsCount']) : 0;
+    }
+    $sumDaily = 0;
+    if (isset($db['websiteStats']['dailyViews']) && is_array($db['websiteStats']['dailyViews'])) {
+        foreach ($db['websiteStats']['dailyViews'] as $dv) {
+            $sumDaily += intval($dv);
+        }
+    }
+    $effectiveAllTime = max(
+        intval($db['websiteStats']['allTimeViews'] ?? 0),
+        $sumDaily,
+        $totalPhoneViews + $totalArticleViews
+    );
+    $db['websiteStats']['allTimeViews'] = $effectiveAllTime;
     sendJson(array(
         'totalPhones' => count($db['phones']),
         'totalBrands' => count($db['brands']),
         'totalArticles' => count($db['articles']),
         'totalReviews' => count($db['reviews']),
-        'totalViews' => $totalViews,
+        'totalViews' => $effectiveAllTime,
         'newsletterSubscribersCount' => count($db['newsletterSubscribers']),
-        'contactInquiriesCount' => count($db['contactInquiries'])
+        'contactInquiriesCount' => count($db['contactInquiries']),
+        'websiteStats' => $db['websiteStats']
     ));
+}
+
+if ($route === 'stats/track' && $method === 'POST') {
+    $body = getJsonBody();
+    $rawPath = trim($body['path'] ?? '/');
+    if (strpos($rawPath, '/admin') === 0 || strpos($rawPath, 'tab=admin') !== false) {
+        sendJson(array('success' => true, 'ignored' => true, 'websiteStats' => $db['websiteStats']));
+    }
+    $dateKey = (isset($body['dateKey']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $body['dateKey']))
+        ? $body['dateKey']
+        : gmdate('Y-m-d');
+    $hourKey = (isset($body['hourKey']) && preg_match('/^\d{2}$/', $body['hourKey']))
+        ? $body['hourKey']
+        : gmdate('H');
+    $title = substr(trim($body['title'] ?? 'Home'), 0, 220);
+    $pageType = (isset($body['type']) && in_array($body['type'], array('article', 'phone', 'page')))
+        ? $body['type']
+        : 'page';
+    $entityId = isset($body['entityId']) ? trim($body['entityId']) : '';
+
+    $ws = &$db['websiteStats'];
+    $ws['allTimeViews'] = intval($ws['allTimeViews'] ?? 0) + 1;
+    $ws['dailyViews'][$dateKey] = intval($ws['dailyViews'][$dateKey] ?? 0) + 1;
+    if (!isset($ws['hourlyViews'][$dateKey]) || !is_array($ws['hourlyViews'][$dateKey])) {
+        $ws['hourlyViews'][$dateKey] = array();
+    }
+    $ws['hourlyViews'][$dateKey][$hourKey] = intval($ws['hourlyViews'][$dateKey][$hourKey] ?? 0) + 1;
+
+    $prevPage = isset($ws['pageViews'][$rawPath]) && is_array($ws['pageViews'][$rawPath])
+        ? $ws['pageViews'][$rawPath]
+        : array();
+    $ws['pageViews'][$rawPath] = array(
+        'path' => $rawPath,
+        'title' => $title !== '' ? $title : ($prevPage['title'] ?? $rawPath),
+        'type' => $pageType,
+        'entityId' => $entityId !== '' ? $entityId : ($prevPage['entityId'] ?? ''),
+        'views' => intval($prevPage['views'] ?? 0) + 1,
+        'lastViewedAt' => gmdate('c')
+    );
+
+    $ref = substr(trim($body['referrer'] ?? ''), 0, 200);
+    if ($ref !== '') {
+        $ws['referrers'][$ref] = intval($ws['referrers'][$ref] ?? 0) + 1;
+    }
+    $se = substr(trim($body['searchEngine'] ?? ''), 0, 80);
+    if ($se !== '') {
+        $ws['searchEngines'][$se] = intval($ws['searchEngines'][$se] ?? 0) + 1;
+    }
+    $soc = substr(trim($body['socialSource'] ?? ''), 0, 80);
+    if ($soc !== '') {
+        $ws['socialSources'][$soc] = intval($ws['socialSources'][$soc] ?? 0) + 1;
+    }
+    $country = substr(trim($body['country'] ?? 'Unknown'), 0, 80);
+    if ($country !== '') {
+        $ws['countries'][$country] = intval($ws['countries'][$country] ?? 0) + 1;
+    }
+    $browser = substr(trim($body['browser'] ?? ''), 0, 60);
+    if ($browser !== '') {
+        $ws['browsers'][$browser] = intval($ws['browsers'][$browser] ?? 0) + 1;
+    }
+    $os = substr(trim($body['os'] ?? ''), 0, 60);
+    if ($os !== '') {
+        $ws['operatingSystems'][$os] = intval($ws['operatingSystems'][$os] ?? 0) + 1;
+    }
+    $ws['updatedAt'] = gmdate('c');
+    saveDatabase($db);
+    sendJson(array('success' => true, 'websiteStats' => $ws));
 }
 
 if ($route === 'currency/rates' && $method === 'GET') {

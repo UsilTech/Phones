@@ -37,6 +37,7 @@ import BrandLogo from './components/common/BrandLogo';
 import GlobalProgressBar from './components/common/GlobalProgressBar';
 import GlobalToast from './components/common/GlobalToast';
 import PrivacyNotice from './components/common/PrivacyNotice';
+import { trackWebsitePageView } from './services/statsTracker';
 import { 
   SlidersHorizontal,
   Scale,
@@ -80,6 +81,7 @@ function MainApp() {
     setSelectedPhone,
     selectedArticle,
     setSelectedArticle,
+    selectedBrand,
     setSelectedBrand,
     clearCompare,
     triggerNavigation,
@@ -279,6 +281,75 @@ function MainApp() {
       } catch {}
     }
   }, [currentRouteIdentity]);
+
+  // Automatically track website page views in the persistent database
+  useEffect(() => {
+    if (activeTab === 'admin') return;
+
+    if (selectedArticle) {
+      const slugOrId = selectedArticle.slug || selectedArticle.id;
+      trackWebsitePageView({
+        path: `/?article=${slugOrId}`,
+        title: selectedArticle.title,
+        type: 'article',
+        entityId: selectedArticle.id,
+      });
+      return;
+    }
+
+    if (selectedPhone) {
+      const slugOrId = (selectedPhone as any).slug || selectedPhone.id;
+      trackWebsitePageView({
+        path: `/?phone=${slugOrId}`,
+        title: `${selectedPhone.name} — Full Specs & Price`,
+        type: 'phone',
+        entityId: selectedPhone.id,
+      });
+      return;
+    }
+
+    if (activeTab === 'brands' && selectedBrand) {
+      trackWebsitePageView({
+        path: `/?tab=brands&brand=${encodeURIComponent(selectedBrand.name.toLowerCase())}`,
+        title: `${selectedBrand.name} Phones — Specs & Prices`,
+        type: 'page',
+      });
+      return;
+    }
+
+    const TAB_TITLES: Record<string, { path: string; title: string }> = {
+      home: { path: '/', title: `${websiteContent?.siteName || 'GsmScope'} — Homepage` },
+      phones: { path: '/?tab=phones', title: 'All Smartphones Database' },
+      compare: { path: '/?tab=compare', title: 'Compare Phone Specifications' },
+      brands: { path: '/?tab=brands', title: 'Mobile Brands Directory' },
+      news: { path: '/?tab=news', title: 'Latest Tech & Mobile News' },
+      'review-articles': { path: '/?tab=review-articles', title: 'In-Depth Phone Reviews' },
+      reviews: { path: '/?tab=reviews', title: 'Community User Reviews' },
+      guides: { path: '/?tab=guides', title: 'Smartphone Buying Guides' },
+      about: { path: '/?tab=about', title: 'About Us' },
+      contact: { path: '/?tab=contact', title: 'Contact Us' },
+      advertise: { path: '/?tab=advertise', title: 'Advertise With Us' },
+      privacy: { path: '/?tab=privacy', title: 'Privacy Policy' },
+      terms: { path: '/?tab=terms', title: 'Terms of Service' },
+    };
+
+    const pageInfo = TAB_TITLES[activeTab] || {
+      path: `/?tab=${activeTab}`,
+      title: `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Page`,
+    };
+
+    trackWebsitePageView({
+      path: pageInfo.path,
+      title: pageInfo.title,
+      type: 'page',
+    });
+  }, [
+    activeTab,
+    selectedPhone?.id,
+    selectedArticle?.id,
+    selectedBrand?.id,
+    websiteContent?.siteName,
+  ]);
 
   // Apply filters
   const filteredPhones = phones.filter((phone) => {
