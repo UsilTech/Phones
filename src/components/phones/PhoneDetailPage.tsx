@@ -5,6 +5,11 @@ import { useSeoMeta } from '../seo/SeoMeta';
 import SocialShareBar from '../common/SocialShareBar';
 import ScrollProgressBar from '../common/ScrollProgressBar';
 import FormattedContent from '../common/FormattedContent';
+import {
+  getEffectiveSpecTablesSchema,
+  getPhoneSpecDisplayValue,
+  SpecTableGroup,
+} from '../../data/specTablesSchema';
 import { 
   Scale, 
   Check, 
@@ -126,8 +131,47 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
     triggerNavigation,
     startGlobalLoading,
     stopGlobalLoading,
-    showGlobalToast
+    showGlobalToast,
+    websiteContent
   } = useApp();
+
+  const activeSpecTables = getEffectiveSpecTablesSchema(websiteContent?.specTablesSchema);
+
+  const getSpecTableIcon = (tbl: SpecTableGroup) => {
+    const code = (tbl.code || '').toLowerCase();
+    const title = (tbl.title || '').toLowerCase();
+    if (code === 'body' || title.includes('design') || title.includes('body')) {
+      return <Layers className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
+    }
+    if (code === 'camera' || title.includes('camera')) {
+      return <Camera className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
+    }
+    if (code === 'battery' || title.includes('battery')) {
+      return <Battery className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
+    }
+    if (code === 'memory' || title.includes('memory') || title.includes('storage')) {
+      return <Zap className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
+    }
+    if (code === 'platform' || title.includes('platform') || title.includes('benchmark')) {
+      return <Cpu className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
+    }
+    if (code === 'security' || title.includes('security')) {
+      return <Lock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
+    }
+    if (code === 'network' || title.includes('network')) {
+      return <Wifi className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
+    }
+    if (code === 'connectivity' || title.includes('connectivity')) {
+      return <Radio className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
+    }
+    if (code === 'sound' || title.includes('multimedia') || title.includes('sound') || title.includes('audio')) {
+      return <Volume2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
+    }
+    if (code === 'general' || code === 'display' || title.includes('general') || title.includes('display')) {
+      return <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
+    }
+    return <Sliders className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
+  };
 
   const [activeSection, setActiveSection] = useState<'specs' | 'reviews'>('specs');
   const [showAllReviews, setShowAllReviews] = useState(false);
@@ -336,8 +380,8 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
       {/* 2. Phone Overview Hero Card */}
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-          {/* Product Media Area - fills radius frame */}
-          <div className="md:col-span-4 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden relative group aspect-[4/3] sm:aspect-square bg-slate-950 flex items-center justify-center p-0">
+          {/* Product Media Area - full uncropped display */}
+          <div className="md:col-span-4 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden relative group bg-slate-950 flex items-center justify-center p-0">
             {phone.image && !imgError ? (
               <img
                 src={phone.image}
@@ -346,7 +390,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                 decoding="async"
                 referrerPolicy="no-referrer"
                 onError={() => setImgError(true)}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="w-full h-auto max-h-[380px] sm:max-h-[420px] object-contain rounded-2xl transition-transform duration-500"
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 p-6 bg-slate-900/90">
@@ -566,359 +610,93 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
           </div>
 
           <div className="space-y-6 text-xs">
-              {/* 1. GENERAL */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-                <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5 font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                  <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>GENERAL</span>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Release</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 font-semibold">{phone.releaseDate}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Model</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 font-mono font-semibold">
-                      {phone.modelNumber || getDeviceModelNumber(phone)}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Status</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 font-semibold">
-                      {phone.marketStatus?.toLowerCase().includes('discontinued') ? 'Discontinued' : 'Available'}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Price</span>
-                    <span className="col-span-8 text-emerald-600 dark:text-emerald-400 font-mono font-bold">
-                      {formatUSD(phone.priceUSD)} / {formatNaira(phone.priceNGN)}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              {activeSpecTables
+                .filter((tbl) => tbl.enabled !== false)
+                .map((tbl, tblIdx, filteredTables) => {
+                  const enabledSubs = (tbl.subtables || []).filter((s) => s.enabled !== false);
+                  if (enabledSubs.length === 0) return null;
+                  const hasSeparateStorageTypeRow = enabledSubs.some(
+                    (s) => s.keyPath === 'memory.storageType'
+                  );
+                  const isLastTable = tblIdx === filteredTables.length - 1;
 
-              {/* 2. DESIGN */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-                <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5 font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>DESIGN</span>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Dimensions</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 font-medium">{specs.body.dimensions}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Weight</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 font-medium">{specs.body.weight}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Build</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.body.build}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Water Resistance</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.body.waterResistance}</span>
-                  </div>
-                </div>
-              </div>
+                  return (
+                    <div
+                      key={tbl.id}
+                      className={`${
+                        isLastTable ? '!mb-0 ' : ''
+                      }border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm`}
+                    >
+                      <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5 font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                        {getSpecTableIcon(tbl)}
+                        <span>{tbl.title}</span>
+                      </div>
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
+                        {enabledSubs.map((sub) => {
+                          const rawVal = getPhoneSpecDisplayValue(phone, sub.keyPath, {
+                            formatUSD,
+                            formatNaira,
+                            getDeviceModelNumber,
+                            hasSeparateStorageTypeRow,
+                          });
+                          const displayVal =
+                            sub.keyPath === 'sensors' && !rawVal
+                              ? getFeaturesSensors(phone, specs.sensors)
+                              : rawVal || 'N/A';
 
-              {/* 3. DISPLAY */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-                <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5 font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                  <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>DISPLAY</span>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Type</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.display.type}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Size</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.display.size}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Resolution</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.display.resolution}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Protection</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.display.protection}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Peak Brightness</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.display.brightness}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Refresh Rate</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.display.refreshRate}</span>
-                  </div>
-                </div>
-              </div>
+                          const isAntutu = sub.keyPath === 'platform.antutuScore';
+                          const isPrice = sub.keyPath === 'priceUSD / priceNGN';
+                          const isMono =
+                            sub.keyPath === 'modelNumber' ||
+                            sub.keyPath === 'mainCamera.video' ||
+                            sub.keyPath === 'selfieCamera.video';
+                          const isBold =
+                            sub.keyPath === 'battery.capacity' ||
+                            sub.keyPath === 'platform.chipset';
+                          const isSemibold =
+                            sub.keyPath === 'releaseDate' ||
+                            sub.keyPath === 'marketStatus' ||
+                            sub.keyPath === 'mainCamera.setup' ||
+                            sub.keyPath === 'memory.ramVariants' ||
+                            sub.keyPath === 'biometrics' ||
+                            sub.keyPath === 'network.bands5g';
 
-              {/* 4. CAMERA */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-                <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5 font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                  <Camera className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>CAMERA</span>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Main Camera Setup</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 font-semibold leading-relaxed">{specs.mainCamera.setup}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Features</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.mainCamera.features}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Video Capabilities</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 font-mono">{specs.mainCamera.video}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Front Selfie Camera</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 leading-relaxed">{specs.selfieCamera.setup}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Selfie Video</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 font-mono">{specs.selfieCamera.video}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 5. BATTERY */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-                <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5 font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                  <Battery className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>BATTERY</span>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Battery Capacity</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 font-bold">{specs.battery.capacity}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Wired Charging</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.battery.charging}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Wireless Charging</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.battery.wirelessCharging}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 6. MEMORY */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-                <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5 font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>MEMORY</span>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">RAM Options</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 font-semibold">
-                      {Array.isArray(specs.memory?.ramVariants) && specs.memory.ramVariants.length > 0
-                        ? specs.memory.ramVariants.join(', ')
-                        : phone.keyHighlights.ram}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Storage Options</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">
-                      {Array.isArray(specs.memory?.storageVariants) && specs.memory.storageVariants.length > 0
-                        ? `${specs.memory.storageVariants.join(', ')}${specs.memory.storageType ? ` (${specs.memory.storageType})` : ''}`
-                        : phone.keyHighlights.storage}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">MicroSD Expansion</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.memory?.cardSlot || 'No'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 7. PLATFORM */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-                <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5 font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                  <Cpu className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>PLATFORM</span>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Operating System</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.platform.os}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Chipset</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 font-bold">{specs.platform.chipset}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">CPU</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.platform.cpu}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">GPU</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.platform.gpu}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3 bg-emerald-50/50 dark:bg-emerald-950/20">
-                    <span className="col-span-4 text-emerald-700 dark:text-emerald-400 font-semibold">AnTuTu Score (v10)</span>
-                    <span className="col-span-8 font-mono text-emerald-600 dark:text-emerald-400 font-bold">{specs.platform.antutuScore || 'N/A'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 8. SECURITY */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-                <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5 font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                  <Lock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>SECURITY</span>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Biometrics</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 font-semibold">
-                      {specs.biometrics || (
-                        specs.sensors?.toLowerCase().includes('face id')
-                          ? 'Face ID (3D facial structured recognition)'
-                          : specs.sensors?.toLowerCase().includes('fingerprint')
-                          ? (specs.sensors?.toLowerCase().includes('under display')
-                            ? 'Fingerprint (under display, optical/ultrasonic)'
-                            : 'Fingerprint (side-mounted / capacitive)')
-                          : 'Biometric Screen Authentication'
-                      )}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Sensors</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 leading-relaxed">{specs.sensors}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Security Hardware</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">
-                      {specs.securityHardware || (
-                        phone.brand.toLowerCase() === 'apple'
-                          ? 'Apple Secure Enclave, Face ID TrueDepth'
-                          : phone.brand.toLowerCase() === 'google'
-                          ? 'Titan M2 security coprocessor'
-                          : phone.brand.toLowerCase() === 'samsung'
-                          ? 'Samsung Knox Vault, EAL5+ certified'
-                          : 'Hardware-backed Keystore & ARM TrustZone TEE'
-                      )}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 9. NETWORK */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-                <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5 font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                  <Wifi className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>NETWORK</span>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Technology</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.network.technology}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">5G Bands</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 font-semibold">{specs.network.bands5g}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Speed</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.network.speed}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">SIM Configuration</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.network.sim}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 10. CONNECTIVITY */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-                <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5 font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                  <Radio className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>CONNECTIVITY</span>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">WLAN</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.connectivity?.wlan || 'Wi-Fi 802.11 a/b/g/n/ac/6, dual-band, Wi-Fi Direct'}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Bluetooth</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.connectivity?.bluetooth || '5.3, A2DP, LE'}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">NFC</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.connectivity?.nfc || 'Yes (market/region dependent)'}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">USB</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.connectivity?.usb || 'USB Type-C 2.0, OTG'}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Infrared port</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">
-                      {specs.connectivity?.infrared || (phone.brand.toLowerCase() === 'xiaomi' || phone.brand.toLowerCase() === 'tecno' ? 'Yes' : 'No')}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Positioning</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">
-                      {specs.connectivity?.positioning || 'GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS, NavIC'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 11. MULTIMEDIA */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-                <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5 font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                  <Volume2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>MULTIMEDIA</span>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Loudspeaker</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.sound?.loudspeaker || 'Yes, with stereo speakers'}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">3.5mm Headphone Jack</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.sound?.jack35mm || 'No'}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">FM Radio</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">{specs.connectivity?.radio || 'No'}</span>
-                  </div>
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Audio Specs</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200">
-                      {specs.sound?.audioSpecs || '24-bit/192kHz Hi-Res audio, Dolby Atmos support'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 12. FEATURES */}
-              <div className="!mb-0 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-                <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5 font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                  <Sliders className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>FEATURES</span>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
-                  <div className="grid grid-cols-12 py-2.5 px-3">
-                    <span className="col-span-4 text-slate-500 dark:text-slate-400 font-medium">Sensors</span>
-                    <span className="col-span-8 text-slate-900 dark:text-slate-200 leading-relaxed">
-                      {specs.sensors || getFeaturesSensors(phone, specs.sensors)}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                          return (
+                            <div
+                              key={sub.id}
+                              className={`grid grid-cols-12 py-2.5 px-3 ${
+                                isAntutu ? 'bg-emerald-50/50 dark:bg-emerald-950/20' : ''
+                              }`}
+                            >
+                              <span
+                                className={`col-span-4 ${
+                                  isAntutu
+                                    ? 'text-emerald-700 dark:text-emerald-400 font-semibold'
+                                    : 'text-slate-500 dark:text-slate-400 font-medium'
+                                }`}
+                              >
+                                {sub.label}
+                              </span>
+                              <span
+                                className={`col-span-8 ${
+                                  isPrice
+                                    ? 'text-emerald-600 dark:text-emerald-400 font-mono font-bold'
+                                    : isAntutu
+                                    ? 'font-mono text-emerald-600 dark:text-emerald-400 font-bold'
+                                    : `text-slate-900 dark:text-slate-200 ${
+                                        isMono ? 'font-mono ' : ''
+                                      }${isBold ? 'font-bold ' : isSemibold ? 'font-semibold ' : ''}leading-relaxed`
+                                }`}
+                              >
+                                {displayVal}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
 
               {/* SOCIAL MEDIA SHARING ROW ABOVE REVIEW CARD */}
               <div className="!mt-[25px]">

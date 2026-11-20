@@ -373,9 +373,19 @@ export async function updateAdSettingsApi(settings: AdSettings): Promise<boolean
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(settings)
     });
-    return res.ok;
+    if (res.ok) return true;
   } catch (err) {
-    console.warn('API updateAdSettings failed:', err);
+    console.warn('API PUT updateAdSettings failed, retrying with POST:', err);
+  }
+  try {
+    const fallbackRes = await fetch('/api/ad-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+    return fallbackRes.ok;
+  } catch (err) {
+    console.warn('API POST updateAdSettings fallback failed:', err);
     return false;
   }
 }
@@ -940,11 +950,24 @@ export async function updateWebsiteContentApi(content: Partial<WebsiteContent>):
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(content)
     });
-    if (!res.ok) return null;
-    const data = await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      return data.websiteContent || null;
+    }
+  } catch (err) {
+    console.warn('API PUT updateWebsiteContent failed, retrying with POST:', err);
+  }
+  try {
+    const fallbackRes = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(content)
+    });
+    if (!fallbackRes.ok) return null;
+    const data = await fallbackRes.json();
     return data.websiteContent || null;
   } catch (err) {
-    console.warn('API updateWebsiteContent failed:', err);
+    console.warn('API POST updateWebsiteContent fallback failed:', err);
     return null;
   }
 }

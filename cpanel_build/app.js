@@ -40409,7 +40409,7 @@ app.delete("/api/reviews/:id", (req, res) => {
 app.get("/api/ad-settings", (_req, res) => {
   res.json(adSettingsDatabase);
 });
-app.put("/api/ad-settings", (req, res) => {
+var handleUpdateAdSettings = (req, res) => {
   const incoming = req.body || {};
   const nextPlacements = {
     ...INITIAL_AD_SETTINGS.placements || {},
@@ -40471,7 +40471,9 @@ app.put("/api/ad-settings", (req, res) => {
   restoreUploadsFromDatabase();
   saveDatabaseToDisk();
   res.json({ success: true, adSettings: adSettingsDatabase });
-});
+};
+app.put("/api/ad-settings", handleUpdateAdSettings);
+app.post("/api/ad-settings", handleUpdateAdSettings);
 app.get("/api/database/export", (_req, res) => {
   res.json({
     exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -40520,7 +40522,7 @@ app.post("/api/database/reset", (_req, res) => {
 app.get("/api/settings", (_req, res) => {
   res.json(websiteContentDatabase);
 });
-app.put("/api/settings", (req, res) => {
+var handleUpdateSettings = (req, res) => {
   websiteContentDatabase = {
     ...websiteContentDatabase,
     ...req.body,
@@ -40529,7 +40531,9 @@ app.put("/api/settings", (req, res) => {
   saveDatabaseToDisk();
   console.log("[Website Settings Updated] Site Name:", websiteContentDatabase.siteName);
   res.json({ success: true, websiteContent: websiteContentDatabase });
-});
+};
+app.put("/api/settings", handleUpdateSettings);
+app.post("/api/settings", handleUpdateSettings);
 app.get("/api/media", (_req, res) => {
   res.json(mediaDatabase);
 });

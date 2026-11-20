@@ -20,6 +20,15 @@ import {
   ServerHealthStatus,
 } from '../../services/api';
 import { INITIAL_WEBSITE_CONTENT, DEFAULT_AD_PLACEMENTS } from '../../data/seedData';
+import {
+  DEFAULT_SPEC_TABLES,
+  SpecTableGroup,
+  SpecSubtableItem,
+  getEffectiveSpecTablesSchema,
+  getSpecPlaceholder,
+  getPhoneSpecEditorValue,
+  setPhoneSpecEditorValue,
+} from '../../data/specTablesSchema';
 import RichTextEditor from '../common/RichTextEditor';
 import FormattedContent from '../common/FormattedContent';
 import {
@@ -85,20 +94,7 @@ type AdminSection =
   | 'scripts'
   | 'backup';
 
-export interface SpecSubtableItem {
-  id: string;
-  label: string;
-  keyPath: string;
-  enabled: boolean;
-}
-
-export interface SpecTableGroup {
-  id: string;
-  title: string;
-  code: string;
-  enabled: boolean;
-  subtables: SpecSubtableItem[];
-}
+export type { SpecSubtableItem, SpecTableGroup };
 
 export interface AdminUserRecord {
   id: string;
@@ -123,146 +119,6 @@ export interface CustomScriptsSettings {
 }
 
 export type MediaAssetItem = MediaItem;
-
-const DEFAULT_SPEC_TABLES: SpecTableGroup[] = [
-  {
-    id: 'tbl-general',
-    title: 'GENERAL',
-    code: 'general',
-    enabled: true,
-    subtables: [
-      { id: 'sub-gen-rel', label: 'Release', keyPath: 'releaseDate', enabled: true },
-      { id: 'sub-gen-mod', label: 'Model', keyPath: 'modelNumber', enabled: true },
-      { id: 'sub-gen-sta', label: 'Status', keyPath: 'marketStatus', enabled: true },
-      { id: 'sub-gen-pri', label: 'Price', keyPath: 'priceUSD / priceNGN', enabled: true },
-    ],
-  },
-  {
-    id: 'tbl-design',
-    title: 'DESIGN',
-    code: 'body',
-    enabled: true,
-    subtables: [
-      { id: 'sub-body-dim', label: 'Dimensions', keyPath: 'body.dimensions', enabled: true },
-      { id: 'sub-body-weight', label: 'Weight', keyPath: 'body.weight', enabled: true },
-      { id: 'sub-body-build', label: 'Build', keyPath: 'body.build', enabled: true },
-      { id: 'sub-body-water', label: 'Water Resistance', keyPath: 'body.waterResistance', enabled: true },
-    ],
-  },
-  {
-    id: 'tbl-display',
-    title: 'DISPLAY',
-    code: 'display',
-    enabled: true,
-    subtables: [
-      { id: 'sub-disp-type', label: 'Type', keyPath: 'display.type', enabled: true },
-      { id: 'sub-disp-size', label: 'Size', keyPath: 'display.size', enabled: true },
-      { id: 'sub-disp-res', label: 'Resolution', keyPath: 'display.resolution', enabled: true },
-      { id: 'sub-disp-prot', label: 'Protection', keyPath: 'display.protection', enabled: true },
-      { id: 'sub-disp-bri', label: 'Peak Brightness', keyPath: 'display.brightness', enabled: true },
-      { id: 'sub-disp-ref', label: 'Refresh Rate', keyPath: 'display.refreshRate', enabled: true },
-    ],
-  },
-  {
-    id: 'tbl-camera',
-    title: 'CAMERA',
-    code: 'camera',
-    enabled: true,
-    subtables: [
-      { id: 'sub-cam-main', label: 'Main Camera Setup', keyPath: 'mainCamera.setup', enabled: true },
-      { id: 'sub-cam-feat', label: 'Features', keyPath: 'mainCamera.features', enabled: true },
-      { id: 'sub-cam-vid', label: 'Video Capabilities', keyPath: 'mainCamera.video', enabled: true },
-      { id: 'sub-cam-selfie', label: 'Front Selfie Camera', keyPath: 'selfieCamera.setup', enabled: true },
-      { id: 'sub-cam-selffeat', label: 'Selfie Features', keyPath: 'selfieCamera.features', enabled: true },
-      { id: 'sub-cam-selfvid', label: 'Selfie Video', keyPath: 'selfieCamera.video', enabled: true },
-    ],
-  },
-  {
-    id: 'tbl-battery',
-    title: 'BATTERY',
-    code: 'battery',
-    enabled: true,
-    subtables: [
-      { id: 'sub-bat-cap', label: 'Battery Capacity', keyPath: 'battery.capacity', enabled: true },
-      { id: 'sub-bat-chg', label: 'Wired Charging', keyPath: 'battery.charging', enabled: true },
-      { id: 'sub-bat-wir', label: 'Wireless Charging', keyPath: 'battery.wirelessCharging', enabled: true },
-    ],
-  },
-  {
-    id: 'tbl-memory',
-    title: 'MEMORY',
-    code: 'memory',
-    enabled: true,
-    subtables: [
-      { id: 'sub-mem-ram', label: 'RAM Options', keyPath: 'memory.ramVariants', enabled: true },
-      { id: 'sub-mem-rom', label: 'Storage Options', keyPath: 'memory.storageVariants', enabled: true },
-      { id: 'sub-mem-type', label: 'Storage Type', keyPath: 'memory.storageType', enabled: true },
-      { id: 'sub-mem-slot', label: 'MicroSD Expansion', keyPath: 'memory.cardSlot', enabled: true },
-    ],
-  },
-  {
-    id: 'tbl-platform',
-    title: 'PLATFORM',
-    code: 'platform',
-    enabled: true,
-    subtables: [
-      { id: 'sub-plat-os', label: 'Operating System', keyPath: 'platform.os', enabled: true },
-      { id: 'sub-plat-chip', label: 'Chipset', keyPath: 'platform.chipset', enabled: true },
-      { id: 'sub-plat-cpu', label: 'CPU', keyPath: 'platform.cpu', enabled: true },
-      { id: 'sub-plat-gpu', label: 'GPU', keyPath: 'platform.gpu', enabled: true },
-      { id: 'sub-plat-antutu', label: 'AnTuTu Score (v10)', keyPath: 'platform.antutuScore', enabled: true },
-    ],
-  },
-  {
-    id: 'tbl-security',
-    title: 'SECURITY',
-    code: 'security',
-    enabled: true,
-    subtables: [
-      { id: 'sub-sec-bio', label: 'Biometrics', keyPath: 'biometrics', enabled: true },
-      { id: 'sub-sec-sen', label: 'Sensors', keyPath: 'sensors', enabled: true },
-      { id: 'sub-sec-hw', label: 'Security Hardware', keyPath: 'securityHardware', enabled: true },
-    ],
-  },
-  {
-    id: 'tbl-network',
-    title: 'NETWORK',
-    code: 'network',
-    enabled: true,
-    subtables: [
-      { id: 'sub-net-tech', label: 'Technology', keyPath: 'network.technology', enabled: true },
-      { id: 'sub-net-5g', label: '5G Bands', keyPath: 'network.bands5g', enabled: true },
-      { id: 'sub-net-spd', label: 'Speed', keyPath: 'network.speed', enabled: true },
-      { id: 'sub-net-sim', label: 'SIM Configuration', keyPath: 'network.sim', enabled: true },
-    ],
-  },
-  {
-    id: 'tbl-conn',
-    title: 'CONNECTIVITY',
-    code: 'connectivity',
-    enabled: true,
-    subtables: [
-      { id: 'sub-con-wlan', label: 'WLAN', keyPath: 'connectivity.wlan', enabled: true },
-      { id: 'sub-con-bt', label: 'Bluetooth', keyPath: 'connectivity.bluetooth', enabled: true },
-      { id: 'sub-con-nfc', label: 'NFC', keyPath: 'connectivity.nfc', enabled: true },
-      { id: 'sub-con-usb', label: 'USB', keyPath: 'connectivity.usb', enabled: true },
-      { id: 'sub-con-ir', label: 'Infrared port', keyPath: 'connectivity.infrared', enabled: true },
-      { id: 'sub-con-pos', label: 'Positioning', keyPath: 'connectivity.positioning', enabled: true },
-    ],
-  },
-  {
-    id: 'tbl-multimedia',
-    title: 'MULTIMEDIA',
-    code: 'sound',
-    enabled: true,
-    subtables: [
-      { id: 'sub-snd-spk', label: 'Loudspeaker', keyPath: 'sound.loudspeaker', enabled: true },
-      { id: 'sub-snd-jack', label: '3.5mm Headphone Jack', keyPath: 'sound.jack35mm', enabled: true },
-      { id: 'sub-snd-rad', label: 'FM Radio', keyPath: 'connectivity.radio', enabled: true },
-      { id: 'sub-snd-aud', label: 'Audio Specs', keyPath: 'sound.audioSpecs', enabled: true },
-    ],
-  },
-];
 
 const DEFAULT_USERS: AdminUserRecord[] = [
   {
@@ -868,18 +724,62 @@ export default function AdminDashboardModal() {
   }, [contextWebsiteContent]);
 
   // 11. Specification Tables & Subtables Schema state
-  const [specTablesSchema, setSpecTablesSchema] = useState<SpecTableGroup[]>(() => {
-    if (Array.isArray(contextWebsiteContent?.specTablesSchema) && contextWebsiteContent.specTablesSchema.length > 0) {
-      return contextWebsiteContent.specTablesSchema;
-    }
-    try {
-      const saved = localStorage.getItem('gsmscope_spec_tables_schema_v1');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return DEFAULT_SPEC_TABLES;
-  });
+  const [specTablesSchema, setSpecTablesSchema] = useState<SpecTableGroup[]>(() =>
+    getEffectiveSpecTablesSchema(contextWebsiteContent?.specTablesSchema)
+  );
+  const specSchemaDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [newTableTitle, setNewTableTitle] = useState('');
   const [newSubtableLabels, setNewSubtableLabels] = useState<Record<string, { label: string; keyPath: string }>>({});
+
+  const persistSpecTablesSchema = (
+    nextSchema: SpecTableGroup[],
+    toastMessage?: string,
+    debounce = false
+  ) => {
+    setSpecTablesSchema(nextSchema);
+    try {
+      localStorage.setItem('gsmscope_spec_tables_schema_v1', JSON.stringify(nextSchema));
+    } catch {}
+    const nextWebsiteContent: WebsiteContentSettings = {
+      ...websiteContentRef.current,
+      specTablesSchema: nextSchema,
+    };
+    websiteContentRef.current = nextWebsiteContent;
+    setWebsiteContent(nextWebsiteContent);
+
+    if (specSchemaDebounceRef.current) {
+      clearTimeout(specSchemaDebounceRef.current);
+      specSchemaDebounceRef.current = null;
+    }
+
+    if (debounce) {
+      specSchemaDebounceRef.current = setTimeout(() => {
+        updateWebsiteContent(websiteContentRef.current);
+      }, 350);
+    } else {
+      updateWebsiteContent(nextWebsiteContent);
+    }
+
+    if (toastMessage) {
+      showGlobalToast(toastMessage, 'success');
+    }
+  };
+
+  const generalTableConfig = specTablesSchema.find(
+    (g) => g.code === 'general' || g.id === 'tbl-general'
+  );
+  const isGeneralTableEnabled = !generalTableConfig || generalTableConfig.enabled !== false;
+  const isGeneralSubtableEnabled = (keyPath: string) => {
+    if (!generalTableConfig) return true;
+    if (generalTableConfig.enabled === false) return false;
+    return (generalTableConfig.subtables || []).some(
+      (s) => s.keyPath === keyPath && s.enabled !== false
+    );
+  };
+  const getGeneralSubtableLabel = (keyPath: string, fallback: string) => {
+    const found = generalTableConfig?.subtables?.find((s) => s.keyPath === keyPath);
+    return found?.label || fallback;
+  };
 
   // 12. Users Management state
   const [usersList, setUsersList] = useState<AdminUserRecord[]>(() => {
@@ -1978,22 +1878,32 @@ export default function AdminDashboardModal() {
       }));
     };
 
-    const updateSpecGroup = <K extends keyof Phone['detailedSpecs']>(
-      groupKey: K,
-      fieldKey: string,
-      value: any
-    ) => {
-      setDraft((prev: Phone) => ({
-        ...prev,
-        detailedSpecs: {
-          ...prev.detailedSpecs,
-          [groupKey]:
-            typeof prev.detailedSpecs[groupKey] === 'object' && prev.detailedSpecs[groupKey] !== null
-              ? { ...(prev.detailedSpecs[groupKey] as any), [fieldKey]: value }
-              : value,
-        },
-      }));
-    };
+    const BUILTIN_GENERAL_KEYS = new Set([
+      'releaseDate',
+      'modelNumber',
+      'marketStatus',
+      'priceUSD / priceNGN',
+    ]);
+
+    const dynamicTablesToRender = specTablesSchema
+      .filter((group) => group.enabled !== false)
+      .map((group) => {
+        const isGeneralGroup = group.code === 'general' || group.id === 'tbl-general';
+        const enabledSubs = (group.subtables || []).filter((sub) => {
+          if (sub.enabled === false) return false;
+          // In Section 1 & Section 2, the 4 built-in GENERAL fields are rendered in the top identity/general card
+          // (respecting isGeneralSubtableEnabled), while any custom subtables added to GENERAL render right here.
+          if (isGeneralGroup && BUILTIN_GENERAL_KEYS.has(sub.keyPath)) {
+            return false;
+          }
+          return true;
+        });
+        return {
+          ...group,
+          enabledSubs,
+        };
+      })
+      .filter((group) => group.enabledSubs.length > 0);
 
     return (
       <div className="space-y-5">
@@ -2097,557 +2007,93 @@ export default function AdminDashboardModal() {
           </div>
         </div>
 
-        {/* META BOX B: DESIGN & BODY */}
-        <div className="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-          <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-200 dark:border-slate-800 pb-2">
-            2. DESIGN & BODY SPECIFICATIONS (Dimensions, Weight, Build, Water Resistance)
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Dimensions</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.body.dimensions}
-                onChange={(e) => updateSpecGroup('body', 'dimensions', e.target.value)}
-                placeholder="162.3 x 79.0 x 8.6 mm"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Weight</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.body.weight}
-                onChange={(e) => updateSpecGroup('body', 'weight', e.target.value)}
-                placeholder="232 g"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Build Materials</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.body.build}
-                onChange={(e) => updateSpecGroup('body', 'build', e.target.value)}
-                placeholder="Glass front, titanium frame, glass back"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Water & Dust Resistance</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.body.waterResistance}
-                onChange={(e) => updateSpecGroup('body', 'waterResistance', e.target.value)}
-                placeholder="IP68 dust/water resistant (up to 1.5m for 30 min)"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* META BOX C: DISPLAY */}
-        <div className="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-          <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-200 dark:border-slate-800 pb-2">
-            3. DISPLAY SPECIFICATIONS (Type, Size, Resolution, Protection, Brightness, Refresh Rate)
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Panel Type</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.display.type}
-                onChange={(e) => updateSpecGroup('display', 'type', e.target.value)}
-                placeholder="Dynamic LTPO AMOLED 2X, 120Hz, HDR10+"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Size & Screen-to-Body Ratio</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.display.size}
-                onChange={(e) => updateSpecGroup('display', 'size', e.target.value)}
-                placeholder="6.8 inches, 114.7 cm² (~88.5% screen-to-body ratio)"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Resolution & Density</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.display.resolution}
-                onChange={(e) => updateSpecGroup('display', 'resolution', e.target.value)}
-                placeholder="1440 x 3120 pixels, 19.5:9 ratio (~505 ppi density)"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Glass Protection</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.display.protection}
-                onChange={(e) => updateSpecGroup('display', 'protection', e.target.value)}
-                placeholder="Corning Gorilla Glass Armor"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Peak Brightness</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.display.brightness}
-                onChange={(e) => updateSpecGroup('display', 'brightness', e.target.value)}
-                placeholder="2600 nits (peak)"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Refresh Rate</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.display.refreshRate}
-                onChange={(e) => updateSpecGroup('display', 'refreshRate', e.target.value)}
-                placeholder="1Hz - 120Hz adaptive"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* META BOX D: PLATFORM & BENCHMARKS */}
-        <div className="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-          <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-200 dark:border-slate-800 pb-2">
-            4. PLATFORM & BENCHMARKS (OS, Chipset, CPU, GPU, AnTuTu Score)
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Operating System (OS)</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.platform.os}
-                onChange={(e) => updateSpecGroup('platform', 'os', e.target.value)}
-                placeholder="Android 15, up to 7 major upgrades"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Chipset / SoC</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.platform.chipset}
-                onChange={(e) => updateSpecGroup('platform', 'chipset', e.target.value)}
-                placeholder="Qualcomm SM8650-AC Snapdragon 8 Gen 3 (4 nm)"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">AnTuTu Benchmark Score (v10)</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.platform.antutuScore}
-                onChange={(e) => updateSpecGroup('platform', 'antutuScore', e.target.value)}
-                placeholder="1,823,822 (AnTuTu v10)"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">CPU Cores & Clock Speeds</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.platform.cpu}
-                onChange={(e) => updateSpecGroup('platform', 'cpu', e.target.value)}
-                placeholder="8-core (1x3.39GHz Cortex-X4 & 3x3.1GHz Cortex-A720...)"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">GPU Graphics</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.platform.gpu}
-                onChange={(e) => updateSpecGroup('platform', 'gpu', e.target.value)}
-                placeholder="Adreno 750 (1 GHz)"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* META BOX E: MEMORY & STORAGE */}
-        <div className="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-          <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-200 dark:border-slate-800 pb-2">
-            5. MEMORY & STORAGE (RAM Variants, Storage Variants, Storage Type, MicroSD Slot)
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                RAM Options (comma-separated)
-              </label>
-              <input
-                type="text"
-                value={ramStr}
-                onChange={(e) => setRamStr(e.target.value)}
-                placeholder="8GB, 12GB, 16GB"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                Storage Options (comma-separated)
-              </label>
-              <input
-                type="text"
-                value={storageStr}
-                onChange={(e) => setStorageStr(e.target.value)}
-                placeholder="128GB, 256GB, 512GB, 1TB"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Storage Technology Type</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.memory.storageType}
-                onChange={(e) => updateSpecGroup('memory', 'storageType', e.target.value)}
-                placeholder="UFS 4.0 / NVMe"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">MicroSD Card Slot</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.memory.cardSlot}
-                onChange={(e) => updateSpecGroup('memory', 'cardSlot', e.target.value)}
-                placeholder="No or microSDXC (dedicated slot)"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* META BOX F: CAMERA — MAIN REAR & FRONT SELFIE */}
-        <div className="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-          <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-200 dark:border-slate-800 pb-2">
-            6. CAMERA SYSTEM (Main Rear Camera Setup, Features, Video + Front Selfie Camera Setup, Features, Video)
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="sm:col-span-2">
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Main Rear Camera Setup / Modules</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.mainCamera.setup}
-                onChange={(e) => updateSpecGroup('mainCamera', 'setup', e.target.value)}
-                placeholder="200 MP, f/1.7 (wide) OIS + 50 MP (periscope telephoto) 5x zoom + 12 MP (ultrawide)"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Main Camera Features</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.mainCamera.features}
-                onChange={(e) => updateSpecGroup('mainCamera', 'features', e.target.value)}
-                placeholder="Laser AF, LED flash, auto-HDR, panorama"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Main Camera Video Capabilities</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.mainCamera.video}
-                onChange={(e) => updateSpecGroup('mainCamera', 'video', e.target.value)}
-                placeholder="8K@24/30fps, 4K@30/60/120fps, 1080p@30/60/240fps, HDR10+"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Front Selfie Camera Setup</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.selfieCamera.setup}
-                onChange={(e) => updateSpecGroup('selfieCamera', 'setup', e.target.value)}
-                placeholder="12 MP, f/2.2, 26mm (wide), Dual Pixel PDAF"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Selfie Features</label>
-                <input
-                  type="text"
-                  value={draft.detailedSpecs.selfieCamera.features}
-                  onChange={(e) => updateSpecGroup('selfieCamera', 'features', e.target.value)}
-                  placeholder="Auto-HDR, HDR10+"
-                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-                />
+        {/* DYNAMIC SPECIFICATION TABLES DRIVEN BY specTablesSchema */}
+        {dynamicTablesToRender.map((group, groupIdx) => {
+          const subNames = group.enabledSubs.map((s) => s.label).join(', ');
+          return (
+            <div
+              key={group.id}
+              className="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+                <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400">
+                  {groupIdx + 2}. {group.title} ({subNames})
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setSection('spec-tables')}
+                  className="text-[10px] font-mono text-slate-400 hover:text-emerald-500 cursor-pointer"
+                  title="Manage or reorder tables & subtables"
+                >
+                  Manage Subtables →
+                </button>
               </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Selfie Video</label>
-                <input
-                  type="text"
-                  value={draft.detailedSpecs.selfieCamera.video}
-                  onChange={(e) => updateSpecGroup('selfieCamera', 'video', e.target.value)}
-                  placeholder="4K@30/60fps, 1080p@30fps"
-                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {group.enabledSubs.map((sub) => {
+                  if (sub.keyPath === 'memory.ramVariants') {
+                    return (
+                      <div key={sub.id}>
+                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                          {sub.label} (comma-separated)
+                        </label>
+                        <input
+                          type="text"
+                          value={ramStr}
+                          onChange={(e) => setRamStr(e.target.value)}
+                          placeholder={getSpecPlaceholder(sub.keyPath, sub.label)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
+                        />
+                      </div>
+                    );
+                  }
+
+                  if (sub.keyPath === 'memory.storageVariants') {
+                    return (
+                      <div key={sub.id}>
+                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                          {sub.label} (comma-separated)
+                        </label>
+                        <input
+                          type="text"
+                          value={storageStr}
+                          onChange={(e) => setStorageStr(e.target.value)}
+                          placeholder={getSpecPlaceholder(sub.keyPath, sub.label)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
+                        />
+                      </div>
+                    );
+                  }
+
+                  const isWideField =
+                    sub.keyPath === 'mainCamera.setup' ||
+                    sub.keyPath === 'platform.cpu' ||
+                    sub.keyPath === 'sensors';
+
+                  return (
+                    <div key={sub.id} className={isWideField ? 'sm:col-span-2' : ''}>
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                        {sub.label}
+                      </label>
+                      <input
+                        type="text"
+                        value={getPhoneSpecEditorValue(draft, sub.keyPath)}
+                        onChange={(e) =>
+                          setDraft((prev: Phone) =>
+                            setPhoneSpecEditorValue(prev, sub.keyPath, e.target.value)
+                          )
+                        }
+                        placeholder={getSpecPlaceholder(sub.keyPath, sub.label)}
+                        className={`w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs ${
+                          sub.keyPath === 'platform.antutuScore' ? 'font-mono' : ''
+                        }`}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* META BOX G: BATTERY & CHARGING */}
-        <div className="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-          <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-200 dark:border-slate-800 pb-2">
-            7. BATTERY & CHARGING (Capacity, Wired Charging, Wireless / Reverse Charging)
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Battery Capacity & Type</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.battery.capacity}
-                onChange={(e) => updateSpecGroup('battery', 'capacity', e.target.value)}
-                placeholder="Li-Ion 5000 mAh, non-removable"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Wired Charging</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.battery.charging}
-                onChange={(e) => updateSpecGroup('battery', 'charging', e.target.value)}
-                placeholder="45W wired, PD3.0, 65% in 30 min"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Wireless & Reverse Charging</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.battery.wirelessCharging}
-                onChange={(e) => updateSpecGroup('battery', 'wirelessCharging', e.target.value)}
-                placeholder="15W wireless (Qi/PMA), 4.5W reverse wireless"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* META BOX H: NETWORK & CELLULAR */}
-        <div className="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-          <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-200 dark:border-slate-800 pb-2">
-            8. NETWORK & CELLULAR (Technology, 5G Bands, Speed, SIM Configuration)
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Network Technology</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.network.technology}
-                onChange={(e) => updateSpecGroup('network', 'technology', e.target.value)}
-                placeholder="GSM / CDMA / HSPA / EVDO / LTE / 5G"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">5G Bands</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.network.bands5g}
-                onChange={(e) => updateSpecGroup('network', 'bands5g', e.target.value)}
-                placeholder="SA/NSA/Sub6, Bands n1, n3, n5, n7, n8, n20, n28, n38, n40, n41, n77, n78"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Network Speed</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.network.speed}
-                onChange={(e) => updateSpecGroup('network', 'speed', e.target.value)}
-                placeholder="HSPA 42.2/5.76 Mbps, LTE-A, 5G"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">SIM Configuration</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.network.sim}
-                onChange={(e) => updateSpecGroup('network', 'sim', e.target.value)}
-                placeholder="Dual SIM (2 Nano-SIMs + eSIM, dual stand-by)"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* META BOX I: CONNECTIVITY & MULTIMEDIA */}
-        <div className="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-          <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-200 dark:border-slate-800 pb-2">
-            9. CONNECTIVITY & MULTIMEDIA (WLAN, Bluetooth, NFC, USB, Infrared, Positioning, Radio, Audio)
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">WLAN (Wi-Fi)</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.connectivity.wlan}
-                onChange={(e) => updateSpecGroup('connectivity', 'wlan', e.target.value)}
-                placeholder="Wi-Fi 802.11 a/b/g/n/ac/6e/7, tri-band"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Bluetooth</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.connectivity.bluetooth}
-                onChange={(e) => updateSpecGroup('connectivity', 'bluetooth', e.target.value)}
-                placeholder="5.3, A2DP, LE"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">NFC</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.connectivity.nfc}
-                onChange={(e) => updateSpecGroup('connectivity', 'nfc', e.target.value)}
-                placeholder="Yes"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">USB Port</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.connectivity.usb}
-                onChange={(e) => updateSpecGroup('connectivity', 'usb', e.target.value)}
-                placeholder="USB Type-C 3.2, DisplayPort 1.2, OTG"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Infrared Port</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.connectivity.infrared}
-                onChange={(e) => updateSpecGroup('connectivity', 'infrared', e.target.value)}
-                placeholder="Yes or No"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">FM Radio</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.connectivity.radio}
-                onChange={(e) => updateSpecGroup('connectivity', 'radio', e.target.value)}
-                placeholder="No or FM radio"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">GPS / Satellite Positioning</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.connectivity.positioning || 'GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS'}
-                onChange={(e) => updateSpecGroup('connectivity', 'positioning', e.target.value)}
-                placeholder="GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Loudspeaker</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.sound.loudspeaker}
-                onChange={(e) => updateSpecGroup('sound', 'loudspeaker', e.target.value)}
-                placeholder="Yes, with stereo speakers"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">3.5mm Headphone Jack</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.sound.jack35mm}
-                onChange={(e) => updateSpecGroup('sound', 'jack35mm', e.target.value)}
-                placeholder="No or Yes"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Audio Specs (Hi-Res / Dolby)</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.sound.audioSpecs || '24-bit/192kHz Hi-Res audio, Dolby Atmos support'}
-                onChange={(e) => updateSpecGroup('sound', 'audioSpecs', e.target.value)}
-                placeholder="32-bit/384kHz audio, Tuned by AKG, Dolby Atmos"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* META BOX J: SECURITY, BIOMETRICS & SENSORS */}
-        <div className="bg-slate-50 dark:bg-slate-950/70 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-          <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-200 dark:border-slate-800 pb-2">
-            10. SECURITY, BIOMETRICS & SENSORS
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Biometrics</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.biometrics || 'Fingerprint (under display, ultrasonic)'}
-                onChange={(e) =>
-                  setDraft((prev: Phone) => ({
-                    ...prev,
-                    detailedSpecs: { ...prev.detailedSpecs, biometrics: e.target.value },
-                  }))
-                }
-                placeholder="Fingerprint (under display, ultrasonic) / Face ID"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Security Hardware</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.securityHardware || 'Hardware-backed Keystore & Knox Vault'}
-                onChange={(e) =>
-                  setDraft((prev: Phone) => ({
-                    ...prev,
-                    detailedSpecs: { ...prev.detailedSpecs, securityHardware: e.target.value },
-                  }))
-                }
-                placeholder="Samsung Knox Vault / Apple Secure Enclave"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">All Sensors</label>
-              <input
-                type="text"
-                value={draft.detailedSpecs.sensors}
-                onChange={(e) =>
-                  setDraft((prev: Phone) => ({
-                    ...prev,
-                    detailedSpecs: { ...prev.detailedSpecs, sensors: e.target.value },
-                  }))
-                }
-                placeholder="Fingerprint, accelerometer, gyro, proximity, compass, barometer"
-                className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-              />
-            </div>
-          </div>
-        </div>
+          );
+        })}
 
         {/* META BOX K: SEO TITLE, FOCUS KEYWORDS & META DESCRIPTION */}
         <div className="bg-emerald-50/40 dark:bg-emerald-950/20 p-4 rounded-xl border border-emerald-500/30 space-y-3">
@@ -3294,41 +2740,53 @@ export default function AdminDashboardModal() {
                           ))}
                         </datalist>
                       </div>
-                      <div>
-                        <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Model Number (GENERAL Table)</label>
-                        <input
-                          type="text"
-                          value={phoneDraft.modelNumber || ''}
-                          onChange={(e) => setPhoneDraft({ ...phoneDraft, modelNumber: e.target.value })}
-                          placeholder="e.g. SM-S928B, SM-S928B/DS"
-                          className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Market Status (GENERAL Table)</label>
-                        <select
-                          value={phoneDraft.marketStatus}
-                          onChange={(e) => setPhoneDraft({ ...phoneDraft, marketStatus: e.target.value })}
-                          className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-                        >
-                          <option value="Available">Available</option>
-                          <option value="Pre-order">Pre-order</option>
-                          <option value="Coming Soon">Coming Soon</option>
-                          <option value="Rumored">Rumored</option>
-                          <option value="Discontinued">Discontinued</option>
-                        </select>
-                      </div>
+                      {isGeneralSubtableEnabled('modelNumber') && (
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+                            {getGeneralSubtableLabel('modelNumber', 'Model Number')} (GENERAL Table)
+                          </label>
+                          <input
+                            type="text"
+                            value={phoneDraft.modelNumber || ''}
+                            onChange={(e) => setPhoneDraft({ ...phoneDraft, modelNumber: e.target.value })}
+                            placeholder="e.g. SM-S928B, SM-S928B/DS"
+                            className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono"
+                          />
+                        </div>
+                      )}
+                      {isGeneralSubtableEnabled('marketStatus') && (
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+                            {getGeneralSubtableLabel('marketStatus', 'Market Status')} (GENERAL Table)
+                          </label>
+                          <select
+                            value={phoneDraft.marketStatus}
+                            onChange={(e) => setPhoneDraft({ ...phoneDraft, marketStatus: e.target.value })}
+                            className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
+                          >
+                            <option value="Available">Available</option>
+                            <option value="Pre-order">Pre-order</option>
+                            <option value="Coming Soon">Coming Soon</option>
+                            <option value="Rumored">Rumored</option>
+                            <option value="Discontinued">Discontinued</option>
+                          </select>
+                        </div>
+                      )}
 
-                      <div>
-                        <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Release Date Text (GENERAL Table)</label>
-                        <input
-                          type="text"
-                          value={phoneDraft.releaseDate}
-                          onChange={(e) => setPhoneDraft({ ...phoneDraft, releaseDate: e.target.value })}
-                          placeholder="e.g. January 2025"
-                          className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-                        />
-                      </div>
+                      {isGeneralSubtableEnabled('releaseDate') && (
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+                            {getGeneralSubtableLabel('releaseDate', 'Release Date Text')} (GENERAL Table)
+                          </label>
+                          <input
+                            type="text"
+                            value={phoneDraft.releaseDate}
+                            onChange={(e) => setPhoneDraft({ ...phoneDraft, releaseDate: e.target.value })}
+                            placeholder="e.g. January 2025"
+                            className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
+                          />
+                        </div>
+                      )}
                       <div>
                         <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Price (USD $) *</label>
                         <input
@@ -3733,61 +3191,83 @@ export default function AdminDashboardModal() {
               {/* GENERAL TABLE FIELDS FOR SELECTED PHONE */}
               <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-sm">
                 <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-200 dark:border-slate-800 pb-2">
-                  0. GENERAL TABLE (Release Date, Model Number, Market Status, USD & NGN Price)
+                  0. {generalTableConfig?.title || 'GENERAL'} TABLE (
+                  {isGeneralTableEnabled
+                    ? 'Release Date, Model Number, Market Status, USD & NGN Price'
+                    : 'Table Hidden on Public Page — Core Identity & Visibility Controls'}
+                  )
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Release Date</label>
-                    <input
-                      type="text"
-                      value={specPhoneDraft.releaseDate}
-                      onChange={(e) => setSpecPhoneDraft({ ...specPhoneDraft, releaseDate: e.target.value })}
-                      className="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs"
-                    />
+                {isGeneralTableEnabled && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    {isGeneralSubtableEnabled('releaseDate') && (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                          {getGeneralSubtableLabel('releaseDate', 'Release Date')}
+                        </label>
+                        <input
+                          type="text"
+                          value={specPhoneDraft.releaseDate}
+                          onChange={(e) => setSpecPhoneDraft({ ...specPhoneDraft, releaseDate: e.target.value })}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs"
+                        />
+                      </div>
+                    )}
+                    {isGeneralSubtableEnabled('modelNumber') && (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                          {getGeneralSubtableLabel('modelNumber', 'Model Number')}
+                        </label>
+                        <input
+                          type="text"
+                          value={specPhoneDraft.modelNumber || ''}
+                          onChange={(e) => setSpecPhoneDraft({ ...specPhoneDraft, modelNumber: e.target.value })}
+                          placeholder="e.g. SM-S928B"
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-mono"
+                        />
+                      </div>
+                    )}
+                    {isGeneralSubtableEnabled('marketStatus') && (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                          {getGeneralSubtableLabel('marketStatus', 'Market Status')}
+                        </label>
+                        <select
+                          value={specPhoneDraft.marketStatus}
+                          onChange={(e) => setSpecPhoneDraft({ ...specPhoneDraft, marketStatus: e.target.value })}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs"
+                        >
+                          <option value="Available">Available</option>
+                          <option value="Pre-order">Pre-order</option>
+                          <option value="Coming Soon">Coming Soon</option>
+                          <option value="Rumored">Rumored</option>
+                          <option value="Discontinued">Discontinued</option>
+                        </select>
+                      </div>
+                    )}
+                    {isGeneralSubtableEnabled('priceUSD / priceNGN') && (
+                      <>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-500 mb-1">Price (USD $)</label>
+                          <input
+                            type="number"
+                            value={specPhoneDraft.priceUSD}
+                            onChange={(e) => setSpecPhoneDraft({ ...specPhoneDraft, priceUSD: Number(e.target.value) })}
+                            className="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-500 mb-1">Price (NGN ₦)</label>
+                          <input
+                            type="number"
+                            value={specPhoneDraft.priceNGN}
+                            onChange={(e) => setSpecPhoneDraft({ ...specPhoneDraft, priceNGN: Number(e.target.value) })}
+                            className="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-mono"
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Model Number</label>
-                    <input
-                      type="text"
-                      value={specPhoneDraft.modelNumber || ''}
-                      onChange={(e) => setSpecPhoneDraft({ ...specPhoneDraft, modelNumber: e.target.value })}
-                      placeholder="e.g. SM-S928B"
-                      className="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Market Status</label>
-                    <select
-                      value={specPhoneDraft.marketStatus}
-                      onChange={(e) => setSpecPhoneDraft({ ...specPhoneDraft, marketStatus: e.target.value })}
-                      className="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs"
-                    >
-                      <option value="Available">Available</option>
-                      <option value="Pre-order">Pre-order</option>
-                      <option value="Coming Soon">Coming Soon</option>
-                      <option value="Rumored">Rumored</option>
-                      <option value="Discontinued">Discontinued</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Price (USD $)</label>
-                    <input
-                      type="number"
-                      value={specPhoneDraft.priceUSD}
-                      onChange={(e) => setSpecPhoneDraft({ ...specPhoneDraft, priceUSD: Number(e.target.value) })}
-                      className="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Price (NGN ₦)</label>
-                    <input
-                      type="number"
-                      value={specPhoneDraft.priceNGN}
-                      onChange={(e) => setSpecPhoneDraft({ ...specPhoneDraft, priceNGN: Number(e.target.value) })}
-                      className="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-mono"
-                    />
-                  </div>
-                </div>
+                )}
 
                 <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-slate-200 dark:border-slate-800 text-xs">
                   <label className="flex items-center gap-1.5 cursor-pointer font-semibold text-emerald-600 dark:text-emerald-400">
@@ -6897,18 +6377,37 @@ export default function AdminDashboardModal() {
                     Add, rename, reorder, or toggle main specification tables (GENERAL, DESIGN, DISPLAY, CAMERA, BATTERY, MEMORY, PLATFORM, SECURITY, NETWORK, CONNECTIVITY, MULTIMEDIA) and their subtable rows.
                   </p>
                 </div>
-                <button
-                  onClick={() =>
-                    runWithProgress(() => {
-                      localStorage.setItem('gsmscope_spec_tables_schema_v1', JSON.stringify(specTablesSchema));
-                      updateWebsiteContent({ specTablesSchema });
-                    }, 'Saved Specification Tables & Subtables schema to server.')
-                  }
-                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer self-start"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Save Schema Changes</span>
-                </button>
+                <div className="flex flex-wrap items-center gap-2 self-start">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      runWithProgress(
+                        () => {
+                          persistSpecTablesSchema(DEFAULT_SPEC_TABLES);
+                        },
+                        'Restored default specification tables & subtables.'
+                      )
+                    }
+                    className="px-3.5 py-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset Defaults</span>
+                  </button>
+                  <button
+                    onClick={() =>
+                      runWithProgress(
+                        () => {
+                          persistSpecTablesSchema(specTablesSchema);
+                        },
+                        'Saved Specification Tables & Subtables schema to server.'
+                      )
+                    }
+                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Schema Changes</span>
+                  </button>
+                </div>
               </div>
 
               <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-3">
@@ -6929,9 +6428,9 @@ export default function AdminDashboardModal() {
                       enabled: true,
                       subtables: [],
                     };
-                    setSpecTablesSchema((prev) => [...prev, created]);
+                    const next = [...specTablesSchema, created];
+                    persistSpecTablesSchema(next, `Added table "${created.title}".`);
                     setNewTableTitle('');
-                    showGlobalToast(`Added table "${created.title}".`, 'success');
                   }}
                   className="px-4 py-2 rounded-lg bg-slate-900 dark:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                 >
@@ -6956,7 +6455,10 @@ export default function AdminDashboardModal() {
                             onChange={(e) => {
                               const next = [...specTablesSchema];
                               next[idx] = { ...group, enabled: e.target.checked };
-                              setSpecTablesSchema(next);
+                              persistSpecTablesSchema(
+                                next,
+                                `${e.target.checked ? 'Enabled' : 'Hidden'} table "${group.title}".`
+                              );
                             }}
                             className="accent-emerald-600"
                           />
@@ -6966,7 +6468,7 @@ export default function AdminDashboardModal() {
                             onChange={(e) => {
                               const next = [...specTablesSchema];
                               next[idx] = { ...group, title: e.target.value.toUpperCase() };
-                              setSpecTablesSchema(next);
+                              persistSpecTablesSchema(next, undefined, true);
                             }}
                             className="font-mono font-bold text-xs uppercase bg-transparent border-b border-transparent focus:border-emerald-500 focus:outline-none text-slate-900 dark:text-white"
                           />
@@ -6985,7 +6487,7 @@ export default function AdminDashboardModal() {
                               const temp = next[idx - 1];
                               next[idx - 1] = next[idx];
                               next[idx] = temp;
-                              setSpecTablesSchema(next);
+                              persistSpecTablesSchema(next);
                             }}
                             className="p-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 disabled:opacity-40 cursor-pointer"
                           >
@@ -7000,7 +6502,7 @@ export default function AdminDashboardModal() {
                               const temp = next[idx + 1];
                               next[idx + 1] = next[idx];
                               next[idx] = temp;
-                              setSpecTablesSchema(next);
+                              persistSpecTablesSchema(next);
                             }}
                             className="p-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 disabled:opacity-40 cursor-pointer"
                           >
@@ -7008,9 +6510,10 @@ export default function AdminDashboardModal() {
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
-                              setSpecTablesSchema((prev) => prev.filter((g) => g.id !== group.id))
-                            }
+                            onClick={() => {
+                              const next = specTablesSchema.filter((g) => g.id !== group.id);
+                              persistSpecTablesSchema(next, `Deleted table "${group.title}".`);
+                            }}
                             className="p-1 rounded bg-rose-500/10 text-rose-500 hover:bg-rose-600 hover:text-white cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -7033,7 +6536,10 @@ export default function AdminDashboardModal() {
                                   const updatedSubs = [...group.subtables];
                                   updatedSubs[sIdx] = { ...sub, enabled: e.target.checked };
                                   next[idx] = { ...group, subtables: updatedSubs };
-                                  setSpecTablesSchema(next);
+                                  persistSpecTablesSchema(
+                                    next,
+                                    `${e.target.checked ? 'Enabled' : 'Hidden'} subtable "${sub.label}" in ${group.title}.`
+                                  );
                                 }}
                                 className="accent-emerald-600"
                               />
@@ -7045,7 +6551,7 @@ export default function AdminDashboardModal() {
                                   const updatedSubs = [...group.subtables];
                                   updatedSubs[sIdx] = { ...sub, label: e.target.value };
                                   next[idx] = { ...group, subtables: updatedSubs };
-                                  setSpecTablesSchema(next);
+                                  persistSpecTablesSchema(next, undefined, true);
                                 }}
                                 className="font-semibold bg-transparent border-b border-transparent focus:border-emerald-500 focus:outline-none text-slate-800 dark:text-slate-200"
                               />
@@ -7059,7 +6565,10 @@ export default function AdminDashboardModal() {
                                   ...group,
                                   subtables: group.subtables.filter((s) => s.id !== sub.id),
                                 };
-                                setSpecTablesSchema(next);
+                                persistSpecTablesSchema(
+                                  next,
+                                  `Deleted subtable "${sub.label}" from ${group.title}.`
+                                );
                               }}
                               className="text-rose-500 hover:text-rose-600 cursor-pointer"
                             >
@@ -7090,27 +6599,34 @@ export default function AdminDashboardModal() {
                                 [group.id]: { ...subDraft, keyPath: e.target.value },
                               })
                             }
-                            placeholder="Field key (e.g. display.touchRate)"
-                            className="w-48 px-2.5 py-1.5 rounded bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-mono"
+                            placeholder="Field key (optional, auto-generated if blank)"
+                            className="w-56 px-2.5 py-1.5 rounded bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-mono"
                           />
                           <button
                             type="button"
                             onClick={() => {
                               if (!subDraft.label.trim()) return;
+                              const cleanLabelSlug = subDraft.label
+                                .trim()
+                                .toLowerCase()
+                                .replace(/[^a-z0-9]+/g, '_')
+                                .replace(/^_+|_+$/g, '');
+                              const autoKeyPath = `${group.code || 'custom'}.${cleanLabelSlug || `field_${Date.now()}`}`;
+                              const createdSub: SpecSubtableItem = {
+                                id: `sub-${Date.now()}`,
+                                label: subDraft.label.trim(),
+                                keyPath: subDraft.keyPath.trim() || autoKeyPath,
+                                enabled: true,
+                              };
                               const next = [...specTablesSchema];
                               next[idx] = {
                                 ...group,
-                                subtables: [
-                                  ...group.subtables,
-                                  {
-                                    id: `sub-${Date.now()}`,
-                                    label: subDraft.label.trim(),
-                                    keyPath: subDraft.keyPath.trim() || 'custom.field',
-                                    enabled: true,
-                                  },
-                                ],
+                                subtables: [...group.subtables, createdSub],
                               };
-                              setSpecTablesSchema(next);
+                              persistSpecTablesSchema(
+                                next,
+                                `Added subtable "${createdSub.label}" to ${group.title}.`
+                              );
                               setNewSubtableLabels({
                                 ...newSubtableLabels,
                                 [group.id]: { label: '', keyPath: '' },

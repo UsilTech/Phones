@@ -1665,7 +1665,7 @@ app.get('/api/ad-settings', (_req: Request, res: Response) => {
   res.json(adSettingsDatabase);
 });
 
-app.put('/api/ad-settings', (req: Request, res: Response) => {
+const handleUpdateAdSettings = (req: Request, res: Response) => {
   const incoming = req.body || {};
   const nextPlacements: any = {
     ...(INITIAL_AD_SETTINGS.placements || {}),
@@ -1730,7 +1730,9 @@ app.put('/api/ad-settings', (req: Request, res: Response) => {
   restoreUploadsFromDatabase();
   saveDatabaseToDisk();
   res.json({ success: true, adSettings: adSettingsDatabase });
-});
+};
+app.put('/api/ad-settings', handleUpdateAdSettings);
+app.post('/api/ad-settings', handleUpdateAdSettings);
 
 app.get('/api/database/export', (_req: Request, res: Response) => {
   res.json({
@@ -1785,7 +1787,7 @@ app.get('/api/settings', (_req: Request, res: Response) => {
   res.json(websiteContentDatabase);
 });
 
-app.put('/api/settings', (req: Request, res: Response) => {
+const handleUpdateSettings = (req: Request, res: Response) => {
   websiteContentDatabase = {
     ...websiteContentDatabase,
     ...req.body,
@@ -1794,7 +1796,9 @@ app.put('/api/settings', (req: Request, res: Response) => {
   saveDatabaseToDisk();
   console.log('[Website Settings Updated] Site Name:', websiteContentDatabase.siteName);
   res.json({ success: true, websiteContent: websiteContentDatabase });
-});
+};
+app.put('/api/settings', handleUpdateSettings);
+app.post('/api/settings', handleUpdateSettings);
 
 // 5d. Media Library & File Upload API (cPanel & Local Disk Persistent)
 app.get('/api/media', (_req: Request, res: Response) => {

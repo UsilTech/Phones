@@ -368,7 +368,9 @@ function normalizePhoneRecord(raw: any): Phone {
       network5g: raw?.keyHighlights?.network5g !== undefined ? Boolean(raw.keyHighlights.network5g) : true,
     },
     detailedSpecs: {
+      ...(raw?.detailedSpecs && typeof raw.detailedSpecs === 'object' ? raw.detailedSpecs : {}),
       network: {
+        ...(raw?.detailedSpecs?.network && typeof raw.detailedSpecs.network === 'object' ? raw.detailedSpecs.network : {}),
         technology: cleanTemplateStr(raw?.detailedSpecs?.network?.technology, 'GSM / HSPA / LTE / 5G', 'GSM / HSPA / LTE / 5G'),
         bands5g: cleanTemplateStr(
           raw?.detailedSpecs?.network?.bands5g,
@@ -383,6 +385,7 @@ function normalizePhoneRecord(raw: any): Phone {
         ),
       },
       body: {
+        ...(raw?.detailedSpecs?.body && typeof raw.detailedSpecs.body === 'object' ? raw.detailedSpecs.body : {}),
         dimensions: cleanTemplateStr(raw?.detailedSpecs?.body?.dimensions, '162.3 x 75.6 x 8.2 mm', '162.3 x 75.6 x 8.2 mm'),
         weight: cleanTemplateStr(raw?.detailedSpecs?.body?.weight, '195 g', '195 g'),
         build: cleanTemplateStr(
@@ -397,6 +400,7 @@ function normalizePhoneRecord(raw: any): Phone {
         ),
       },
       display: {
+        ...(raw?.detailedSpecs?.display && typeof raw.detailedSpecs.display === 'object' ? raw.detailedSpecs.display : {}),
         type: cleanTemplateStr(
           raw?.detailedSpecs?.display?.type || raw?.keyHighlights?.display,
           'Dynamic LTPO AMOLED 2X, 120Hz, HDR10+',
@@ -421,6 +425,7 @@ function normalizePhoneRecord(raw: any): Phone {
         refreshRate: cleanTemplateStr(raw?.detailedSpecs?.display?.refreshRate, '1Hz - 120Hz adaptive', '120Hz adaptive'),
       },
       platform: {
+        ...(raw?.detailedSpecs?.platform && typeof raw.detailedSpecs.platform === 'object' ? raw.detailedSpecs.platform : {}),
         os: cleanTemplateStr(raw?.detailedSpecs?.platform?.os || raw?.keyHighlights?.os, 'Android 15', 'Android 15'),
         chipset: cleanTemplateStr(
           raw?.detailedSpecs?.platform?.chipset || raw?.keyHighlights?.processor,
@@ -436,12 +441,14 @@ function normalizePhoneRecord(raw: any): Phone {
         antutuScore: cleanTemplateStr(raw?.detailedSpecs?.platform?.antutuScore, '1,680,000 (AnTuTu v10)', '1,550,000 (AnTuTu v10)'),
       },
       memory: {
+        ...(raw?.detailedSpecs?.memory && typeof raw.detailedSpecs.memory === 'object' ? raw.detailedSpecs.memory : {}),
         ramVariants,
         storageVariants,
         cardSlot: cleanTemplateStr(raw?.detailedSpecs?.memory?.cardSlot, 'No', 'No'),
         storageType: cleanTemplateStr(raw?.detailedSpecs?.memory?.storageType, 'UFS 4.0', 'UFS 4.0'),
       },
       mainCamera: {
+        ...(raw?.detailedSpecs?.mainCamera && typeof raw.detailedSpecs.mainCamera === 'object' ? raw.detailedSpecs.mainCamera : {}),
         setup: cleanTemplateStr(
           raw?.detailedSpecs?.mainCamera?.setup || raw?.detailedSpecs?.mainCamera?.modules || raw?.keyHighlights?.camera,
           '50 MP, f/1.8, 24mm (wide), PDAF, OIS + 12 MP, f/2.2, 120˚ (ultrawide) + 10 MP, f/2.4 (telephoto), 3x optical zoom',
@@ -459,6 +466,7 @@ function normalizePhoneRecord(raw: any): Phone {
         ),
       },
       selfieCamera: {
+        ...(raw?.detailedSpecs?.selfieCamera && typeof raw.detailedSpecs.selfieCamera === 'object' ? raw.detailedSpecs.selfieCamera : {}),
         setup: cleanTemplateStr(
           raw?.detailedSpecs?.selfieCamera?.setup || raw?.detailedSpecs?.selfieCamera?.modules || raw?.keyHighlights?.selfieCamera,
           '32 MP, f/2.2, 26mm (wide), Dual Pixel PDAF',
@@ -468,6 +476,7 @@ function normalizePhoneRecord(raw: any): Phone {
         video: cleanTemplateStr(raw?.detailedSpecs?.selfieCamera?.video, '4K@30/60fps, 1080p@30fps', '4K@30fps, 1080p@30/60fps'),
       },
       battery: {
+        ...(raw?.detailedSpecs?.battery && typeof raw.detailedSpecs.battery === 'object' ? raw.detailedSpecs.battery : {}),
         capacity: cleanTemplateStr(
           raw?.detailedSpecs?.battery?.capacity || raw?.keyHighlights?.battery,
           'Li-Ion 5000 mAh, non-removable',
@@ -485,6 +494,7 @@ function normalizePhoneRecord(raw: any): Phone {
         ),
       },
       sound: {
+        ...(raw?.detailedSpecs?.sound && typeof raw.detailedSpecs.sound === 'object' ? raw.detailedSpecs.sound : {}),
         loudspeaker: cleanTemplateStr(raw?.detailedSpecs?.sound?.loudspeaker, 'Yes, with stereo speakers', 'Yes, with stereo speakers'),
         jack35mm: cleanTemplateStr(raw?.detailedSpecs?.sound?.jack35mm, 'No', 'No'),
         audioSpecs: cleanTemplateStr(
@@ -494,6 +504,7 @@ function normalizePhoneRecord(raw: any): Phone {
         ),
       },
       connectivity: {
+        ...(raw?.detailedSpecs?.connectivity && typeof raw.detailedSpecs.connectivity === 'object' ? raw.detailedSpecs.connectivity : {}),
         wlan: cleanTemplateStr(
           raw?.detailedSpecs?.connectivity?.wlan,
           'Wi-Fi 802.11 a/b/g/n/ac/6e/7, tri-band, Wi-Fi Direct',
@@ -1837,6 +1848,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     if (!isAdmin && apiRaw) {
       safeSetLocalStorage('gsmscope_website_content_v1', JSON.stringify(apiNorm));
+      if (Array.isArray(apiNorm.specTablesSchema) && apiNorm.specTablesSchema.length > 0) {
+        safeSetLocalStorage('gsmscope_spec_tables_schema_v1', JSON.stringify(apiNorm.specTablesSchema));
+      }
       return apiNorm;
     }
 
@@ -1855,19 +1869,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const apiUpdatedAt = (apiRaw as any)?.updatedAt as string | undefined;
 
     const preferLocal =
-      wasAdminSaved ||
-      Boolean(localUpdatedAt && (!apiUpdatedAt || localUpdatedAt >= apiUpdatedAt));
+      localUpdatedAt && apiUpdatedAt
+        ? localUpdatedAt >= apiUpdatedAt
+        : localUpdatedAt
+        ? true
+        : apiUpdatedAt
+        ? false
+        : wasAdminSaved;
 
     const customOverrides: Partial<WebsiteContent> = {};
-    (Object.keys(localSource) as Array<keyof WebsiteContent>).forEach((key) => {
-      const localVal = (localSource as any)[key];
-      const defaultVal = (INITIAL_WEBSITE_CONTENT as any)[key];
-      if (localVal !== undefined && localVal !== null && localVal !== '') {
-        if (preferLocal || JSON.stringify(localVal) !== JSON.stringify(defaultVal)) {
-          (customOverrides as any)[key] = localVal;
+    if (preferLocal) {
+      (Object.keys(localSource) as Array<keyof WebsiteContent>).forEach((key) => {
+        const localVal = (localSource as any)[key];
+        const defaultVal = (INITIAL_WEBSITE_CONTENT as any)[key];
+        if (localVal !== undefined && localVal !== null && localVal !== '') {
+          if (JSON.stringify(localVal) !== JSON.stringify(defaultVal)) {
+            (customOverrides as any)[key] = localVal;
+          }
         }
-      }
-    });
+      });
+    }
 
     const merged = normalizeWebsiteContent({
       ...apiNorm,
@@ -1878,8 +1899,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } as any);
 
     safeSetLocalStorage('gsmscope_website_content_v1', JSON.stringify(merged));
+    if (Array.isArray(merged.specTablesSchema) && merged.specTablesSchema.length > 0) {
+      safeSetLocalStorage('gsmscope_spec_tables_schema_v1', JSON.stringify(merged.specTablesSchema));
+    }
 
-    if (isAdmin && JSON.stringify(merged) !== JSON.stringify(apiNorm)) {
+    if (isAdmin && preferLocal && JSON.stringify(merged) !== JSON.stringify(apiNorm)) {
       updateWebsiteContentApi(merged).catch(() => {});
     }
 
@@ -2886,8 +2910,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fetchReviewsFromApi(),
         fetchBrandsFromApi(),
         fetchAdSettingsFromApi(),
+        fetchWebsiteContentApi(),
       ])
-        .then(([srvPhones, srvArticles, srvReviews, srvBrands, srvAds]) => {
+        .then(([srvPhones, srvArticles, srvReviews, srvBrands, srvAds, srvContent]) => {
           if (!isMounted) return;
           if (srvPhones && srvPhones.length > 0) {
             setPhones((prev) => mergePhonesAndSync(prev, srvPhones));
@@ -2903,6 +2928,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
           if (srvAds) {
             setAdSettings((prev) => mergeAdSettingsAndSync(prev, srvAds));
+          }
+          if (srvContent) {
+            setWebsiteContentState((prev) => mergeWebsiteContentAndSync(prev, srvContent));
           }
         })
         .catch(() => {});

@@ -1169,7 +1169,7 @@ function MainApp() {
 
                             {/* Featured Phone Image Showcase below phone name (decorated like HeroSection) */}
                             <div className="w-full my-1.5 sm:my-2 flex items-center justify-center">
-                              <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-44 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
+                              <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/90 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
                                 <div className="absolute inset-0 bg-emerald-500/10 rounded-2xl blur-xl group-hover:bg-emerald-500/25 transition-all pointer-events-none" />
                                 <img
                                   src={leadPhone.image}
@@ -1177,7 +1177,7 @@ function MainApp() {
                                   loading="lazy"
                                   decoding="async"
                                   referrerPolicy="no-referrer"
-                                  className="w-full h-full object-cover rounded-2xl group-hover:scale-105 transition-transform duration-500"
+                                  className="relative z-10 w-full h-auto max-h-[380px] sm:max-h-[420px] md:max-h-[450px] object-contain rounded-2xl transition-transform duration-500"
                                 />
                               </div>
                             </div>
@@ -1333,7 +1333,7 @@ function MainApp() {
 
                       {/* Featured Phone Image Showcase below phone name (decorated like HeroSection) */}
                       <div className="w-full my-1.5 sm:my-2 flex items-center justify-center">
-                        <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-44 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
+                        <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/90 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
                           <div className="absolute inset-0 bg-emerald-500/10 rounded-2xl blur-xl group-hover:bg-emerald-500/25 transition-all pointer-events-none" />
                           <img
                             src={leadTop.image}
@@ -1341,7 +1341,7 @@ function MainApp() {
                             loading="lazy"
                             decoding="async"
                             referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover rounded-2xl group-hover:scale-105 transition-transform duration-500"
+                            className="relative z-10 w-full h-auto max-h-[380px] sm:max-h-[420px] md:max-h-[450px] object-contain rounded-2xl transition-transform duration-500"
                           />
                         </div>
                       </div>
