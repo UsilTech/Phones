@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import LazyImage from '../common/LazyImage';
 import { ChevronDown, Loader2 } from 'lucide-react';
 
 export default function QuickCompareBanner() {
@@ -77,12 +78,9 @@ export default function QuickCompareBanner() {
             {/* Phone 1 Image fills top radius frame */}
             <div className="w-full h-24 sm:h-28 rounded-t-2xl overflow-hidden bg-slate-950/80 flex items-center justify-center p-0">
               {phone1Obj?.image ? (
-                <img
+                <LazyImage
                   src={phone1Obj.image}
                   alt={phone1Obj.name}
-                  loading="lazy"
-                  decoding="async"
-                  referrerPolicy="no-referrer"
                   className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                 />
               ) : (
@@ -126,12 +124,9 @@ export default function QuickCompareBanner() {
             {/* Phone 2 Image fills top radius frame */}
             <div className="w-full h-24 sm:h-28 rounded-t-2xl overflow-hidden bg-slate-950/80 flex items-center justify-center p-0">
               {phone2Obj?.image ? (
-                <img
+                <LazyImage
                   src={phone2Obj.image}
                   alt={phone2Obj.name}
-                  loading="lazy"
-                  decoding="async"
-                  referrerPolicy="no-referrer"
                   className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                 />
               ) : (

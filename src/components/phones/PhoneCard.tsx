@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Phone } from '../../types';
 import { useApp } from '../../context/AppContext';
+import LazyImage from '../common/LazyImage';
 import { Scale, Check, Eye, Smartphone, Cpu, Battery, Camera } from 'lucide-react';
 
 interface PhoneCardProps {
@@ -66,14 +67,11 @@ export default function PhoneCard({ phone, onSelect, hidePrice = false }: PhoneC
       className="group relative flex flex-col justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden hover:border-emerald-500/60 transition-all hover:shadow-xl cursor-pointer shadow-sm"
     >
       {/* Top Media Area */}
-      <div className="relative w-full aspect-[4/3] bg-[#061a11]/60 overflow-hidden flex items-center justify-center p-0">
+      <div className="relative w-full aspect-[16/9] bg-[#061a11]/60 overflow-hidden flex items-center justify-center p-0">
         {hasValidImage ? (
-          <img
+          <LazyImage
             src={phone.image}
             alt={phone.name}
-            loading="lazy"
-            decoding="async"
-            referrerPolicy="no-referrer"
             onError={() => setImgError(true)}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />

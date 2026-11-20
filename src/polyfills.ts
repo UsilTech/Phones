@@ -294,4 +294,11 @@
       };
     };
   }
+
+  // 11. Preserve scroll position across page refresh/reload in sessionStorage
+  try {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'auto';
+    }
+  } catch {}
 })();

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApp, SEED_PHONE_IDS, getRecordTimestamp } from '../../context/AppContext';
+import LazyImage, { preloadImages } from '../common/LazyImage';
 import { ArrowRight, Scale, Eye, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 
 export default function HeroSection() {
@@ -41,6 +42,11 @@ export default function HeroSection() {
   useEffect(() => {
     setActiveSlide(0);
   }, [firstFeaturedId]);
+
+  // Preload all featured carousel images in idle time so slide transitions are instantaneous
+  useEffect(() => {
+    preloadImages(featuredPhones.map((p) => p.image));
+  }, [featuredPhones]);
 
   // Auto carousel slide every 4s (reduced by 4s from 8s)
   useEffect(() => {
@@ -93,13 +99,10 @@ export default function HeroSection() {
             >
               <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-49 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
                 <div className="absolute inset-0 bg-emerald-500/10 rounded-2xl blur-xl group-hover:bg-emerald-500/25 transition-all pointer-events-none" />
-                <img
+                <LazyImage
                   src={currentPhone.image}
                   alt={currentPhone.name}
-                  loading="eager"
-                  fetchPriority="high"
-                  decoding="async"
-                  referrerPolicy="no-referrer"
+                  priority
                   className="w-full h-full object-fill rounded-2xl group-hover:scale-105 transition-transform duration-500"
                 />
               </div>

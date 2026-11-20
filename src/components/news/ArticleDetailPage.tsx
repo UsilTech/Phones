@@ -6,6 +6,7 @@ import { useSeoMeta } from '../seo/SeoMeta';
 import SocialShareBar from '../common/SocialShareBar';
 import ScrollProgressBar from '../common/ScrollProgressBar';
 import FormattedContent from '../common/FormattedContent';
+import LazyImage from '../common/LazyImage';
 import { 
   Clock, 
   Tag, 
@@ -65,8 +66,13 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
   );
   const [commentSubmitted, setCommentSubmitted] = useState(false);
 
+  const prevArticleIdRef = useRef<string | undefined>(article?.id);
+
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (prevArticleIdRef.current !== article?.id) {
+      prevArticleIdRef.current = article?.id;
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
     if (article?.id) {
       recordArticleView(article.id);
       const fallback = INITIAL_ARTICLES.some((a) => a.id === article.id) ? DEFAULT_ARTICLE_COMMENTS : [];
@@ -525,12 +531,11 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
 
           {/* Featured Cover Banner */}
           <div className="relative aspect-[16/9] w-full bg-slate-950 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-md">
-            <img
+            <LazyImage
               src={article.coverImage}
               alt={article.title}
-              loading="lazy"
-              decoding="async"
-              referrerPolicy="no-referrer"
+              priority
+              fallbackSrc="/src/assets/images/hero_flagship_phones_1792578844852.jpg"
               className="w-full h-full object-cover"
             />
           </div>
@@ -748,12 +753,9 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
                     className="group p-3 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 hover:border-emerald-500/50 hover:bg-emerald-50/30 dark:hover:bg-[#061a11] transition-all cursor-pointer flex items-center gap-3"
                   >
                     <div className="w-[58px] h-14 bg-slate-950 rounded-lg overflow-hidden p-0 shrink-0 border border-slate-200 dark:border-slate-800">
-                      <img
+                      <LazyImage
                         src={p.image}
                         alt={p.name}
-                        loading="lazy"
-                        decoding="async"
-                        referrerPolicy="no-referrer"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     </div>
@@ -809,12 +811,9 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
                     0{idx + 1}
                   </span>
                   <div className="w-15 h-12 bg-slate-950 rounded-lg overflow-hidden p-0 shrink-0 border border-slate-200 dark:border-slate-800">
-                    <img
+                    <LazyImage
                       src={popPhone.image}
                       alt={popPhone.name}
-                      loading="lazy"
-                      decoding="async"
-                      referrerPolicy="no-referrer"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>

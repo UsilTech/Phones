@@ -2135,9 +2135,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const params = new URLSearchParams(window.location.search);
       const sec = params.get('section');
       if (sec) return sec;
+      try {
+        const savedSec = sessionStorage.getItem('gsmscope_admin_section_v1');
+        if (savedSec) return savedSec;
+      } catch {}
     }
     return 'dashboard';
   });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && adminSection) {
+      try {
+        sessionStorage.setItem('gsmscope_admin_section_v1', adminSection);
+      } catch {}
+    }
+  }, [adminSection]);
 
   const [adminSubView, setAdminSubViewState] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {

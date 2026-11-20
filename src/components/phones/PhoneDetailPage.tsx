@@ -5,6 +5,7 @@ import { useSeoMeta } from '../seo/SeoMeta';
 import SocialShareBar from '../common/SocialShareBar';
 import ScrollProgressBar from '../common/ScrollProgressBar';
 import FormattedContent from '../common/FormattedContent';
+import LazyImage from '../common/LazyImage';
 import {
   getEffectiveSpecTablesSchema,
   getPhoneSpecDisplayValue,
@@ -194,9 +195,14 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
     setImgError(false);
   }, [phone.id, phone.image]);
 
-  // Scroll to top and record real user view
+  const prevPhoneIdRef = useRef<string>(phone.id);
+
+  // Scroll to top only when switching to a different phone (preserve scroll position on page refresh) and record real user view
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (prevPhoneIdRef.current !== phone.id) {
+      prevPhoneIdRef.current = phone.id;
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
     recordPhoneView(phone.id);
   }, [phone.id]);
 
@@ -383,12 +389,10 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
           {/* Product Media Area - fills radius frame */}
           <div className="md:col-span-4 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden relative group aspect-[4/3] sm:aspect-square bg-slate-950 flex items-center justify-center p-0">
             {phone.image && !imgError ? (
-              <img
+              <LazyImage
                 src={phone.image}
                 alt={phone.name}
-                loading="lazy"
-                decoding="async"
-                referrerPolicy="no-referrer"
+                priority
                 onError={() => setImgError(true)}
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
@@ -506,11 +510,19 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
               <button
                 onClick={() => {
                   triggerNavigation(() => {
+                    const matched = brands.find(
+                      (b) => b.name.toLowerCase() === phone.brand.toLowerCase() || b.slug.toLowerCase() === phone.brand.toLowerCase()
+                    );
                     setSelectedPhone(null);
                     setSelectedArticle(null);
-                    resetFilters();
-                    setFilterState(prev => ({ ...prev, selectedBrands: [phone.brand] }));
-                    setActiveTab('phones');
+                    if (matched) {
+                      setSelectedBrand(matched);
+                      setActiveTab('brands');
+                    } else {
+                      resetFilters();
+                      setFilterState(prev => ({ ...prev, selectedBrands: [phone.brand] }));
+                      setActiveTab('phones');
+                    }
                     window.scrollTo({ top: 0, behavior: 'instant' });
                   });
                 }}
@@ -540,12 +552,9 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                 {/* Thumbnail filling its radius frame */}
                 <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg overflow-hidden shrink-0 shadow-sm border border-slate-200 dark:border-slate-800 bg-slate-950 p-0 relative">
                   {phone.image ? (
-                    <img
+                    <LazyImage
                       src={phone.image}
                       alt={phone.name}
-                      loading="lazy"
-                      decoding="async"
-                      referrerPolicy="no-referrer"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
@@ -917,11 +926,19 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
               <button
                 onClick={() => {
                   triggerNavigation(() => {
+                    const matched = brands.find(
+                      (b) => b.name.toLowerCase() === phone.brand.toLowerCase() || b.slug.toLowerCase() === phone.brand.toLowerCase()
+                    );
                     setSelectedPhone(null);
                     setSelectedArticle(null);
-                    resetFilters();
-                    setFilterState(prev => ({ ...prev, selectedBrands: [phone.brand] }));
-                    setActiveTab('phones');
+                    if (matched) {
+                      setSelectedBrand(matched);
+                      setActiveTab('brands');
+                    } else {
+                      resetFilters();
+                      setFilterState(prev => ({ ...prev, selectedBrands: [phone.brand] }));
+                      setActiveTab('phones');
+                    }
                     window.scrollTo({ top: 0, behavior: 'instant' });
                   });
                 }}
@@ -942,12 +959,9 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                     className="group flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700/80"
                   >
                     <div className="w-[68px] h-[63px] rounded-xl overflow-hidden shrink-0 bg-slate-950 p-0 border border-slate-200 dark:border-slate-800">
-                      <img
+                      <LazyImage
                         src={sbPhone.image}
                         alt={sbPhone.name}
-                        loading="lazy"
-                        decoding="async"
-                        referrerPolicy="no-referrer"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     </div>
@@ -1016,12 +1030,9 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                   >
                     {/* Thumbnail Image set to h-100px / w-120px */}
                     <div className="w-[120px] h-[100px] rounded-xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 shrink-0 relative">
-                      <img
+                      <LazyImage
                         src={art.coverImage}
                         alt={art.title}
-                        loading="lazy"
-                        decoding="async"
-                        referrerPolicy="no-referrer"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     </div>
@@ -1072,12 +1083,9 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                   </span>
                   
                   <div className="w-[68px] h-[63px] rounded-xl overflow-hidden shrink-0 bg-slate-950 p-0 border border-slate-200 dark:border-slate-800">
-                    <img
+                    <LazyImage
                       src={popPhone.image}
                       alt={popPhone.name}
-                      loading="lazy"
-                      decoding="async"
-                      referrerPolicy="no-referrer"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>
@@ -1119,12 +1127,9 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                   >
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="w-[68px] h-[63px] rounded-xl overflow-hidden shrink-0 bg-slate-950 p-0 border border-slate-200 dark:border-slate-800">
-                        <img
+                        <LazyImage
                           src={rival.image}
                           alt={rival.name}
-                          loading="lazy"
-                          decoding="async"
-                          referrerPolicy="no-referrer"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       </div>

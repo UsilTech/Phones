@@ -290,14 +290,14 @@ export async function clearIndexedDBVault(): Promise<void> {
  * are compressed to crisp, fast-loading web assets (~80KB-250KB) that never overflow storage
  * and restore instantaneously across server restarts.
  */
-export function optimizeImageDataUrl(rawDataUrl: string, maxDimension = 1400): Promise<string> {
+export function optimizeImageDataUrl(rawDataUrl: string, maxDimension = 1200): Promise<string> {
   if (
     typeof window === 'undefined' ||
     !rawDataUrl ||
     !rawDataUrl.startsWith('data:image/') ||
     rawDataUrl.startsWith('data:image/svg') ||
     rawDataUrl.startsWith('data:image/gif') ||
-    rawDataUrl.length < 220000
+    rawDataUrl.length < 75000
   ) {
     return Promise.resolve(rawDataUrl);
   }
@@ -330,10 +330,10 @@ export function optimizeImageDataUrl(rawDataUrl: string, maxDimension = 1400): P
             return;
           }
           ctx.drawImage(img, 0, 0, width, height);
-          const isPngOrWebp =
-            rawDataUrl.startsWith('data:image/png') || rawDataUrl.startsWith('data:image/webp');
-          const mime = isPngOrWebp ? 'image/webp' : 'image/jpeg';
-          const compressed = canvas.toDataURL(mime, 0.84);
+          let compressed = canvas.toDataURL('image/webp', 0.82);
+          if (!compressed.startsWith('data:image/webp')) {
+            compressed = canvas.toDataURL('image/jpeg', 0.82);
+          }
           resolve(compressed.length < rawDataUrl.length ? compressed : rawDataUrl);
         } catch {
           resolve(rawDataUrl);

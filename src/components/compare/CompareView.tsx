@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useSeoMeta } from '../seo/SeoMeta';
 import SocialShareBar from '../common/SocialShareBar';
+import LazyImage from '../common/LazyImage';
 import { 
   Plus, 
   X, 
@@ -412,12 +413,10 @@ export default function CompareView() {
 
                           <div className="w-[69px] h-16 sm:w-[85px] sm:h-20 lg:w-[101px] lg:h-24 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden mb-2 flex items-center justify-center p-0">
                             {phone.image ? (
-                              <img
+                              <LazyImage
                                 src={phone.image}
                                 alt={phone.name}
-                                loading="lazy"
-                                decoding="async"
-                                referrerPolicy="no-referrer"
+                                priority
                                 className="w-full h-full object-cover"
                               />
                             ) : (
@@ -754,12 +753,9 @@ export default function CompareView() {
                     0{idx + 1}
                   </span>
                   <div className="w-15 h-12 bg-slate-950 rounded-lg overflow-hidden p-0 shrink-0 border border-slate-200 dark:border-slate-800">
-                    <img
+                    <LazyImage
                       src={phone.image}
                       alt={phone.name}
-                      loading="lazy"
-                      decoding="async"
-                      referrerPolicy="no-referrer"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>

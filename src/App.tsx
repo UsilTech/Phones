@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AppProvider, useApp, SEED_PHONE_IDS, SEED_ARTICLE_IDS, getRecordTimestamp } from './context/AppContext';
 import Header from './components/common/Header';
 import Breadcrumbs from './components/common/Breadcrumbs';
@@ -12,6 +12,7 @@ import PhoneFinderSection from './components/home/PhoneFinderSection';
 import QuickCompareBanner from './components/home/QuickCompareBanner';
 import PhoneCard from './components/phones/PhoneCard';
 import PhoneFilterDrawer from './components/phones/PhoneFilterDrawer';
+import LazyImage from './components/common/LazyImage';
 
 // Direct imports for all views so pages open immediately without a circular preloader
 import PhoneDetailPage from './components/phones/PhoneDetailPage';
@@ -149,10 +150,135 @@ function MainApp() {
     }, 350);
   };
 
-  // Automatically scroll to the top whenever viewing a phone, article, or switching tabs
+  // Compute a stable route identity key that treats initial URL query params (?phone=, ?article=) as the same route during async hydration
+  const currentRouteIdentity = (() => {
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const phoneKey = (
+      selectedPhone?.id ||
+      (selectedPhone as any)?.slug ||
+      params?.get('phone') ||
+      ''
+    ).toLowerCase();
+    const articleKey = (
+      selectedArticle?.id ||
+      selectedArticle?.slug ||
+      params?.get('article') ||
+      ''
+    ).toLowerCase();
+    return `${activeTab}|${phoneKey}|${articleKey}`;
+  })();
+
+  const prevRouteIdentityRef = useRef<string>(currentRouteIdentity);
+  const isRestoringScrollRef = useRef<boolean>(false);
+
+  // Track user scroll position in sessionStorage so refreshing/reloading keeps the page where it was before
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [selectedPhone, selectedArticle, activeTab]);
+    if (typeof window === 'undefined') return;
+    const STORAGE_KEY = 'gsmscope_scroll_restore_v1';
+
+    // 1. On initial mount (page load/refresh), restore saved scroll position if URL matches
+    try {
+      const raw = sessionStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const currentUrl = window.location.pathname + window.location.search;
+        if (parsed && parsed.url === currentUrl && typeof parsed.y === 'number' && parsed.y > 0) {
+          const targetY = parsed.y;
+          isRestoringScrollRef.current = true;
+          let cancelled = false;
+
+          const cancelOnUserInteract = () => {
+            cancelled = true;
+            isRestoringScrollRef.current = false;
+          };
+          window.addEventListener('wheel', cancelOnUserInteract, { passive: true, once: true });
+          window.addEventListener('touchmove', cancelOnUserInteract, { passive: true, once: true });
+          window.addEventListener('keydown', cancelOnUserInteract, { passive: true, once: true });
+
+          const applyScroll = () => {
+            if (cancelled) return;
+            window.scrollTo({ top: targetY, left: 0, behavior: 'instant' });
+          };
+
+          applyScroll();
+          const t1 = window.setTimeout(applyScroll, 40);
+          const t2 = window.setTimeout(applyScroll, 140);
+          const t3 = window.setTimeout(() => {
+            applyScroll();
+            isRestoringScrollRef.current = false;
+          }, 320);
+
+          return () => {
+            cancelled = true;
+            isRestoringScrollRef.current = false;
+            window.clearTimeout(t1);
+            window.clearTimeout(t2);
+            window.clearTimeout(t3);
+            window.removeEventListener('wheel', cancelOnUserInteract);
+            window.removeEventListener('touchmove', cancelOnUserInteract);
+            window.removeEventListener('keydown', cancelOnUserInteract);
+          };
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Save current scroll position continuously on scroll and before unload
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const STORAGE_KEY = 'gsmscope_scroll_restore_v1';
+    let ticking = false;
+
+    const saveCurrentScroll = () => {
+      if (isRestoringScrollRef.current) return;
+      try {
+        sessionStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            url: window.location.pathname + window.location.search,
+            y: Math.round(window.scrollY || window.pageYOffset || 0),
+          })
+        );
+      } catch {}
+    };
+
+    const handleScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        window.requestAnimationFrame(() => {
+          saveCurrentScroll();
+          ticking = false;
+        });
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('beforeunload', saveCurrentScroll);
+    window.addEventListener('pagehide', saveCurrentScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('beforeunload', saveCurrentScroll);
+      window.removeEventListener('pagehide', saveCurrentScroll);
+    };
+  }, []);
+
+  // Scroll to top ONLY when actively navigating to a different phone, article, or tab (never on page refresh or data sync)
+  useEffect(() => {
+    if (prevRouteIdentityRef.current !== currentRouteIdentity) {
+      prevRouteIdentityRef.current = currentRouteIdentity;
+      isRestoringScrollRef.current = false;
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      try {
+        sessionStorage.setItem(
+          'gsmscope_scroll_restore_v1',
+          JSON.stringify({
+            url: window.location.pathname + window.location.search,
+            y: 0,
+          })
+        );
+      } catch {}
+    }
+  }, [currentRouteIdentity]);
 
   // Apply filters
   const filteredPhones = phones.filter((phone) => {
@@ -458,12 +584,9 @@ function MainApp() {
                       {/* Thumbnail - Adjusted height, without rank badge */}
                       <div className="relative w-24 sm:w-[122px] h-[82px] sm:h-[95px] rounded-xl overflow-hidden shrink-0 bg-slate-950 p-0 border border-slate-200 dark:border-slate-800 shadow-inner">
                         {phone.image ? (
-                          <img
+                          <LazyImage
                             src={phone.image}
                             alt={phone.name}
-                            loading="lazy"
-                            decoding="async"
-                            referrerPolicy="no-referrer"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         ) : (
@@ -596,18 +719,10 @@ function MainApp() {
                     >
                       {/* Top Landscape Cover Image */}
                       <div className="w-full h-49 sm:h-52 md:h-56 rounded-xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 relative">
-                        <img
+                        <LazyImage
                           src={leadReview.coverImage || relatedPhone?.image}
                           alt={leadReview.title}
-                          loading="lazy"
-                          decoding="async"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            const target = e.currentTarget;
-                            if (!target.src.includes('hero_flagship_phones_1792578844852.jpg')) {
-                              target.src = '/src/assets/images/hero_flagship_phones_1792578844852.jpg';
-                            }
-                          }}
+                          fallbackSrc="/src/assets/images/hero_flagship_phones_1792578844852.jpg"
                           className="w-full h-full object-fill group-hover:scale-105 transition-transform duration-500"
                         />
                       </div>
@@ -651,18 +766,10 @@ function MainApp() {
                             >
                               {/* Square / Squircle Thumbnail Image (Height reduced 15%) */}
                               <div className="relative w-24 sm:w-28 h-[82px] sm:h-[95px] rounded-xl overflow-hidden shrink-0 bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-inner">
-                                <img
+                                <LazyImage
                                   src={post.coverImage || postPhone?.image}
                                   alt={post.title}
-                                  loading="lazy"
-                                  decoding="async"
-                                  referrerPolicy="no-referrer"
-                                  onError={(e) => {
-                                    const target = e.currentTarget;
-                                    if (!target.src.includes('hero_flagship_phones_1792578844852.jpg')) {
-                                      target.src = '/src/assets/images/hero_flagship_phones_1792578844852.jpg';
-                                    }
-                                  }}
+                                  fallbackSrc="/src/assets/images/hero_flagship_phones_1792578844852.jpg"
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 />
                               </div>
@@ -755,12 +862,10 @@ function MainApp() {
                     >
                       {/* Top Landscape Cover Image */}
                       <div className="w-full h-49 sm:h-52 md:h-56 rounded-xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 relative">
-                        <img
+                        <LazyImage
                           src={leadNews.coverImage || relatedPhone?.image}
                           alt={leadNews.title}
-                          loading="lazy"
-                          decoding="async"
-                          referrerPolicy="no-referrer"
+                          fallbackSrc="/src/assets/images/hero_flagship_phones_1792578844852.jpg"
                           className="w-full h-full object-fill group-hover:scale-105 transition-transform duration-500"
                         />
                       </div>
@@ -804,12 +909,10 @@ function MainApp() {
                             >
                               {/* Square / Squircle Thumbnail Image */}
                               <div className="relative w-24 sm:w-28 h-[82px] sm:h-[95px] rounded-xl overflow-hidden shrink-0 bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-inner">
-                                <img
+                                <LazyImage
                                   src={post.coverImage || postPhone?.image}
                                   alt={post.title}
-                                  loading="lazy"
-                                  decoding="async"
-                                  referrerPolicy="no-referrer"
+                                  fallbackSrc="/src/assets/images/hero_flagship_phones_1792578844852.jpg"
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 />
                               </div>
@@ -1171,12 +1274,10 @@ function MainApp() {
                             <div className="w-full my-1.5 sm:my-2 flex items-center justify-center">
                               <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-49 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
                                 <div className="absolute inset-0 bg-emerald-500/10 rounded-2xl blur-xl group-hover:bg-emerald-500/25 transition-all pointer-events-none" />
-                                <img
+                                <LazyImage
                                   src={leadPhone.image}
                                   alt={leadPhone.name}
-                                  loading="lazy"
-                                  decoding="async"
-                                  referrerPolicy="no-referrer"
+                                  priority
                                   className="w-full h-full object-fill rounded-2xl group-hover:scale-105 transition-transform duration-500"
                                 />
                               </div>
@@ -1335,12 +1436,10 @@ function MainApp() {
                       <div className="w-full my-1.5 sm:my-2 flex items-center justify-center">
                         <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-49 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
                           <div className="absolute inset-0 bg-emerald-500/10 rounded-2xl blur-xl group-hover:bg-emerald-500/25 transition-all pointer-events-none" />
-                          <img
+                          <LazyImage
                             src={leadTop.image}
                             alt={leadTop.name}
-                            loading="lazy"
-                            decoding="async"
-                            referrerPolicy="no-referrer"
+                            priority
                             className="w-full h-full object-fill rounded-2xl group-hover:scale-105 transition-transform duration-500"
                           />
                         </div>

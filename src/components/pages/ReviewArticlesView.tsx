@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp, SEED_ARTICLE_IDS, getRecordTimestamp } from '../../context/AppContext';
 import { useSeoMeta } from '../seo/SeoMeta';
 import AdPlacementSlot from '../common/AdPlacementSlot';
+import LazyImage from '../common/LazyImage';
 import {
   Clock,
   ArrowRight,
@@ -25,9 +26,29 @@ export default function ReviewArticlesView() {
     showGlobalToast,
   } = useApp();
 
-  const [selectedFilter, setSelectedFilter] = useState<string>('All');
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const POSTS_PER_PAGE = 10;
+  const [selectedFilter, setSelectedFilter] = useState<string>(() => {
+    try {
+      return sessionStorage.getItem('gsmscope_reviews_filter_v1') || 'All';
+    } catch {
+      return 'All';
+    }
+  });
+  const [currentPage, setCurrentPage] = useState<number>(() => {
+    try {
+      const saved = Number(sessionStorage.getItem('gsmscope_reviews_page_v1'));
+      return saved > 0 ? saved : 1;
+    } catch {
+      return 1;
+    }
+  });
+  const POSTS_PER_PAGE = 9;
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('gsmscope_reviews_filter_v1', selectedFilter);
+      sessionStorage.setItem('gsmscope_reviews_page_v1', String(currentPage));
+    } catch {}
+  }, [selectedFilter, currentPage]);
 
   const allReviewArticles = articles.filter(
     (a) =>
@@ -186,21 +207,14 @@ export default function ReviewArticlesView() {
           className="group relative rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:border-emerald-500/50 transition-all cursor-pointer grid grid-cols-1 lg:grid-cols-12 gap-0"
         >
           <div className="lg:col-span-7 aspect-[16/9] lg:aspect-auto relative overflow-hidden bg-slate-950">
-            <img
+            <LazyImage
               src={
                 featuredReview.coverImage ||
                 phones.find((p) => featuredReview.relatedPhoneIds?.includes(p.id))?.image
               }
               alt={featuredReview.title}
-              loading="lazy"
-              decoding="async"
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                const target = e.currentTarget;
-                if (!target.src.includes('IMG_20261026_152954_83c935f6.jpg')) {
-                  target.src = '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg';
-                }
-              }}
+              priority
+              fallbackSrc="/assets/aistudio/IMG_20261026_152954_83c935f6.jpg"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
             <div className="site-badge absolute top-3 left-3 px-1.5 py-px text-[9px] font-mono uppercase font-bold tracking-wider text-white bg-emerald-600 rounded">
@@ -261,18 +275,10 @@ export default function ReviewArticlesView() {
                   <div>
                     {/* Cover Image */}
                     <div className="relative aspect-[16/9] w-full bg-slate-950 overflow-hidden">
-                      <img
+                      <LazyImage
                         src={article.coverImage || relatedPhone?.image}
                         alt={article.title}
-                        loading="lazy"
-                        decoding="async"
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          const target = e.currentTarget;
-                          if (!target.src.includes('IMG_20261026_152954_83c935f6.jpg')) {
-                            target.src = '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg';
-                          }
-                        }}
+                        fallbackSrc="/assets/aistudio/IMG_20261026_152954_83c935f6.jpg"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                       <span className="site-badge absolute top-2.5 left-2.5 px-1.5 py-px rounded text-[9px] font-mono font-semibold uppercase tracking-wider bg-slate-950/85 text-emerald-400 border border-emerald-500/30">
@@ -400,12 +406,9 @@ export default function ReviewArticlesView() {
                     0{idx + 1}
                   </span>
                   <div className="w-15 h-12 bg-slate-950 rounded-lg overflow-hidden p-0 shrink-0 border border-slate-200 dark:border-slate-800">
-                    <img
+                    <LazyImage
                       src={phone.image}
                       alt={phone.name}
-                      loading="lazy"
-                      decoding="async"
-                      referrerPolicy="no-referrer"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>

@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Phone } from '../../types';
+import LazyImage from './LazyImage';
 import { 
   TrendingUp, 
   Smartphone, 
@@ -163,14 +164,10 @@ export default function PredictiveSearchDropdown({
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="w-12 h-12 rounded-lg bg-black/60 border border-emerald-500/20 shrink-0 overflow-hidden">
                     {phone.image ? (
-                      <img
+                      <LazyImage
                         src={phone.image}
                         alt={phone.name}
                         className="w-full h-full object-cover"
-                        loading="lazy"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">

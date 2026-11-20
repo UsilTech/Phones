@@ -5,6 +5,7 @@ import SocialShareBar from '../common/SocialShareBar';
 import ScrollProgressBar from '../common/ScrollProgressBar';
 import AdPlacementSlot from '../common/AdPlacementSlot';
 import FormattedContent from '../common/FormattedContent';
+import LazyImage from '../common/LazyImage';
 import { 
   BookOpen, 
   Clock, 
@@ -44,9 +45,22 @@ export default function GuidesView() {
   const { setActiveTab, setSelectedPhone, phones, articles, startGlobalLoading, stopGlobalLoading } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const POSTS_PER_PAGE = 10;
+  const [currentPage, setCurrentPage] = useState<number>(() => {
+    try {
+      const saved = Number(sessionStorage.getItem('gsmscope_guides_page_v1'));
+      return saved > 0 ? saved : 1;
+    } catch {
+      return 1;
+    }
+  });
+  const POSTS_PER_PAGE = 9;
   const [activeGuide, setActiveGuide] = useState<GuideItem | null>(null);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('gsmscope_guides_page_v1', String(currentPage));
+    } catch {}
+  }, [currentPage]);
   const [isSearchingGuides, setIsSearchingGuides] = useState(false);
   const guideArticleRef = useRef<HTMLElement>(null);
 
@@ -389,18 +403,11 @@ export default function GuidesView() {
 
             {activeGuide.image && (
               <div className="w-full aspect-[16/9] rounded-2xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800">
-                <img
+                <LazyImage
                   src={activeGuide.image}
                   alt={activeGuide.title}
-                  loading="lazy"
-                  decoding="async"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    const target = e.currentTarget;
-                    if (!target.src.includes('IMG_20261026_152954_83c935f6.jpg')) {
-                      target.src = '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg';
-                    }
-                  }}
+                  priority
+                  fallbackSrc="/assets/aistudio/IMG_20261026_152954_83c935f6.jpg"
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -537,12 +544,9 @@ export default function GuidesView() {
                       0{idx + 1}
                     </span>
                     <div className="w-15 h-12 bg-slate-950 rounded-lg overflow-hidden p-0 shrink-0 border border-slate-200 dark:border-slate-800">
-                      <img
+                      <LazyImage
                         src={popPhone.image}
                         alt={popPhone.name}
-                        loading="lazy"
-                        decoding="async"
-                        referrerPolicy="no-referrer"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     </div>
@@ -677,18 +681,11 @@ export default function GuidesView() {
                   </h2>
 
                   <div className="w-full h-48 sm:h-60 md:h-64 rounded-2xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800">
-                    <img
+                    <LazyImage
                       src={leadGuide.image}
                       alt={leadGuide.title}
-                      loading="lazy"
-                      decoding="async"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        const target = e.currentTarget;
-                        if (!target.src.includes('IMG_20261026_152954_83c935f6.jpg')) {
-                          target.src = '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg';
-                        }
-                      }}
+                      priority
+                      fallbackSrc="/assets/aistudio/IMG_20261026_152954_83c935f6.jpg"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                   </div>
@@ -723,18 +720,10 @@ export default function GuidesView() {
                   <div>
                     {g.image && (
                       <div className="relative aspect-[16/9] w-full bg-slate-950 overflow-hidden border-b border-slate-100 dark:border-slate-800">
-                        <img
+                        <LazyImage
                           src={g.image}
                           alt={g.title}
-                          loading="lazy"
-                          decoding="async"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            const target = e.currentTarget;
-                            if (!target.src.includes('IMG_20261026_152954_83c935f6.jpg')) {
-                              target.src = '/assets/aistudio/IMG_20261026_152954_83c935f6.jpg';
-                            }
-                          }}
+                          fallbackSrc="/assets/aistudio/IMG_20261026_152954_83c935f6.jpg"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       </div>
