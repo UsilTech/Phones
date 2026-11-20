@@ -1406,15 +1406,32 @@ if ($route === 'admin/verify-otp' && $method === 'POST') {
     sendJson(array('success' => true, 'message' => 'OTP verified.'));
 }
 
+function trackPhpActiveUsers(&$ws, $explicitSessionId = '') {
+    $nowSec = time();
+    if (!isset($ws['activeSessions']) || !is_array($ws['activeSessions'])) {
+        $ws['activeSessions'] = array();
+    }
+    $sid = trim($explicitSessionId);
+    if ($sid === '' && isset($_GET['sessionId'])) {
+        $sid = trim($_GET['sessionId']);
+    }
+    if ($sid === '') {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'anon';
+        $ua = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 48);
+        $sid = $ip . '-' . $ua;
+    }
+    if ($sid !== '') {
+        $ws['activeSessions'][$sid] = $nowSec;
+    }
+    foreach ($ws['activeSessions'] as $k => $ts) {
+        if ($nowSec - intval($ts) > 300) {
+            unset($ws['activeSessions'][$k]);
+        }
+    }
+    return max(1, count($ws['activeSessions']));
+}
+
 if ($route === 'stats' && $method === 'GET') {
-    $totalPhoneViews = 0;
-    foreach ($db['phones'] as $p) {
-        $totalPhoneViews += isset($p['viewsCount']) ? intval($p['viewsCount']) : 0;
-    }
-    $totalArticleViews = 0;
-    foreach ($db['articles'] as $a) {
-        $totalArticleViews += isset($a['viewsCount']) ? intval($a['viewsCount']) : 0;
-    }
     $sumDaily = 0;
     if (isset($db['websiteStats']['dailyViews']) && is_array($db['websiteStats']['dailyViews'])) {
         foreach ($db['websiteStats']['dailyViews'] as $dv) {
@@ -1423,16 +1440,19 @@ if ($route === 'stats' && $method === 'GET') {
     }
     $effectiveAllTime = max(
         intval($db['websiteStats']['allTimeViews'] ?? 0),
-        $sumDaily,
-        $totalPhoneViews + $totalArticleViews
+        $sumDaily
     );
+    $activeUsers = trackPhpActiveUsers($db['websiteStats']);
     $db['websiteStats']['allTimeViews'] = $effectiveAllTime;
+    $db['websiteStats']['activeUsers'] = $activeUsers;
+    saveDatabase($db);
     sendJson(array(
         'totalPhones' => count($db['phones']),
         'totalBrands' => count($db['brands']),
         'totalArticles' => count($db['articles']),
         'totalReviews' => count($db['reviews']),
         'totalViews' => $effectiveAllTime,
+        'activeUsers' => $activeUsers,
         'newsletterSubscribersCount' => count($db['newsletterSubscribers']),
         'contactInquiriesCount' => count($db['contactInquiries']),
         'websiteStats' => $db['websiteStats']
@@ -1442,8 +1462,10 @@ if ($route === 'stats' && $method === 'GET') {
 if ($route === 'stats/track' && $method === 'POST') {
     $body = getJsonBody();
     $rawPath = trim($body['path'] ?? '/');
+    $activeUsers = trackPhpActiveUsers($db['websiteStats'], $body['sessionId'] ?? '');
+    $db['websiteStats']['activeUsers'] = $activeUsers;
     if (strpos($rawPath, '/admin') === 0 || strpos($rawPath, 'tab=admin') !== false) {
-        sendJson(array('success' => true, 'ignored' => true, 'websiteStats' => $db['websiteStats']));
+        sendJson(array('success' => true, 'ignored' => true, 'activeUsers' => $activeUsers, 'websiteStats' => $db['websiteStats']));
     }
     $dateKey = (isset($body['dateKey']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $body['dateKey']))
         ? $body['dateKey']
@@ -1503,7 +1525,7 @@ if ($route === 'stats/track' && $method === 'POST') {
     }
     $ws['updatedAt'] = gmdate('c');
     saveDatabase($db);
-    sendJson(array('success' => true, 'websiteStats' => $ws));
+    sendJson(array('success' => true, 'activeUsers' => $activeUsers, 'websiteStats' => $ws));
 }
 
 if ($route === 'currency/rates' && $method === 'GET') {

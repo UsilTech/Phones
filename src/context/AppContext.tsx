@@ -746,6 +746,7 @@ function mergePhonesAndSync(
     const mergedPhone: Phone = normalizePhoneRecord({
       ...secondaryPhone,
       ...primaryPhone,
+      viewsCount: typeof apiPhone.viewsCount === 'number' ? apiPhone.viewsCount : 0,
       image: chosenImage,
       images: combinedGallery,
       createdAt: (apiPhone as any).createdAt || (localPhone as any).createdAt,
@@ -943,13 +944,8 @@ function normalizeArticleRecord(raw: any): Article {
       ? raw.views
       : Number(raw?.viewsCount) || Number(raw?.views) || 0;
 
-  // Stable visitor views generator for seed articles without view count
-  const idStr = String(raw?.id || raw?.title || '');
-  let hash = 0;
-  for (let i = 0; i < idStr.length; i++) {
-    hash = (hash * 31 + idStr.charCodeAt(i)) % 10000;
-  }
-  const defaultViews = 8000 + Math.abs(hash * 2);
+  // Strip legacy generated fake views (> 5000) so articles start at 0 and count real visits
+  const cleanViews = rawViews >= 5000 ? 0 : Math.max(0, rawViews);
 
   const rawCategory = String(raw?.category || 'News').trim();
   const normalizedCategory =
@@ -977,7 +973,7 @@ function normalizeArticleRecord(raw: any): Article {
     readTime: raw?.readTime || '4 min read',
     tags: Array.isArray(raw?.tags) && raw.tags.length > 0 ? raw.tags : [normalizedCategory],
     featured: Boolean(raw?.featured),
-    viewsCount: hasExplicitViews ? rawViews : (rawViews > 0 ? rawViews : defaultViews),
+    viewsCount: hasExplicitViews ? cleanViews : 0,
     relatedPhoneIds: Array.isArray(raw?.relatedPhoneIds) ? raw.relatedPhoneIds : [],
     ...(raw?.seoTitle ? { seoTitle: raw.seoTitle } : {}),
     ...(raw?.seoKeywords ? { seoKeywords: raw.seoKeywords } : {}),
@@ -1089,6 +1085,7 @@ function mergeArticlesAndSync(
     const mergedArt: Article = normalizeArticleRecord({
       ...secondaryArt,
       ...primaryArt,
+      viewsCount: typeof apiArt.viewsCount === 'number' ? apiArt.viewsCount : 0,
       coverImage: chosenCover,
       createdAt: (apiArt as any).createdAt || (localArt as any).createdAt,
       updatedAt: Math.max(localUpdated, apiUpdated) || undefined,
@@ -1477,21 +1474,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [phones, setPhones] = useState<Phone[]>(() => {
     try {
       localStorage.removeItem('gsmscope_phones_v2'); // Clean up old fake cache
+      const needsZeroReset = localStorage.getItem('gsmscope_views_zero_reset_v3') !== 'true';
       const saved = localStorage.getItem('gsmscope_phones_v3');
       if (saved) {
         const parsed: any[] = JSON.parse(saved);
-        return parsed.map(p => {
+        const mapped = parsed.map(p => {
           const norm = normalizePhoneRecord(p);
-          const views = norm.viewsCount === 120 ? 0 : (norm.viewsCount || 0);
+          const views = needsZeroReset || norm.viewsCount === 120 ? 0 : (norm.viewsCount || 0);
           return {
             ...norm,
             viewsCount: views
           };
         });
+        if (needsZeroReset) {
+          safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(mapped));
+        }
+        return mapped;
       }
-      return INITIAL_PHONES.map(normalizePhoneRecord);
+      return INITIAL_PHONES.map(p => ({ ...normalizePhoneRecord(p), viewsCount: 0 }));
     } catch {
-      return INITIAL_PHONES.map(normalizePhoneRecord);
+      return INITIAL_PHONES.map(p => ({ ...normalizePhoneRecord(p), viewsCount: 0 }));
     }
   });
 
@@ -1529,22 +1531,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [articles, setArticles] = useState<Article[]>(() => {
     try {
+      const needsZeroReset = localStorage.getItem('gsmscope_views_zero_reset_v3') !== 'true';
       const saved = localStorage.getItem('gsmscope_articles_v2');
       const deletedRaw = localStorage.getItem('gsmscope_deleted_article_ids');
       const deletedIds = new Set<string>(deletedRaw ? JSON.parse(deletedRaw) : []);
       const parsed = saved ? JSON.parse(saved) : INITIAL_ARTICLES;
-      const baseList = Array.isArray(parsed)
+      const baseList = (Array.isArray(parsed)
         ? parsed.map(normalizeArticleRecord)
-        : INITIAL_ARTICLES.map(normalizeArticleRecord);
+        : INITIAL_ARTICLES.map(normalizeArticleRecord)
+      ).map((a) => (needsZeroReset ? { ...a, viewsCount: 0 } : a));
       const existingIds = new Set(baseList.map((a) => a.id));
       for (const seedArt of INITIAL_ARTICLES) {
         if (!existingIds.has(seedArt.id) && !deletedIds.has(seedArt.id)) {
-          baseList.push(normalizeArticleRecord(seedArt));
+          baseList.push({ ...normalizeArticleRecord(seedArt), viewsCount: 0 });
         }
+      }
+      if (needsZeroReset) {
+        safeSetLocalStorage('gsmscope_articles_v2', JSON.stringify(baseList));
+        localStorage.setItem('gsmscope_views_zero_reset_v3', 'true');
       }
       return baseList;
     } catch {
-      return INITIAL_ARTICLES.map(normalizeArticleRecord);
+      return INITIAL_ARTICLES.map((a) => ({ ...normalizeArticleRecord(a), viewsCount: 0 }));
     }
   });
 

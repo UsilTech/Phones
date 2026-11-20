@@ -660,15 +660,17 @@ function loadDatabaseFromDisk(silent = false): void {
                   rawCat === 'Tips & Security'
                 ? 'Buying Guide'
                 : rawCat || 'News';
+            const rawArtViews = Number(a.viewsCount) || 0;
             return {
               ...a,
               category: normalizedCat,
+              viewsCount: rawArtViews >= 5000 ? 0 : Math.max(0, rawArtViews),
             };
           });
         const loadedArtIds = new Set(loadedArticles.map((a) => a.id));
         for (const seedArt of INITIAL_ARTICLES) {
           if (!loadedArtIds.has(seedArt.id) && !deletedArticleIdsDatabase.has(seedArt.id)) {
-            loadedArticles.push(seedArt);
+            loadedArticles.push({ ...seedArt, viewsCount: 0 });
           }
         }
         articlesDatabase = loadedArticles;
@@ -2379,18 +2381,37 @@ function resolveServerCountryName(req: Request, clientCountry?: string): string 
   return cleanClient || 'Unknown';
 }
 
-app.get('/api/stats', (_req: Request, res: Response) => {
+// Track real-time active users (visitors active within the last 5 minutes)
+const activeVisitorSessions = new Map<string, number>();
+const ACTIVE_USER_WINDOW_MS = 5 * 60 * 1000;
+
+function recordAndCountActiveUsers(req: Request, explicitSessionId?: string): number {
+  const nowMs = Date.now();
+  const sid =
+    (typeof explicitSessionId === 'string' && explicitSessionId.trim()) ||
+    (typeof req.query?.sessionId === 'string' && String(req.query.sessionId).trim()) ||
+    `${req.ip || 'anon'}-${(req.headers['user-agent'] || '').slice(0, 48)}`;
+  if (sid) {
+    activeVisitorSessions.set(sid, nowMs);
+  }
+  for (const [k, ts] of activeVisitorSessions.entries()) {
+    if (nowMs - ts > ACTIVE_USER_WINDOW_MS) {
+      activeVisitorSessions.delete(k);
+    }
+  }
+  return Math.max(1, activeVisitorSessions.size);
+}
+
+app.get('/api/stats', (req: Request, res: Response) => {
   syncDatabaseFromDiskIfChanged();
-  const totalPhoneViews = phonesDatabase.reduce((acc, p) => acc + (p.viewsCount || 0), 0);
-  const totalArticleViews = articlesDatabase.reduce((acc, a) => acc + (a.viewsCount || 0), 0);
+  const activeUsers = recordAndCountActiveUsers(req);
   const sumDaily = Object.values(websiteStatsDatabase.dailyViews || {}).reduce(
     (acc, v) => acc + (Number(v) || 0),
     0
   );
   const effectiveAllTime = Math.max(
     websiteStatsDatabase.allTimeViews || 0,
-    sumDaily,
-    totalPhoneViews + totalArticleViews
+    sumDaily
   );
   res.json({
     totalPhones: phonesDatabase.length,
@@ -2398,11 +2419,13 @@ app.get('/api/stats', (_req: Request, res: Response) => {
     totalArticles: articlesDatabase.length,
     totalReviews: reviewsDatabase.length,
     totalViews: effectiveAllTime,
+    activeUsers,
     newsletterSubscribersCount: newsletterSubscribers.length,
     contactInquiriesCount: contactInquiries.length,
     websiteStats: {
       ...websiteStatsDatabase,
       allTimeViews: effectiveAllTime,
+      activeUsers,
     },
   });
 });
@@ -2410,9 +2433,15 @@ app.get('/api/stats', (_req: Request, res: Response) => {
 app.post('/api/stats/track', (req: Request, res: Response) => {
   syncDatabaseFromDiskIfChanged();
   const body = req.body || {};
+  const activeUsers = recordAndCountActiveUsers(req, body.sessionId);
   const rawPath = String(body.path || '/').trim();
   if (rawPath.startsWith('/admin') || rawPath.includes('tab=admin')) {
-    return res.json({ success: true, ignored: true, websiteStats: websiteStatsDatabase });
+    return res.json({
+      success: true,
+      ignored: true,
+      activeUsers,
+      websiteStats: { ...websiteStatsDatabase, activeUsers },
+    });
   }
 
   const now = new Date();
@@ -2496,7 +2525,11 @@ app.post('/api/stats/track', (req: Request, res: Response) => {
 
   res.json({
     success: true,
-    websiteStats: websiteStatsDatabase,
+    activeUsers,
+    websiteStats: {
+      ...websiteStatsDatabase,
+      activeUsers,
+    },
   });
 });
 

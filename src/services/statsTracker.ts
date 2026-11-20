@@ -11,6 +11,7 @@ export interface TrackedPageEntry {
 
 export interface WebsiteStatsData {
   allTimeViews: number;
+  activeUsers?: number;
   dailyViews: Record<string, number>; // "YYYY-MM-DD" -> count
   hourlyViews: Record<string, Record<string, number>>; // "YYYY-MM-DD" -> { "00".."23": count }
   pageViews: Record<string, TrackedPageEntry>;
@@ -23,11 +24,12 @@ export interface WebsiteStatsData {
   updatedAt: string;
 }
 
-const LOCAL_STATS_STORAGE_KEY = 'gsmscope_website_stats_v1';
+const LOCAL_STATS_STORAGE_KEY = 'gsmscope_website_stats_v3';
 
 export function createEmptyWebsiteStats(): WebsiteStatsData {
   return {
     allTimeViews: 0,
+    activeUsers: 1,
     dailyViews: {},
     hourlyViews: {},
     pageViews: {},
@@ -289,11 +291,28 @@ export function parseReferrerInfo(rawReferrer?: string, currentLocationHref?: st
   };
 }
 
+const VISITOR_SESSION_KEY = 'gsmscope_visitor_session_id_v1';
+
+export function getVisitorSessionId(): string {
+  if (typeof window === 'undefined') return 'server';
+  try {
+    let sid = sessionStorage.getItem(VISITOR_SESSION_KEY);
+    if (!sid) {
+      sid = `vs-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      sessionStorage.setItem(VISITOR_SESSION_KEY, sid);
+    }
+    return sid;
+  } catch {
+    return 'visitor-default';
+  }
+}
+
 export function normalizeWebsiteStats(raw: any): WebsiteStatsData {
   const empty = createEmptyWebsiteStats();
   if (!raw || typeof raw !== 'object') return empty;
   return {
     allTimeViews: typeof raw.allTimeViews === 'number' && raw.allTimeViews >= 0 ? raw.allTimeViews : 0,
+    activeUsers: typeof raw.activeUsers === 'number' && raw.activeUsers >= 0 ? raw.activeUsers : 1,
     dailyViews: raw.dailyViews && typeof raw.dailyViews === 'object' ? { ...raw.dailyViews } : {},
     hourlyViews: raw.hourlyViews && typeof raw.hourlyViews === 'object' ? { ...raw.hourlyViews } : {},
     pageViews: raw.pageViews && typeof raw.pageViews === 'object' ? { ...raw.pageViews } : {},
@@ -310,6 +329,8 @@ export function normalizeWebsiteStats(raw: any): WebsiteStatsData {
 export function getLocalWebsiteStats(): WebsiteStatsData {
   if (typeof window === 'undefined') return createEmptyWebsiteStats();
   try {
+    localStorage.removeItem('gsmscope_website_stats_v1');
+    localStorage.removeItem('gsmscope_website_stats_v2');
     const raw = localStorage.getItem(LOCAL_STATS_STORAGE_KEY);
     if (raw) {
       return normalizeWebsiteStats(JSON.parse(raw));
@@ -331,6 +352,14 @@ export function saveLocalWebsiteStats(stats: WebsiteStatsData): void {
 export function mergeWebsiteStats(serverRaw: any, localRaw?: any): WebsiteStatsData {
   const srv = normalizeWebsiteStats(serverRaw);
   const loc = localRaw ? normalizeWebsiteStats(localRaw) : getLocalWebsiteStats();
+
+  // If the server stats were freshly reset to 0, respect the reset
+  if (srv.allTimeViews === 0 && Object.keys(srv.dailyViews).length === 0 && Object.keys(srv.pageViews).length === 0) {
+    return {
+      ...srv,
+      activeUsers: typeof srv.activeUsers === 'number' ? srv.activeUsers : 1,
+    };
+  }
 
   const mergeNumRecord = (a: Record<string, number>, b: Record<string, number>): Record<string, number> => {
     const out: Record<string, number> = { ...a };
@@ -375,6 +404,7 @@ export function mergeWebsiteStats(serverRaw: any, localRaw?: any): WebsiteStatsD
 
   return {
     allTimeViews,
+    activeUsers: typeof srv.activeUsers === 'number' ? srv.activeUsers : loc.activeUsers || 1,
     dailyViews,
     hourlyViews,
     pageViews,
@@ -389,8 +419,8 @@ export function mergeWebsiteStats(serverRaw: any, localRaw?: any): WebsiteStatsD
 }
 
 /**
- * Enriches stats with actual recorded viewsCount from articles and phones in the database
- * so Popular Posts and Pages and All-Time Views always reflect real database counts.
+ * Resolves live tracked stats and lists every article, phone page, and tracked site page
+ * starting at 0 views so they count gradually from 0 as user visits grow.
  */
 export function enrichStatsWithDatabaseViews(
   stats: WebsiteStatsData,
@@ -401,47 +431,42 @@ export function enrichStatsWithDatabaseViews(
   const pageViews: Record<string, TrackedPageEntry> = { ...enriched.pageViews };
 
   for (const art of articles) {
-    const artViews = Number(art.viewsCount) || 0;
+    if (!art?.id) continue;
     const slugOrId = art.slug || art.id;
     const pathKey = `/?article=${slugOrId}`;
     const existing = pageViews[pathKey] || pageViews[`/?article=${art.id}`];
-    const bestViews = Math.max(artViews, existing?.views || 0);
-    if (bestViews > 0) {
-      pageViews[pathKey] = {
-        path: pathKey,
-        title: art.title,
-        type: 'article',
-        entityId: art.id,
-        views: bestViews,
-        lastViewedAt: existing?.lastViewedAt || new Date().toISOString(),
-      };
-    }
+    const trackedViews = Number(existing?.views) || 0;
+    pageViews[pathKey] = {
+      path: pathKey,
+      title: art.title,
+      type: 'article',
+      entityId: art.id,
+      views: Math.max(0, trackedViews),
+      lastViewedAt: existing?.lastViewedAt || '',
+    };
   }
 
   for (const phone of phones) {
-    const pViews = Number(phone.viewsCount) || 0;
+    if (!phone?.id) continue;
     const slugOrId = (phone as any).slug || phone.id;
     const pathKey = `/?phone=${slugOrId}`;
     const existing = pageViews[pathKey] || pageViews[`/?phone=${phone.id}`];
-    const bestViews = Math.max(pViews, existing?.views || 0);
-    if (bestViews > 0) {
-      pageViews[pathKey] = {
-        path: pathKey,
-        title: `${phone.name} — Full Specs & Price`,
-        type: 'phone',
-        entityId: phone.id,
-        views: bestViews,
-        lastViewedAt: existing?.lastViewedAt || new Date().toISOString(),
-      };
-    }
+    const trackedViews = Number(existing?.views) || 0;
+    pageViews[pathKey] = {
+      path: pathKey,
+      title: `${phone.name} — Full Specs & Price`,
+      type: 'phone',
+      entityId: phone.id,
+      views: Math.max(0, trackedViews),
+      lastViewedAt: existing?.lastViewedAt || '',
+    };
   }
 
-  const totalEntityViews = Object.values(pageViews).reduce((sum, p) => sum + (Number(p.views) || 0), 0);
   const sumDaily = Object.values(enriched.dailyViews).reduce((sum, v) => sum + (Number(v) || 0), 0);
 
   return {
     ...enriched,
-    allTimeViews: Math.max(enriched.allTimeViews, sumDaily, totalEntityViews),
+    allTimeViews: Math.max(enriched.allTimeViews || 0, sumDaily),
     pageViews,
   };
 }
@@ -480,6 +505,7 @@ export async function trackWebsitePageView(params: {
   const os = detectVisitorOS();
   const country = detectVisitorCountry();
   const { referrerLabel, searchEngine, socialSource } = parseReferrerInfo();
+  const sessionId = getVisitorSessionId();
 
   // 1. Update local stats immediately for instant reactivity
   const local = getLocalWebsiteStats();
@@ -543,12 +569,16 @@ export async function trackWebsitePageView(params: {
         country,
         browser,
         os,
+        sessionId,
       }),
     });
     if (res.ok) {
       const data = await res.json();
       if (data && data.websiteStats) {
         const merged = mergeWebsiteStats(data.websiteStats, local);
+        if (typeof data.activeUsers === 'number') {
+          merged.activeUsers = data.activeUsers;
+        }
         saveLocalWebsiteStats(merged);
         try {
           window.dispatchEvent(new CustomEvent('gsmscope:stats-updated', { detail: merged }));
@@ -563,12 +593,16 @@ export async function trackWebsitePageView(params: {
 
 export async function fetchWebsiteStatsFromApi(): Promise<WebsiteStatsData> {
   const local = getLocalWebsiteStats();
+  const sessionId = getVisitorSessionId();
   try {
-    const res = await fetch('/api/stats', { cache: 'no-store' });
+    const res = await fetch(`/api/stats?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (data && data.websiteStats) {
         const merged = mergeWebsiteStats(data.websiteStats, local);
+        if (typeof data.activeUsers === 'number') {
+          merged.activeUsers = data.activeUsers;
+        }
         saveLocalWebsiteStats(merged);
         return merged;
       }
@@ -576,3 +610,4 @@ export async function fetchWebsiteStatsFromApi(): Promise<WebsiteStatsData> {
   } catch {}
   return local;
 }
+

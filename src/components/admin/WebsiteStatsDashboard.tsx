@@ -258,10 +258,10 @@ export default function WebsiteStatsDashboard({
     return chartPoints.reduce((sum, pt) => sum + pt.views, 0);
   }, [chartRange, chartPoints, overviewMetrics.allTimeViews]);
 
-  // 3. Popular Posts and Pages list
+  // 3. Popular Posts and Pages list (includes 0-view posts so every page view starts at 0 and counts up)
   const popularPages: TrackedPageEntry[] = useMemo(() => {
     const list = Object.values(stats.pageViews || {}).filter(
-      (entry) => entry && entry.title && (Number(entry.views) || 0) > 0
+      (entry) => entry && entry.title && (Number(entry.views) || 0) >= 0
     );
     const filtered =
       postsFilter === 'all' ? list : list.filter((entry) => entry.type === postsFilter);
@@ -706,7 +706,7 @@ export default function WebsiteStatsDashboard({
           <div className="divide-y divide-slate-100 dark:divide-slate-800/70">
             {itemsToShow.map((entry, index) => {
               const views = Number(entry.views) || 0;
-              const barPct = Math.max(3, Math.min(100, (views / maxPageViews) * 100));
+              const barPct = views > 0 ? Math.max(3, Math.min(100, (views / maxPageViews) * 100)) : 0;
 
               const canOpenPublic =
                 (entry.type === 'article' && entry.entityId && onOpenArticleInPublic) ||
@@ -811,21 +811,27 @@ export default function WebsiteStatsDashboard({
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 self-start sm:self-auto">
-            <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-3 self-start sm:self-auto">
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
               <span
                 className="w-2 h-2 rounded-full animate-pulse"
                 style={{ backgroundColor: ACCENT_GREEN }}
               />
-              Auto-updating
+              <span className="font-mono font-bold" style={{ color: ACCENT_GREEN }}>
+                {(Number(stats.activeUsers) || 1).toLocaleString()}
+              </span>
+              <span>
+                {(Number(stats.activeUsers) || 1) === 1 ? 'Live User' : 'Live Users'}
+              </span>
             </span>
             <button
               type="button"
               onClick={() => refreshStats(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-emerald-500 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/70 cursor-pointer transition-colors"
+              className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg text-xs font-bold text-white shadow-sm cursor-pointer transition-opacity hover:opacity-90"
+              style={{ backgroundColor: ACCENT_GREEN }}
+              title="Real-Time Statistics"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
+              <span>Real-Time</span>
             </button>
           </div>
         </div>

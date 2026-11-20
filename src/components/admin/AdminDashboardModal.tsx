@@ -78,6 +78,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import WebsiteStatsDashboard, { StatsTabId } from './WebsiteStatsDashboard';
+import { getLocalWebsiteStats, fetchWebsiteStatsFromApi } from '../../services/statsTracker';
 
 type AdminSection =
   | 'dashboard'
@@ -372,6 +373,15 @@ export default function AdminDashboardModal() {
     setAdminSection(nextSec);
   };
   const [statsTab, setStatsTab] = useState<StatsTabId>('overview');
+  const [overviewStatsTotal, setOverviewStatsTotal] = useState<number>(() => getLocalWebsiteStats().allTimeViews || 0);
+  useEffect(() => {
+    fetchWebsiteStatsFromApi().then((s) => setOverviewStatsTotal(s.allTimeViews || 0));
+    const onStatsUpdate = () => {
+      setOverviewStatsTotal(getLocalWebsiteStats().allTimeViews || 0);
+    };
+    window.addEventListener('gsmscope:stats-updated', onStatsUpdate);
+    return () => window.removeEventListener('gsmscope:stats-updated', onStatsUpdate);
+  }, [section]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
@@ -2621,8 +2631,7 @@ export default function AdminDashboardModal() {
                     <BarChart3 className="w-4 h-4 text-[#00a950]" />
                   </div>
                   <div className="text-xl font-bold text-slate-900 dark:text-white mt-1.5 font-mono">
-                    {phones.reduce((s, p) => s + (Number(p.viewsCount) || 0), 0) +
-                      articles.reduce((s, a) => s + (Number(a.viewsCount) || 0), 0)}
+                    {overviewStatsTotal.toLocaleString()}
                   </div>
                   <div className="text-[10px] text-[#00a950] mt-1 truncate">
                     Traffic, Posts & Audience

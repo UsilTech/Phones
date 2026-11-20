@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "updatedAt": "2026-11-16T10:37:25.262Z",
+  "updatedAt": "2026-11-20T20:03:18.342Z",
   "phones": [
     {
       "id": "smart-20",
@@ -20,7 +20,7 @@
       "accentColor": "#10b981",
       "rating": 4,
       "reviewsCount": 1,
-      "viewsCount": 8,
+      "viewsCount": 0,
       "categories": [
         "best-battery"
       ],
@@ -131,7 +131,7 @@
       "accentColor": "#dc2626",
       "rating": 4.8,
       "reviewsCount": 4,
-      "viewsCount": 5,
+      "viewsCount": 0,
       "categories": [
         "best-gaming",
         "best-battery",
@@ -244,7 +244,7 @@
       "accentColor": "#14b8a6",
       "rating": 0,
       "reviewsCount": 0,
-      "viewsCount": 3,
+      "viewsCount": 0,
       "categories": [
         "best-camera",
         "best-5g",
@@ -358,7 +358,7 @@
       "accentColor": "#ea580c",
       "rating": 4,
       "reviewsCount": 1,
-      "viewsCount": 14,
+      "viewsCount": 0,
       "categories": [
         "best-battery"
       ],
@@ -470,7 +470,7 @@
       "accentColor": "#f97316",
       "rating": 0,
       "reviewsCount": 0,
-      "viewsCount": 2,
+      "viewsCount": 0,
       "categories": [
         "best-camera",
         "best-5g"
@@ -583,7 +583,7 @@
       "accentColor": "#4f46e5",
       "rating": 4.8,
       "reviewsCount": 4,
-      "viewsCount": 3,
+      "viewsCount": 0,
       "categories": [
         "best-camera",
         "best-5g",
@@ -698,7 +698,7 @@
       "accentColor": "#334155",
       "rating": 0,
       "reviewsCount": 0,
-      "viewsCount": 2,
+      "viewsCount": 0,
       "categories": [
         "best-camera",
         "best-5g",
@@ -813,7 +813,7 @@
       "accentColor": "#2563eb",
       "rating": 0,
       "reviewsCount": 0,
-      "viewsCount": 2,
+      "viewsCount": 0,
       "categories": [
         "best-camera",
         "best-5g",
@@ -1421,7 +1421,7 @@
         "Lagos Tech"
       ],
       "featured": true,
-      "viewsCount": 27086,
+      "viewsCount": 0,
       "relatedPhoneIds": [
         "apple-iphone-16-pro-max"
       ]
@@ -1448,7 +1448,7 @@
         "Cameras"
       ],
       "featured": true,
-      "viewsCount": 10916,
+      "viewsCount": 0,
       "relatedPhoneIds": [
         "samsung-galaxy-s24-ultra"
       ]
@@ -1477,7 +1477,8 @@
       "featured": true,
       "relatedPhoneIds": [
         "apple-iphone-16-pro-max"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-redmi-vs-infinix",
@@ -1503,7 +1504,8 @@
       "featured": true,
       "relatedPhoneIds": [
         "xiaomi-redmi-note-13-pro-5g"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-budget-under-200k",
@@ -1531,7 +1533,8 @@
         "smart-20",
         "xiaomi-redmi-13c",
         "umidigi-g5-mecha"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-5g-worth-it-2026",
@@ -1558,7 +1561,8 @@
       "relatedPhoneIds": [
         "oneplus-12r",
         "xiaomi-redmi-note-13-pro-5g"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-s24-ultra-review",
@@ -1584,7 +1588,8 @@
       "featured": true,
       "relatedPhoneIds": [
         "samsung-galaxy-s24-ultra"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-iphone-16-pro-review",
@@ -1610,7 +1615,8 @@
       "featured": true,
       "relatedPhoneIds": [
         "apple-iphone-16-pro-max"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-oneplus-12r-review",
@@ -1636,7 +1642,8 @@
       "featured": true,
       "relatedPhoneIds": [
         "oneplus-12r"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-samsung-oneui7",
@@ -1662,7 +1669,8 @@
       "featured": false,
       "relatedPhoneIds": [
         "samsung-galaxy-s24-ultra"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-samsung-s25-benchmarks",
@@ -1687,7 +1695,8 @@
       "featured": false,
       "relatedPhoneIds": [
         "samsung-galaxy-s24-ultra"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-apple-intelligence-features",
@@ -1712,7 +1721,8 @@
       "featured": false,
       "relatedPhoneIds": [
         "apple-iphone-16-pro-max"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-apple-iphone-battery-tips",
@@ -1737,7 +1747,8 @@
       "featured": false,
       "relatedPhoneIds": [
         "apple-iphone-16-pro-max"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-tecno-camon-30-imaging",
@@ -1762,7 +1773,8 @@
       "featured": false,
       "relatedPhoneIds": [
         "tecno-camon-30-premier"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-tecno-phantom-fold2",
@@ -1787,7 +1799,8 @@
       "featured": false,
       "relatedPhoneIds": [
         "tecno-camon-30-premier"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-infinix-note-40-fastcharge",
@@ -1813,7 +1826,8 @@
       "relatedPhoneIds": [
         "infinix-note-40-pro-plus",
         "smart-20"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-infinix-zero-flip",
@@ -1838,7 +1852,8 @@
       "featured": false,
       "relatedPhoneIds": [
         "smart-20"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-xiaomi-14-ultra-lens",
@@ -1864,7 +1879,8 @@
       "relatedPhoneIds": [
         "xiaomi-redmi-note-13-pro-5g",
         "xiaomi-redmi-13c"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-google-pixel-9-pro-review",
@@ -1889,7 +1905,8 @@
       "featured": false,
       "relatedPhoneIds": [
         "google-pixel-9-pro-xl"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-google-pixel-9-ai-update",
@@ -1914,7 +1931,8 @@
       "featured": false,
       "relatedPhoneIds": [
         "google-pixel-9-pro-xl"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-oneplus-13-announcement",
@@ -1939,7 +1957,8 @@
       "featured": false,
       "relatedPhoneIds": [
         "oneplus-12r"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "art-xiaomi-redmi-13c-review",
@@ -1965,7 +1984,8 @@
       "featured": false,
       "relatedPhoneIds": [
         "xiaomi-redmi-13c"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "guide-1",
@@ -1990,7 +2010,8 @@
       "relatedPhoneIds": [
         "xiaomi-redmi-13c",
         "smart-20"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "guide-2",
@@ -2014,7 +2035,8 @@
       "featured": false,
       "relatedPhoneIds": [
         "samsung-galaxy-s24-ultra"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "guide-3",
@@ -2036,7 +2058,8 @@
         "BFT Tool"
       ],
       "featured": false,
-      "relatedPhoneIds": []
+      "relatedPhoneIds": [],
+      "viewsCount": 0
     },
     {
       "id": "guide-4",
@@ -2060,7 +2083,8 @@
       "featured": false,
       "relatedPhoneIds": [
         "samsung-galaxy-s24-ultra"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "guide-5",
@@ -2085,7 +2109,8 @@
       "relatedPhoneIds": [
         "infinix-note-40-pro-plus",
         "oneplus-12r"
-      ]
+      ],
+      "viewsCount": 0
     },
     {
       "id": "guide-6",
@@ -2107,7 +2132,8 @@
         "MTK Client"
       ],
       "featured": false,
-      "relatedPhoneIds": []
+      "relatedPhoneIds": [],
+      "viewsCount": 0
     },
     {
       "id": "guide-7",
@@ -2131,7 +2157,8 @@
       "featured": false,
       "relatedPhoneIds": [
         "samsung-galaxy-s24-ultra"
-      ]
+      ],
+      "viewsCount": 0
     }
   ],
   "reviews": [
@@ -2635,5 +2662,18 @@
   "deletedArticleIds": [],
   "deletedReviewIds": [],
   "deletedBrandKeys": [],
-  "deletedInquiryIds": []
+  "deletedInquiryIds": [],
+  "websiteStats": {
+    "allTimeViews": 0,
+    "dailyViews": {},
+    "hourlyViews": {},
+    "pageViews": {},
+    "referrers": {},
+    "searchEngines": {},
+    "socialSources": {},
+    "countries": {},
+    "browsers": {},
+    "operatingSystems": {},
+    "updatedAt": "2026-11-20T20:03:18.342Z"
+  }
 }

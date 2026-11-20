@@ -54,6 +54,8 @@ import {
   Search,
   ArrowUpDown,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Loader2
 } from 'lucide-react';
 
@@ -96,6 +98,30 @@ function MainApp() {
   const [isDbSearching, setIsDbSearching] = useState(false);
   const [dbSearchPredictiveOpen, setDbSearchPredictiveOpen] = useState(false);
   const [dbSearchPredictiveIndex, setDbSearchPredictiveIndex] = useState(-1);
+  const [phonesCurrentPage, setPhonesCurrentPage] = useState<number>(() => {
+    try {
+      const saved = Number(sessionStorage.getItem('gsmscope_phones_page_v1'));
+      return saved > 0 ? saved : 1;
+    } catch {
+      return 1;
+    }
+  });
+  const PHONES_PER_PAGE = 9;
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('gsmscope_phones_page_v1', String(phonesCurrentPage));
+    } catch {}
+  }, [phonesCurrentPage]);
+
+  const filterSignRef = useRef<string>(JSON.stringify(filterState));
+  useEffect(() => {
+    const nextSign = JSON.stringify(filterState);
+    if (filterSignRef.current !== nextSign) {
+      filterSignRef.current = nextSign;
+      setPhonesCurrentPage(1);
+    }
+  }, [filterState]);
 
   // Inject Google AdSense Auto Ads script into <head> when enabled in Admin Dashboard
   useEffect(() => {
@@ -1312,125 +1338,185 @@ function MainApp() {
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-8">
-                    {/* 1. ONE BIG Grid Display (Featured Lead Phone) */}
-                    {(() => {
-                      const leadPhone = sortedPhones[0];
-                      const inComp = isInCompare(leadPhone.id);
-                      return (
-                        <div
-                          onClick={() => {
-                            triggerNavigation(() => {
-                              setSelectedPhone(leadPhone);
-                              window.scrollTo({ top: 0, behavior: 'instant' });
-                            });
-                          }}
-                          className="group rounded-3xl bg-white dark:bg-slate-900 border-2 border-emerald-500/40 hover:border-emerald-500 p-6 sm:p-8 flex flex-col gap-4 shadow-xl relative overflow-hidden cursor-pointer transition-all"
-                        >
-                          <div className="w-full space-y-4">
-                            <div className="flex items-center gap-2">
-                              <span className="site-badge text-[9px] font-mono uppercase tracking-wider font-bold text-white bg-emerald-600 px-1.5 py-px rounded">
-                                Top Result
-                              </span>
-                              <span className="site-badge text-[9px] font-mono font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/90 border border-emerald-200 dark:border-emerald-500/30 px-1.5 py-px rounded">
-                                {leadPhone.brand}
-                              </span>
+                  (() => {
+                    const totalPhonePages = Math.max(1, Math.ceil(sortedPhones.length / PHONES_PER_PAGE));
+                    const safePhonePage = Math.min(phonesCurrentPage, totalPhonePages);
+                    const startIndex = (safePhonePage - 1) * PHONES_PER_PAGE;
+                    const paginatedPhones = sortedPhones.slice(startIndex, startIndex + PHONES_PER_PAGE);
+                    const leadPhone = paginatedPhones[0];
+                    const remainingPhones = paginatedPhones.slice(1);
+                    const inComp = leadPhone ? isInCompare(leadPhone.id) : false;
+
+                    const handlePhonesPageChange = (nextPage: number) => {
+                      if (nextPage < 1 || nextPage > totalPhonePages || nextPage === safePhonePage) return;
+                      triggerNavigation(() => {
+                        setPhonesCurrentPage(nextPage);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      });
+                    };
+
+                    return (
+                      <div className="space-y-8">
+                        {/* 1. ONE BIG Grid Display (Featured Lead Phone) */}
+                        {leadPhone && (
+                          <div
+                            onClick={() => {
+                              triggerNavigation(() => {
+                                setSelectedPhone(leadPhone);
+                                window.scrollTo({ top: 0, behavior: 'instant' });
+                              });
+                            }}
+                            className="group rounded-3xl bg-white dark:bg-slate-900 border-2 border-emerald-500/40 hover:border-emerald-500 p-6 sm:p-8 flex flex-col gap-4 shadow-xl relative overflow-hidden cursor-pointer transition-all"
+                          >
+                            <div className="w-full space-y-4">
+                              <div className="flex items-center gap-2">
+                                <span className="site-badge text-[9px] font-mono uppercase tracking-wider font-bold text-white bg-emerald-600 px-1.5 py-px rounded">
+                                  Top Result
+                                </span>
+                                <span className="site-badge text-[9px] font-mono font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/90 border border-emerald-200 dark:border-emerald-500/30 px-1.5 py-px rounded">
+                                  {leadPhone.brand}
+                                </span>
+                              </div>
+
+                              <h2 className="post-title text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk'] tracking-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                                {leadPhone.name}
+                              </h2>
+
+                              {/* Featured Phone Image Showcase below phone name (decorated like HeroSection) */}
+                              <div className="w-full my-1.5 sm:my-2 flex items-center justify-center">
+                                <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-49 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
+                                  <div className="absolute inset-0 bg-emerald-500/10 rounded-2xl blur-xl group-hover:bg-emerald-500/25 transition-all pointer-events-none" />
+                                  <LazyImage
+                                    src={leadPhone.image}
+                                    alt={leadPhone.name}
+                                    priority
+                                    className="w-full h-full object-fill rounded-2xl group-hover:scale-105 transition-transform duration-500"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Key specs summary grid */}
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1 text-xs text-slate-600 dark:text-slate-300">
+                                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                                  <span className="text-slate-400 text-[10px] block">Display</span>
+                                  <span className="font-semibold text-slate-900 dark:text-white truncate block">{leadPhone.keyHighlights.display}</span>
+                                </div>
+                                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                                  <span className="text-slate-400 text-[10px] block">Processor</span>
+                                  <span className="font-semibold text-slate-900 dark:text-white truncate block">{leadPhone.keyHighlights.processor}</span>
+                                </div>
+                                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                                  <span className="text-slate-400 text-[10px] block">Battery</span>
+                                  <span className="font-semibold text-slate-900 dark:text-white truncate block">{leadPhone.keyHighlights.battery}</span>
+                                </div>
+                                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                                  <span className="text-slate-400 text-[10px] block">RAM / Storage</span>
+                                  <span className="font-semibold text-slate-900 dark:text-white truncate block">{leadPhone.keyHighlights.ram} / {leadPhone.keyHighlights.storage}</span>
+                                </div>
+                                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 col-span-2 sm:col-span-2">
+                                  <span className="text-slate-400 text-[10px] block">Camera</span>
+                                  <span className="font-semibold text-slate-900 dark:text-white truncate block">{leadPhone.keyHighlights.camera}</span>
+                                </div>
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex items-center justify-center gap-3 pt-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedPhone(leadPhone);
+                                    window.scrollTo({ top: 0, behavior: 'instant' });
+                                  }}
+                                  className="px-4 sm:px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-normal flex items-center gap-1 shadow-md cursor-pointer whitespace-nowrap shrink-0"
+                                >
+                                  <Eye className="w-3.5 h-3.5 shrink-0" />
+                                  <span className="whitespace-nowrap">Full specs</span>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (inComp) removeFromCompare(leadPhone.id);
+                                    else addToCompare(leadPhone.id);
+                                  }}
+                                  className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-normal flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                                    inComp 
+                                      ? 'bg-emerald-600 text-white' 
+                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:border-emerald-500'
+                                  }`}
+                                >
+                                  <Scale className="w-4 h-4 text-emerald-500 shrink-0" />
+                                  <span className="whitespace-nowrap">{inComp ? 'Comparing' : 'Compare'}</span>
+                                </button>
+                              </div>
                             </div>
+                          </div>
+                        )}
 
-                            <h2 className="post-title text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk'] tracking-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                              {leadPhone.name}
-                            </h2>
+                        {/* Ad Placement: Phones Page — Below Top Result */}
+                        <AdPlacementSlot placementId="phones_below_top_result" />
 
-                            {/* Featured Phone Image Showcase below phone name (decorated like HeroSection) */}
-                            <div className="w-full my-1.5 sm:my-2 flex items-center justify-center">
-                              <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-49 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
-                                <div className="absolute inset-0 bg-emerald-500/10 rounded-2xl blur-xl group-hover:bg-emerald-500/25 transition-all pointer-events-none" />
-                                <LazyImage
-                                  src={leadPhone.image}
-                                  alt={leadPhone.name}
-                                  priority
-                                  className="w-full h-full object-fill rounded-2xl group-hover:scale-105 transition-transform duration-500"
-                                />
-                              </div>
+                        {/* 2. Rest Posts Beneath It */}
+                        {remainingPhones.length > 0 && (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                              <h3 className="font-bold text-slate-900 dark:text-white text-base font-['Space_Grotesk']">
+                                All Matching Phones ({sortedPhones.length - 1} more)
+                              </h3>
                             </div>
-
-                            {/* Key specs summary grid */}
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1 text-xs text-slate-600 dark:text-slate-300">
-                              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                                <span className="text-slate-400 text-[10px] block">Display</span>
-                                <span className="font-semibold text-slate-900 dark:text-white truncate block">{leadPhone.keyHighlights.display}</span>
-                              </div>
-                              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                                <span className="text-slate-400 text-[10px] block">Processor</span>
-                                <span className="font-semibold text-slate-900 dark:text-white truncate block">{leadPhone.keyHighlights.processor}</span>
-                              </div>
-                              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                                <span className="text-slate-400 text-[10px] block">Battery</span>
-                                <span className="font-semibold text-slate-900 dark:text-white truncate block">{leadPhone.keyHighlights.battery}</span>
-                              </div>
-                              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                                <span className="text-slate-400 text-[10px] block">RAM / Storage</span>
-                                <span className="font-semibold text-slate-900 dark:text-white truncate block">{leadPhone.keyHighlights.ram} / {leadPhone.keyHighlights.storage}</span>
-                              </div>
-                              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 col-span-2 sm:col-span-2">
-                                <span className="text-slate-400 text-[10px] block">Camera</span>
-                                <span className="font-semibold text-slate-900 dark:text-white truncate block">{leadPhone.keyHighlights.camera}</span>
-                              </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                              {remainingPhones.map((phone) => (
+                                <PhoneCard key={phone.id} phone={phone} />
+                              ))}
                             </div>
+                          </div>
+                        )}
 
-                            {/* Actions */}
-                            <div className="flex items-center justify-center gap-3 pt-2">
+                        {/* 3. Phones Archive Pagination Bar */}
+                        {sortedPhones.length > 0 && (
+                          <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-center">
+                            <div className="flex items-center gap-1.5">
                               <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedPhone(leadPhone);
-                                  window.scrollTo({ top: 0, behavior: 'instant' });
-                                }}
-                                className="px-4 sm:px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-normal flex items-center gap-1 shadow-md cursor-pointer whitespace-nowrap shrink-0"
+                                type="button"
+                                disabled={safePhonePage <= 1}
+                                onClick={() => handlePhonesPageChange(safePhonePage - 1)}
+                                className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
                               >
-                                <Eye className="w-3.5 h-3.5 shrink-0" />
-                                <span className="whitespace-nowrap">Full specs</span>
+                                <ChevronLeft className="w-4 h-4" />
+                                <span>Previous</span>
                               </button>
+
+                              <div className="flex items-center gap-1 px-1">
+                                {Array.from({ length: totalPhonePages }, (_, idx) => idx + 1).map((pageNum) => (
+                                  <button
+                                    key={pageNum}
+                                    type="button"
+                                    onClick={() => handlePhonesPageChange(pageNum)}
+                                    className={`w-8 h-8 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                                      safePhonePage === pageNum
+                                        ? 'bg-emerald-600 text-white shadow-sm'
+                                        : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-emerald-500'
+                                    }`}
+                                  >
+                                    {pageNum}
+                                  </button>
+                                ))}
+                              </div>
+
                               <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (inComp) removeFromCompare(leadPhone.id);
-                                  else addToCompare(leadPhone.id);
-                                }}
-                                className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-normal flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                                  inComp 
-                                    ? 'bg-emerald-600 text-white' 
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:border-emerald-500'
-                                }`}
+                                type="button"
+                                disabled={safePhonePage >= totalPhonePages}
+                                onClick={() => handlePhonesPageChange(safePhonePage + 1)}
+                                className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
                               >
-                                <Scale className="w-4 h-4 text-emerald-500 shrink-0" />
-                                <span className="whitespace-nowrap">{inComp ? 'Comparing' : 'Compare'}</span>
+                                <span>Next</span>
+                                <ChevronRight className="w-4 h-4" />
                               </button>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Ad Placement: Phones Page — Below Top Result */}
-                    <AdPlacementSlot placementId="phones_below_top_result" />
-
-                    {/* 2. Rest Posts Beneath It */}
-                    {sortedPhones.length > 1 && (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
-                          <h3 className="font-bold text-slate-900 dark:text-white text-base font-['Space_Grotesk']">
-                            All Matching Phones ({sortedPhones.length - 1} more)
-                          </h3>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                          {sortedPhones.slice(1).map((phone) => (
-                            <PhoneCard key={phone.id} phone={phone} />
-                          ))}
-                        </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()
                 )}
               </div>
             </div>
