@@ -380,8 +380,8 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
       {/* 2. Phone Overview Hero Card */}
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-          {/* Product Media Area - full uncropped display */}
-          <div className="md:col-span-4 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden relative group bg-slate-950 flex items-center justify-center p-0">
+          {/* Product Media Area - fills radius frame */}
+          <div className="md:col-span-4 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden relative group aspect-[4/3] sm:aspect-square bg-slate-950 flex items-center justify-center p-0">
             {phone.image && !imgError ? (
               <img
                 src={phone.image}
@@ -390,7 +390,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                 decoding="async"
                 referrerPolicy="no-referrer"
                 onError={() => setImgError(true)}
-                className="w-full h-auto max-h-[380px] sm:max-h-[420px] object-contain rounded-2xl transition-transform duration-500"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 p-6 bg-slate-900/90">

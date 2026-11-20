@@ -3062,6 +3062,10 @@ button:active:not(:disabled) {
   object-fit: cover;
 }
 
+.object-fill {
+  object-fit: fill;
+}
+
 .p-0 {
   padding: 0;
 }
