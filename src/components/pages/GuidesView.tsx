@@ -9,6 +9,8 @@ import {
   BookOpen, 
   Clock, 
   ArrowRight, 
+  ChevronLeft,
+  ChevronRight,
   Tag, 
   Wrench, 
   BatteryCharging, 
@@ -42,6 +44,8 @@ export default function GuidesView() {
   const { setActiveTab, setSelectedPhone, phones, articles, startGlobalLoading, stopGlobalLoading } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const POSTS_PER_PAGE = 10;
   const [activeGuide, setActiveGuide] = useState<GuideItem | null>(null);
   const [isSearchingGuides, setIsSearchingGuides] = useState(false);
   const guideArticleRef = useRef<HTMLElement>(null);
@@ -151,6 +155,7 @@ export default function GuidesView() {
   const handleSelectCategory = (cat: string) => {
     startGlobalLoading();
     setSelectedCategory(cat);
+    setCurrentPage(1);
     setTimeout(stopGlobalLoading, 220);
   };
 
@@ -336,6 +341,19 @@ export default function GuidesView() {
     }
     return true;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredGuides.length / POSTS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * POSTS_PER_PAGE;
+  const paginatedGuides = filteredGuides.slice(startIndex, startIndex + POSTS_PER_PAGE);
+
+  const handlePageChange = (nextPage: number) => {
+    if (nextPage < 1 || nextPage > totalPages || nextPage === safePage) return;
+    startGlobalLoading();
+    setCurrentPage(nextPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(stopGlobalLoading, 220);
+  };
 
   // If viewing single guide
   if (activeGuide) {
@@ -573,6 +591,7 @@ export default function GuidesView() {
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
+                  setCurrentPage(1);
                   startGlobalLoading();
                   setTimeout(stopGlobalLoading, 220);
                 }}
@@ -584,6 +603,7 @@ export default function GuidesView() {
                   type="button"
                   onClick={() => {
                     setSearchQuery('');
+                    setCurrentPage(1);
                     startGlobalLoading();
                     setTimeout(stopGlobalLoading, 200);
                   }}
@@ -638,7 +658,8 @@ export default function GuidesView() {
         <div className="space-y-6">
           {/* ONE BIG Grid Display (Lead Featured Guide) */}
           {(() => {
-            const leadGuide = filteredGuides[0];
+            const leadGuide = paginatedGuides[0];
+            if (!leadGuide) return null;
             return (
               <div
                 onClick={() => handleSelectGuide(leadGuide)}
@@ -691,9 +712,9 @@ export default function GuidesView() {
           <AdPlacementSlot placementId="guides_below_featured" />
 
           {/* Rest of the Guides beneath it in multi-column layout */}
-          {filteredGuides.length > 1 && (
+          {paginatedGuides.length > 1 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
-              {filteredGuides.slice(1).map((g) => (
+              {paginatedGuides.slice(1).map((g) => (
                 <div
                   key={g.id}
                   onClick={() => handleSelectGuide(g)}
@@ -741,6 +762,49 @@ export default function GuidesView() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {filteredGuides.length > 0 && (
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-center">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => handlePageChange(safePage - 1)}
+                  className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Previous</span>
+                </button>
+
+                <div className="flex items-center gap-1 px-1">
+                  {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNum) => (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`w-8 h-8 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                        safePage === pageNum
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-emerald-500'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages}
+                  onClick={() => handlePageChange(safePage + 1)}
+                  className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
         </div>

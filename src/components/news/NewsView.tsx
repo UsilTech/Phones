@@ -5,6 +5,8 @@ import AdPlacementSlot from '../common/AdPlacementSlot';
 import { 
   Clock, 
   ArrowRight, 
+  ChevronLeft,
+  ChevronRight,
   Tag, 
   Smartphone, 
   Eye, 
@@ -28,6 +30,8 @@ export default function NewsView() {
   } = useApp();
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const POSTS_PER_PAGE = 10;
 
   const categories = ['All', 'News', 'Buying Guide', 'Launch'];
 
@@ -65,8 +69,21 @@ export default function NewsView() {
         return a.category === selectedCategory;
       });
 
-  const featuredArticle = filteredArticles[0] || null;
-  const remainingArticles = filteredArticles.slice(1);
+  const totalPages = Math.max(1, Math.ceil(filteredArticles.length / POSTS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * POSTS_PER_PAGE;
+  const paginatedArticles = filteredArticles.slice(startIndex, startIndex + POSTS_PER_PAGE);
+
+  const featuredArticle = paginatedArticles[0] || null;
+  const remainingArticles = paginatedArticles.slice(1);
+
+  const handlePageChange = (nextPage: number) => {
+    if (nextPage < 1 || nextPage > totalPages || nextPage === safePage) return;
+    triggerNavigation(() => {
+      setCurrentPage(nextPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  };
 
   useSeoMeta({
     title:
@@ -121,7 +138,12 @@ export default function NewsView() {
         {categories.map((cat) => (
           <button
             key={cat}
-            onClick={() => triggerNavigation(() => setSelectedCategory(cat))}
+            onClick={() =>
+              triggerNavigation(() => {
+                setSelectedCategory(cat);
+                setCurrentPage(1);
+              })
+            }
             className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
               selectedCategory === cat
                 ? 'bg-emerald-600 text-white shadow-sm'
@@ -258,11 +280,57 @@ export default function NewsView() {
             ))}
           </div>
 
+          {filteredArticles.length > 0 && (
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-center">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => handlePageChange(safePage - 1)}
+                  className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Previous</span>
+                </button>
+
+                <div className="flex items-center gap-1 px-1">
+                  {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNum) => (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`w-8 h-8 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                        safePage === pageNum
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-emerald-500'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages}
+                  onClick={() => handlePageChange(safePage + 1)}
+                  className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {filteredArticles.length === 0 && (
             <div className="p-12 text-center rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500">
               <p className="font-semibold text-slate-700 dark:text-slate-300">No articles currently found under &ldquo;{selectedCategory}&rdquo;.</p>
               <button
-                onClick={() => setSelectedCategory('All')}
+                onClick={() => {
+                  setSelectedCategory('All');
+                  setCurrentPage(1);
+                }}
                 className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold cursor-pointer"
               >
                 View all articles

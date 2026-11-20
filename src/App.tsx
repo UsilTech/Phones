@@ -595,7 +595,7 @@ function MainApp() {
                       className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/60 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col space-y-3.5"
                     >
                       {/* Top Landscape Cover Image */}
-                      <div className="w-full aspect-[16/10] sm:aspect-[16/9] md:aspect-[2/1] rounded-xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 relative">
+                      <div className="w-full h-49 sm:h-52 md:h-56 rounded-xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 relative">
                         <img
                           src={leadReview.coverImage || relatedPhone?.image}
                           alt={leadReview.title}
@@ -608,7 +608,7 @@ function MainApp() {
                               target.src = '/src/assets/images/hero_flagship_phones_1792578844852.jpg';
                             }
                           }}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="w-full h-full object-fill group-hover:scale-105 transition-transform duration-500"
                         />
                       </div>
 
@@ -754,14 +754,14 @@ function MainApp() {
                       className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/60 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col space-y-3.5"
                     >
                       {/* Top Landscape Cover Image */}
-                      <div className="w-full aspect-[16/10] sm:aspect-[16/9] md:aspect-[2/1] rounded-xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 relative">
+                      <div className="w-full h-49 sm:h-52 md:h-56 rounded-xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 relative">
                         <img
                           src={leadNews.coverImage || relatedPhone?.image}
                           alt={leadNews.title}
                           loading="lazy"
                           decoding="async"
                           referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="w-full h-full object-fill group-hover:scale-105 transition-transform duration-500"
                         />
                       </div>
 
@@ -1169,7 +1169,7 @@ function MainApp() {
 
                             {/* Featured Phone Image Showcase below phone name (decorated like HeroSection) */}
                             <div className="w-full my-1.5 sm:my-2 flex items-center justify-center">
-                              <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-54 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
+                              <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-49 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
                                 <div className="absolute inset-0 bg-emerald-500/10 rounded-2xl blur-xl group-hover:bg-emerald-500/25 transition-all pointer-events-none" />
                                 <img
                                   src={leadPhone.image}
@@ -1333,7 +1333,7 @@ function MainApp() {
 
                       {/* Featured Phone Image Showcase below phone name (decorated like HeroSection) */}
                       <div className="w-full my-1.5 sm:my-2 flex items-center justify-center">
-                        <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-54 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
+                        <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-49 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
                           <div className="absolute inset-0 bg-emerald-500/10 rounded-2xl blur-xl group-hover:bg-emerald-500/25 transition-all pointer-events-none" />
                           <img
                             src={leadTop.image}

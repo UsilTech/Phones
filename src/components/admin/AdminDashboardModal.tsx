@@ -57,6 +57,7 @@ import {
   Code2,
   Database,
   LogOut,
+  ChevronLeft,
   ChevronRight,
   Eye,
   Shield,
@@ -516,6 +517,8 @@ export default function AdminDashboardModal() {
     seoKeywords: '',
     seoDescription: '',
   });
+  const [articleArchivePage, setArticleArchivePage] = useState<number>(1);
+  const ADMIN_ARTICLES_PER_PAGE = 10;
 
   // 7. Admin Review Creation / Management state
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -4410,7 +4413,10 @@ export default function AdminDashboardModal() {
                         <button
                           key={tab.id}
                           type="button"
-                          onClick={() => setArticleCategoryFilter(tab.id as any)}
+                          onClick={() => {
+                            setArticleCategoryFilter(tab.id as any);
+                            setArticleArchivePage(1);
+                          }}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                             articleCategoryFilter === tab.id
                               ? 'bg-emerald-600 text-white shadow-sm'
@@ -4422,30 +4428,43 @@ export default function AdminDashboardModal() {
                       ))}
                     </div>
                   </div>
-                  <div className="w-full overflow-x-auto touch-pan-x">
-                    <table className="w-full min-w-[620px] text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-[11px] font-mono uppercase text-slate-500">
-                          <th className="py-3 px-4">Article / Guide &amp; SEO</th>
-                          <th className="py-3 px-3 whitespace-nowrap">Category</th>
-                          <th className="py-3 px-3 whitespace-nowrap">Date</th>
-                          <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                        {articles
-                          .filter((art) => {
-                            if (articleCategoryFilter === 'all') return true;
-                            const c = String(art.category || '').toLowerCase();
-                            const isGuide =
-                              c.includes('guide') ||
-                              ['frp & servicing tools', 'charging & battery', 'tips & security'].includes(c);
-                            const isReview = c.includes('review');
-                            if (articleCategoryFilter === 'guides') return isGuide;
-                            if (articleCategoryFilter === 'reviews') return isReview;
-                            return !isGuide && !isReview;
-                          })
-                          .map((art) => (
+                  {(() => {
+                    const filteredAdminArticles = articles.filter((art) => {
+                      if (articleCategoryFilter === 'all') return true;
+                      const c = String(art.category || '').toLowerCase();
+                      const isGuide =
+                        c.includes('guide') ||
+                        ['frp & servicing tools', 'charging & battery', 'tips & security'].includes(c);
+                      const isReview = c.includes('review');
+                      if (articleCategoryFilter === 'guides') return isGuide;
+                      if (articleCategoryFilter === 'reviews') return isReview;
+                      return !isGuide && !isReview;
+                    });
+                    const totalAdminArticlePages = Math.max(
+                      1,
+                      Math.ceil(filteredAdminArticles.length / ADMIN_ARTICLES_PER_PAGE)
+                    );
+                    const safeAdminArticlePage = Math.min(articleArchivePage, totalAdminArticlePages);
+                    const adminStartIndex = (safeAdminArticlePage - 1) * ADMIN_ARTICLES_PER_PAGE;
+                    const paginatedAdminArticles = filteredAdminArticles.slice(
+                      adminStartIndex,
+                      adminStartIndex + ADMIN_ARTICLES_PER_PAGE
+                    );
+
+                    return (
+                      <>
+                        <div className="w-full overflow-x-auto touch-pan-x">
+                          <table className="w-full min-w-[620px] text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-[11px] font-mono uppercase text-slate-500">
+                                <th className="py-3 px-4">Article / Guide &amp; SEO</th>
+                                <th className="py-3 px-3 whitespace-nowrap">Category</th>
+                                <th className="py-3 px-3 whitespace-nowrap">Date</th>
+                                <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                              {paginatedAdminArticles.map((art) => (
                           <tr key={art.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30">
                             <td className="py-3 px-4 min-w-[230px]">
                               <div className="flex items-center gap-3">
@@ -4522,11 +4541,41 @@ export default function AdminDashboardModal() {
                                 </button>
                               </div>
                             </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                              </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        {filteredAdminArticles.length > 0 && (
+                          <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 flex items-center justify-center text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                disabled={safeAdminArticlePage <= 1}
+                                onClick={() => setArticleArchivePage(Math.max(1, safeAdminArticlePage - 1))}
+                                className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer"
+                              >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                                <span>Previous</span>
+                              </button>
+                              <span className="px-2 font-mono font-bold text-slate-700 dark:text-slate-200">
+                                {safeAdminArticlePage} / {totalAdminArticlePages}
+                              </span>
+                              <button
+                                type="button"
+                                disabled={safeAdminArticlePage >= totalAdminArticlePages}
+                                onClick={() => setArticleArchivePage(Math.min(totalAdminArticlePages, safeAdminArticlePage + 1))}
+                                className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer"
+                              >
+                                <span>Next</span>
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

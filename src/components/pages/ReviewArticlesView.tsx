@@ -5,6 +5,8 @@ import AdPlacementSlot from '../common/AdPlacementSlot';
 import {
   Clock,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   TrendingUp,
   Sparkles,
@@ -24,6 +26,8 @@ export default function ReviewArticlesView() {
   } = useApp();
 
   const [selectedFilter, setSelectedFilter] = useState<string>('All');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const POSTS_PER_PAGE = 10;
 
   const allReviewArticles = articles.filter(
     (a) =>
@@ -85,8 +89,21 @@ export default function ReviewArticlesView() {
           return true;
         });
 
-  const featuredReview = filteredReviews[0] || null;
-  const remainingReviews = filteredReviews.slice(1);
+  const totalPages = Math.max(1, Math.ceil(filteredReviews.length / POSTS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * POSTS_PER_PAGE;
+  const paginatedReviews = filteredReviews.slice(startIndex, startIndex + POSTS_PER_PAGE);
+
+  const featuredReview = paginatedReviews[0] || null;
+  const remainingReviews = paginatedReviews.slice(1);
+
+  const handlePageChange = (nextPage: number) => {
+    if (nextPage < 1 || nextPage > totalPages || nextPage === safePage) return;
+    triggerNavigation(() => {
+      setCurrentPage(nextPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  };
 
   useSeoMeta({
     title:
@@ -145,7 +162,12 @@ export default function ReviewArticlesView() {
         {filters.map((filterLabel) => (
           <button
             key={filterLabel}
-            onClick={() => triggerNavigation(() => setSelectedFilter(filterLabel))}
+            onClick={() =>
+              triggerNavigation(() => {
+                setSelectedFilter(filterLabel);
+                setCurrentPage(1);
+              })
+            }
             className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
               selectedFilter === filterLabel
                 ? 'bg-emerald-600 text-white shadow-sm'
@@ -289,13 +311,59 @@ export default function ReviewArticlesView() {
             })}
           </div>
 
+          {filteredReviews.length > 0 && (
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-center">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => handlePageChange(safePage - 1)}
+                  className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Previous</span>
+                </button>
+
+                <div className="flex items-center gap-1 px-1">
+                  {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNum) => (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`w-8 h-8 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                        safePage === pageNum
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-emerald-500'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages}
+                  onClick={() => handlePageChange(safePage + 1)}
+                  className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {filteredReviews.length === 0 && (
             <div className="p-12 text-center rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500">
               <p className="font-semibold text-slate-700 dark:text-slate-300">
                 No review articles currently found under &ldquo;{selectedFilter}&rdquo;.
               </p>
               <button
-                onClick={() => setSelectedFilter('All')}
+                onClick={() => {
+                  setSelectedFilter('All');
+                  setCurrentPage(1);
+                }}
                 className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold cursor-pointer"
               >
                 View all reviews
