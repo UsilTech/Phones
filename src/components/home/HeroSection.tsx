@@ -91,7 +91,7 @@ export default function HeroSection() {
               }}
               className="w-full my-1.5 sm:my-2 flex items-center justify-center cursor-pointer group"
             >
-              <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-44 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
+              <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl h-54 sm:h-52 md:h-56 rounded-2xl overflow-hidden border border-emerald-500/25 bg-slate-950/80 shadow-2xl flex items-center justify-center group-hover:border-emerald-500/50 transition-all">
                 <div className="absolute inset-0 bg-emerald-500/10 rounded-2xl blur-xl group-hover:bg-emerald-500/25 transition-all pointer-events-none" />
                 <img
                   src={currentPhone.image}

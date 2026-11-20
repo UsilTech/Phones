@@ -1426,6 +1426,10 @@ button:active:not(:disabled) {
   height: calc(var(--spacing) * 48);
 }
 
+.h-54 {
+  height: calc(var(--spacing) * 54);
+}
+
 .h-72 {
   height: calc(var(--spacing) * 72);
 }
