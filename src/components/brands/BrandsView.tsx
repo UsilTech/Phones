@@ -4,17 +4,24 @@ import PhoneCard from '../phones/PhoneCard';
 import BrandLogo from '../common/BrandLogo';
 import FormattedContent from '../common/FormattedContent';
 import { useSeoMeta } from '../seo/SeoMeta';
-import { ShieldCheck, MapPin, Smartphone, Search, ArrowUpDown, X } from 'lucide-react';
+import { ShieldCheck, MapPin, Smartphone, Search, ArrowUpDown, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function BrandsView() {
   const { brands, phones, selectedBrand, setSelectedBrand, triggerNavigation } = useApp();
   const [brandSearch, setBrandSearch] = useState('');
   const [brandSort, setBrandSort] = useState<'newest' | 'price-asc' | 'price-desc' | 'rating' | 'battery'>('newest');
+  const [brandPage, setBrandPage] = useState<number>(1);
+  const BRAND_PHONES_PER_PAGE = 9;
 
-  // Reset search when switching brands
+  // Reset search and page when switching brands
   useEffect(() => {
     setBrandSearch('');
+    setBrandPage(1);
   }, [selectedBrand?.id, selectedBrand?.name]);
+
+  useEffect(() => {
+    setBrandPage(1);
+  }, [brandSearch, brandSort]);
 
   const brandPreviewImage = selectedBrand
     ? phones.find((p) => (p.brand || '').toLowerCase() === selectedBrand.name.toLowerCase())?.image
@@ -205,11 +212,71 @@ export default function BrandsView() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {sortedBrandPhones.map((phone) => (
-                <PhoneCard key={phone.id} phone={phone} />
-              ))}
-            </div>
+            (() => {
+              const totalBrandPages = Math.max(1, Math.ceil(sortedBrandPhones.length / BRAND_PHONES_PER_PAGE));
+              const safeBrandPage = Math.min(brandPage, totalBrandPages);
+              const startIdx = (safeBrandPage - 1) * BRAND_PHONES_PER_PAGE;
+              const paginatedBrandPhones = sortedBrandPhones.slice(startIdx, startIdx + BRAND_PHONES_PER_PAGE);
+
+              const handleBrandPageChange = (nextPage: number) => {
+                if (nextPage < 1 || nextPage > totalBrandPages || nextPage === safeBrandPage) return;
+                triggerNavigation(() => {
+                  setBrandPage(nextPage);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+              };
+
+              return (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {paginatedBrandPhones.map((phone) => (
+                      <PhoneCard key={phone.id} phone={phone} />
+                    ))}
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-center">
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={safeBrandPage <= 1}
+                        onClick={() => handleBrandPageChange(safeBrandPage - 1)}
+                        className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                        <span>Previous</span>
+                      </button>
+
+                      <div className="flex items-center gap-1 px-0.5">
+                        {Array.from({ length: totalBrandPages }, (_, idx) => idx + 1).map((pageNum) => (
+                          <button
+                            key={pageNum}
+                            type="button"
+                            onClick={() => handleBrandPageChange(pageNum)}
+                            className={`w-7 h-7 rounded-md text-[11px] font-mono font-bold transition-colors cursor-pointer ${
+                              safeBrandPage === pageNum
+                                ? 'bg-emerald-600 text-white shadow-sm'
+                                : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-emerald-500'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={safeBrandPage >= totalBrandPages}
+                        onClick={() => handleBrandPageChange(safeBrandPage + 1)}
+                        className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
+                      >
+                        <span>Next</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()
           )}
         </div>
       </div>

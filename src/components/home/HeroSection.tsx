@@ -1,5 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useApp, SEED_PHONE_IDS, getRecordTimestamp } from '../../context/AppContext';
+import {
+  WebsiteStatsData,
+  getLocalWebsiteStats,
+  fetchWebsiteStatsFromApi,
+} from '../../services/statsTracker';
 import LazyImage, { preloadImages } from '../common/LazyImage';
 import { ArrowRight, Scale, Eye, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 
@@ -15,6 +20,35 @@ export default function HeroSection() {
     formatNaira,
     formatUSD
   } = useApp();
+
+  // Keep live tracked page views synced so "Most read articles" always reflects true highest views
+  const [liveStats, setLiveStats] = useState<WebsiteStatsData>(() => getLocalWebsiteStats());
+
+  useEffect(() => {
+    let active = true;
+    fetchWebsiteStatsFromApi()
+      .then((fresh) => {
+        if (active && fresh) {
+          setLiveStats(fresh);
+        }
+      })
+      .catch(() => {});
+
+    const handleStatsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<WebsiteStatsData>).detail;
+      if (detail) {
+        setLiveStats(detail);
+      } else {
+        setLiveStats(getLocalWebsiteStats());
+      }
+    };
+
+    window.addEventListener('gsmscope:stats-updated', handleStatsUpdated);
+    return () => {
+      active = false;
+      window.removeEventListener('gsmscope:stats-updated', handleStatsUpdated);
+    };
+  }, []);
 
   // Featured phones: prioritize newly added custom phones marked isFeatured first (sorted newest-first), then featured catalog phones, plus fallback IDs
   const defaultFeaturedIds = ['smart-20', 'oneplus-12r', 'google-pixel-8-pro', 'tecno-camon-30-pro-5g', 'samsung-galaxy-s24-ultra'];
@@ -33,7 +67,7 @@ export default function HeroSection() {
   const fallbackFeatured = defaultFeaturedIds
     .map(id => phones.find(p => p.id === id))
     .filter((p): p is typeof phones[number] => Boolean(p && !adminFeatured.some(af => af.id === p.id)));
-  const featuredPhones = [...adminFeatured, ...fallbackFeatured].slice(0, 5);
+  const featuredPhones = [...adminFeatured, ...fallbackFeatured].slice(0, 3);
 
   const [activeSlide, setActiveSlide] = useState(0);
   const firstFeaturedId = featuredPhones[0]?.id || '';
@@ -48,20 +82,48 @@ export default function HeroSection() {
     preloadImages(featuredPhones.map((p) => p.image));
   }, [featuredPhones]);
 
-  // Auto carousel slide every 4s (reduced by 4s from 8s)
+  // Auto carousel slide every 6s
   useEffect(() => {
     if (featuredPhones.length <= 1) return;
     const interval = setInterval(() => {
       setActiveSlide(prev => (prev + 1) % featuredPhones.length);
-    }, 4000);
+    }, 6000);
     return () => clearInterval(interval);
   }, [featuredPhones.length]);
 
   const currentPhone = featuredPhones[activeSlide] || featuredPhones[0];
-  // Most read articles sorted by highest number of visitor views
-  const mostReadArticles = [...articles]
-    .sort((a, b) => (b.viewsCount || 0) - (a.viewsCount || 0))
-    .slice(0, 4);
+
+  // Most read articles sorted strictly by highest views (combining article.viewsCount & real-time tracked stats)
+  const mostReadArticles = useMemo(() => {
+    const pageViewsMap = liveStats?.pageViews || {};
+    const trackedByEntityId = new Map<string, number>();
+
+    for (const entry of Object.values(pageViewsMap)) {
+      if (entry && entry.type === 'article' && entry.entityId) {
+        const prev = trackedByEntityId.get(entry.entityId) || 0;
+        trackedByEntityId.set(entry.entityId, Math.max(prev, Number(entry.views) || 0));
+      }
+    }
+
+    const getEffectiveViews = (art: typeof articles[number]) => {
+      const dbViews = Number(art.viewsCount) || 0;
+      const slugOrId = art.slug || art.id;
+      const directViews = Math.max(
+        Number(pageViewsMap[`/?article=${slugOrId}`]?.views) || 0,
+        Number(pageViewsMap[`/?article=${art.id}`]?.views) || 0,
+        trackedByEntityId.get(art.id) || 0
+      );
+      return Math.max(dbViews, directViews);
+    };
+
+    return [...articles]
+      .sort((a, b) => {
+        const viewsDiff = getEffectiveViews(b) - getEffectiveViews(a);
+        if (viewsDiff !== 0) return viewsDiff;
+        return getRecordTimestamp(b) - getRecordTimestamp(a);
+      })
+      .slice(0, 4);
+  }, [articles, liveStats]);
 
   return (
     <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">

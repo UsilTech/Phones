@@ -3439,17 +3439,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     deleteArticleApi(id).catch(console.warn);
   };
 
+  const lastArticleViewRef = useRef<{ id: string; ts: number }>({ id: '', ts: 0 });
+
   const recordArticleView = useCallback((articleId: string) => {
     if (!articleId) return;
-    if (typeof window !== 'undefined') {
-      try {
-        const sessionKey = `gsmscope_viewed_art_${articleId}`;
-        if (sessionStorage.getItem(sessionKey)) {
-          return;
-        }
-        sessionStorage.setItem(sessionKey, '1');
-      } catch {}
+    const nowMs = Date.now();
+    if (
+      lastArticleViewRef.current.id === articleId &&
+      nowMs - lastArticleViewRef.current.ts < 1500
+    ) {
+      return;
     }
+    lastArticleViewRef.current = { id: articleId, ts: nowMs };
+
     setArticles(prev => {
       const next = prev.map(a => {
         if (a.id === articleId) {
@@ -3466,7 +3468,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return prev;
     });
-    recordArticleViewApi(articleId).catch(() => {});
+    recordArticleViewApi(articleId)
+      .then((serverViews) => {
+        if (typeof serverViews === 'number' && serverViews >= 0) {
+          setArticles(prev => {
+            const next = prev.map(a => {
+              if (a.id === articleId) {
+                return { ...a, viewsCount: Math.max(a.viewsCount || 0, serverViews) };
+              }
+              return a;
+            });
+            safeSetLocalStorage('gsmscope_articles_v2', JSON.stringify(next));
+            return next;
+          });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const addReview = (reviewData: Omit<Review, 'id' | 'date' | 'status'>) => {

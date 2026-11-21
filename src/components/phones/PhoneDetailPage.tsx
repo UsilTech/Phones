@@ -484,7 +484,10 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
                   <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-mono uppercase mb-0.5">BATTERY</span>
-                  <span className="font-bold text-slate-900 dark:text-white line-clamp-1">{phone.keyHighlights.battery} ({phone.keyHighlights.charging})</span>
+                  <span className="font-bold text-slate-900 dark:text-white line-clamp-1">
+                    {phone.keyHighlights.battery}
+                    {phone.keyHighlights.charging ? ` (${phone.keyHighlights.charging})` : ''}
+                  </span>
                 </div>
               </div>
             </div>
@@ -673,7 +676,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                           return (
                             <div
                               key={sub.id}
-                              className={`grid grid-cols-12 py-2.5 px-3 ${
+                              className={`grid grid-cols-12 py-2.5 px-3 text-[11px] ${
                                 isAntutu ? 'bg-emerald-50/50 dark:bg-emerald-950/20' : ''
                               }`}
                             >

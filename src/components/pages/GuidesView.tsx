@@ -756,24 +756,24 @@ export default function GuidesView() {
 
           {filteredGuides.length > 0 && (
             <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-center">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
                   disabled={safePage <= 1}
                   onClick={() => handlePageChange(safePage - 1)}
-                  className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
+                  className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-3.5 h-3.5" />
                   <span>Previous</span>
                 </button>
 
-                <div className="flex items-center gap-1 px-1">
+                <div className="flex items-center gap-1 px-0.5">
                   {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNum) => (
                     <button
                       key={pageNum}
                       type="button"
                       onClick={() => handlePageChange(pageNum)}
-                      className={`w-8 h-8 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                      className={`w-7 h-7 rounded-md text-[11px] font-mono font-bold transition-colors cursor-pointer ${
                         safePage === pageNum
                           ? 'bg-emerald-600 text-white shadow-sm'
                           : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-emerald-500'
@@ -788,10 +788,10 @@ export default function GuidesView() {
                   type="button"
                   disabled={safePage >= totalPages}
                   onClick={() => handlePageChange(safePage + 1)}
-                  className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
+                  className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:border-emerald-500 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
                 >
                   <span>Next</span>
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
