@@ -124,7 +124,7 @@ export default function JsonLdScript() {
         {
           '@type': 'PropertyValue',
           name: 'Display',
-          value: `${selectedPhone.detailedSpecs?.display?.type || selectedPhone.keyHighlights?.display || ''} (${selectedPhone.detailedSpecs?.display?.size || ''}, ${selectedPhone.detailedSpecs?.display?.refreshRate || ''})`.trim(),
+          value: `${selectedPhone.detailedSpecs?.display?.type || selectedPhone.keyHighlights?.display || ''} (${selectedPhone.detailedSpecs?.display?.size || ''}, ${selectedPhone.detailedSpecs?.display?.refreshRate || ''})`,
         },
         {
           '@type': 'PropertyValue',

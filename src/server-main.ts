@@ -2555,21 +2555,176 @@ function escapeHtmlAttr(unsafe: string): string {
 }
 
 function getRequestOrigin(req: Request): string {
-  const proto = (req.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim() || req.protocol || 'https';
   const host = (req.headers['x-forwarded-host'] as string)?.split(',')[0]?.trim() || req.get('host') || 'gsmscope.com';
+  const isLocal = host.startsWith('localhost') || host.startsWith('127.0.0.1') || host.startsWith('0.0.0.0');
+  const forwardedProto = (req.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim();
+  const proto = forwardedProto || (isLocal ? req.protocol || 'http' : 'https');
   return `${proto}://${host}`;
 }
 
-function resolveAbsoluteAssetUrl(origin: string, rawUrl?: string): string {
+function extractFirstImgFromHtml(html?: string): string {
+  if (!html) return '';
+  const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  return match && match[1] ? match[1].trim() : '';
+}
+
+function resolveAbsoluteAssetUrl(origin: string, rawUrl?: string, ogEndpointFallback?: string): string {
+  const defaultImg = `${origin}/assets/images/hero_flagship_phones_1792578844852.jpg`;
   if (!rawUrl || !rawUrl.trim()) {
-    return `${origin}/assets/aistudio/GsmScope_header_logo_dark.webp`;
+    return ogEndpointFallback || defaultImg;
   }
   const trimmed = rawUrl.trim();
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    return trimmed;
+  if (trimmed.startsWith('data:')) {
+    // Social crawlers (Facebook, X, WhatsApp, Telegram) reject inline data: URIs
+    return ogEndpointFallback || defaultImg;
   }
-  return `${origin}${trimmed.startsWith('/') ? trimmed : `/${trimmed}`}`;
+  if (trimmed.startsWith('//')) {
+    return `https:${trimmed.replace(/ /g, '%20')}`;
+  }
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed.replace(/ /g, '%20');
+  }
+  if (trimmed.startsWith('/src/assets/images/')) {
+    const file = path.basename(trimmed.split('?')[0]);
+    return `${origin}/assets/images/${encodeURIComponent(file)}`;
+  }
+  const normalizedPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return `${origin}${normalizedPath.replace(/ /g, '%20')}`;
 }
+
+function sendBinaryAssetFile(res: Response, filePath: string): boolean {
+  if (!fs.existsSync(filePath)) return false;
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeMap: Record<string, string> = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+  };
+  res.setHeader('Content-Type', mimeMap[ext] || 'image/jpeg');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.sendFile(filePath);
+  return true;
+}
+
+// Serve actual article or phone image for OpenGraph / Twitter social share cards (supports data: URIs, /uploads/, /assets/, and external URLs)
+app.get('/api/og-image', (req: Request, res: Response) => {
+  syncDatabaseFromDiskIfChanged();
+  const type = String(req.query.type || '').trim().toLowerCase();
+  const rawId = String(req.query.id || '').trim();
+  let decodedId = rawId;
+  try {
+    decodedId = decodeURIComponent(rawId);
+  } catch {}
+  const idLower = decodedId.toLowerCase();
+
+  let rawImage = '';
+  if (type === 'article' && idLower) {
+    const matchedArticle = articlesDatabase.find(
+      (a) =>
+        a.id.toLowerCase() === idLower ||
+        (a.slug && a.slug.toLowerCase() === idLower)
+    );
+    if (matchedArticle) {
+      rawImage = (matchedArticle.coverImage || extractFirstImgFromHtml(matchedArticle.content) || '').trim();
+    }
+  } else if (type === 'phone' && idLower) {
+    const matchedPhone = phonesDatabase.find(
+      (p) =>
+        p.id.toLowerCase() === idLower ||
+        ((p as any).slug && String((p as any).slug).toLowerCase() === idLower)
+    );
+    if (matchedPhone) {
+      const mpAny = matchedPhone as any;
+      rawImage = (
+        matchedPhone.image ||
+        (Array.isArray(mpAny.images) && mpAny.images[0]) ||
+        (Array.isArray(mpAny.gallery) && mpAny.gallery[0]) ||
+        ''
+      ).trim();
+    }
+  }
+
+  // 1. Decode inline data:image/...;base64,... directly to real binary image
+  if (rawImage.startsWith('data:image/') && rawImage.includes(';base64,')) {
+    try {
+      const mimeMatch = rawImage.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/);
+      const mimeType = mimeMatch && mimeMatch[1] ? mimeMatch[1] : 'image/jpeg';
+      const base64Data = rawImage.split(';base64,')[1];
+      const buffer = Buffer.from(base64Data, 'base64');
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Length', String(buffer.length));
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.send(buffer);
+    } catch {}
+  }
+
+  // 2. External image URL -> redirect social crawler directly to it
+  if (rawImage.startsWith('http://') || rawImage.startsWith('https://')) {
+    return res.redirect(302, rawImage);
+  }
+  if (rawImage.startsWith('//')) {
+    return res.redirect(302, `https:${rawImage}`);
+  }
+
+  // 3. Local /uploads/ image (from disk or restored from database base64)
+  if (rawImage.startsWith('/uploads/') || rawImage.startsWith('/api/uploads/')) {
+    const filename = path.basename(rawImage.split('?')[0]);
+    if (filename) {
+      for (const dir of [PUBLIC_HTML_UPLOADS_DIR, UPLOADS_DIR, PUBLIC_UPLOADS_DIR]) {
+        const candidate = path.resolve(dir, filename);
+        if (sendBinaryAssetFile(res, candidate)) return;
+      }
+      const targetUrl = `/uploads/${filename}`;
+      let foundDataUrl = uploadDataUrlsDatabase[targetUrl];
+      if (!foundDataUrl) {
+        const mediaMatch = mediaDatabase.find(
+          (m) => m && (m.url === targetUrl || path.basename(m.url || '') === filename) && m.dataUrl
+        );
+        if (mediaMatch?.dataUrl) foundDataUrl = mediaMatch.dataUrl;
+      }
+      if (foundDataUrl && foundDataUrl.includes(';base64,')) {
+        try {
+          const mimeMatch = foundDataUrl.match(/^data:([^;]+);base64,/);
+          const mimeType = mimeMatch && mimeMatch[1] ? mimeMatch[1] : 'image/jpeg';
+          const buffer = Buffer.from(foundDataUrl.split(';base64,')[1], 'base64');
+          writeFileToAllUploadDirs(filename, buffer);
+          res.setHeader('Content-Type', mimeType);
+          res.setHeader('Content-Length', String(buffer.length));
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          return res.send(buffer);
+        } catch {}
+      }
+    }
+  }
+
+  // 4. Local /assets/ or /src/assets/ image
+  if (rawImage.startsWith('/assets/') || rawImage.startsWith('/src/assets/')) {
+    const cleanRel = rawImage.split('?')[0].replace(/^\/src\/assets\//, '').replace(/^\/assets\//, '');
+    const assetCandidates = [
+      path.resolve(APP_ROOT, 'public', 'assets', cleanRel),
+      path.resolve(APP_ROOT, 'dist', 'assets', cleanRel),
+      path.resolve(APP_ROOT, 'cpanel_build', 'assets', cleanRel),
+      path.resolve(APP_ROOT, 'src', 'assets', cleanRel),
+    ];
+    for (const candidate of assetCandidates) {
+      if (sendBinaryAssetFile(res, candidate)) return;
+    }
+  }
+
+  // 5. Fallback to GsmScope hero image
+  const fallbackCandidates = [
+    path.resolve(APP_ROOT, 'public', 'assets', 'images', 'hero_flagship_phones_1792578844852.jpg'),
+    path.resolve(APP_ROOT, 'src', 'assets', 'images', 'hero_flagship_phones_1792578844852.jpg'),
+    path.resolve(APP_ROOT, 'cpanel_build', 'assets', 'images', 'hero_flagship_phones_1792578844852.jpg'),
+  ];
+  for (const candidate of fallbackCandidates) {
+    if (sendBinaryAssetFile(res, candidate)) return;
+  }
+  return res.status(404).end();
+});
 
 // Google AdSense /ads.txt endpoint
 app.get('/ads.txt', (_req: Request, res: Response) => {
@@ -2682,6 +2837,9 @@ app.get('/sitemap.xml', (req: Request, res: Response) => {
 
 // Helper to inject dynamic SSR Meta Tags, OpenGraph, JSON-LD Rich Results & Crawlable Snapshot into index.html
 function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
+  // Always sync latest articles & phones from disk so newly published items immediately render accurate social preview tags
+  syncDatabaseFromDiskIfChanged();
+
   const origin = getRequestOrigin(req);
   const siteName = websiteContentDatabase?.siteName || 'GsmScope';
   const phoneQuery = typeof req.query.phone === 'string' ? req.query.phone.trim() : '';
@@ -2703,7 +2861,11 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
     'gsmscope, smartphone specs, phone prices, mobile phone reviews, buy phones';
   let canonicalUrl = `${origin}/`;
   let ogType = 'website';
-  let ogImage = resolveAbsoluteAssetUrl(origin, phonesDatabase[0]?.image);
+  let ogImage = resolveAbsoluteAssetUrl(
+    origin,
+    (websiteContentDatabase as any)?.ogImageUrl || '/assets/images/hero_flagship_phones_1792578844852.jpg'
+  );
+  let ogImageAlt = pageTitle;
   let robotsDirective =
     (websiteContentDatabase as any)?.customScripts?.robotsTxtMeta ||
     'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
@@ -2748,12 +2910,18 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
     robotsDirective = 'noindex, nofollow';
     canonicalUrl = `${origin}/admin`;
   } else if (phoneQuery) {
+    let decodedPhoneQuery = phoneQuery;
+    try {
+      decodedPhoneQuery = decodeURIComponent(phoneQuery);
+    } catch {}
+    const pqLower = decodedPhoneQuery.toLowerCase();
     const matchedPhone = phonesDatabase.find(
       (p) =>
-        p.id.toLowerCase() === phoneQuery.toLowerCase() ||
-        ((p as any).slug && String((p as any).slug).toLowerCase() === phoneQuery.toLowerCase())
+        p.id.toLowerCase() === pqLower ||
+        ((p as any).slug && String((p as any).slug).toLowerCase() === pqLower)
     );
     if (matchedPhone) {
+      const phoneSlugOrId = (matchedPhone as any).slug || matchedPhone.id;
       pageTitle =
         matchedPhone.seoTitle ||
         `${matchedPhone.name} Full Specifications, Reviews & Price ($${matchedPhone.priceUSD} / ₦${matchedPhone.priceNGN.toLocaleString()}) — ${siteName}`;
@@ -2763,9 +2931,17 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
       pageKeywords =
         matchedPhone.seoKeywords ||
         `${matchedPhone.name}, ${matchedPhone.brand}, ${matchedPhone.name} specs, ${matchedPhone.name} price`;
-      canonicalUrl = `${origin}/?phone=${encodeURIComponent(matchedPhone.id)}`;
+      canonicalUrl = `${origin}/?phone=${encodeURIComponent(phoneSlugOrId)}`;
       ogType = 'product';
-      ogImage = resolveAbsoluteAssetUrl(origin, matchedPhone.image);
+      const mpAny = matchedPhone as any;
+      const phoneRawImg =
+        matchedPhone.image ||
+        (Array.isArray(mpAny.images) && mpAny.images[0]) ||
+        (Array.isArray(mpAny.gallery) && mpAny.gallery[0]) ||
+        '';
+      const phoneOgEndpoint = `${origin}/api/og-image?type=phone&id=${encodeURIComponent(phoneSlugOrId)}`;
+      ogImage = resolveAbsoluteAssetUrl(origin, phoneRawImg, phoneOgEndpoint);
+      ogImageAlt = `${matchedPhone.name} — Full Specifications & Price`;
 
       const approvedReviews = reviewsDatabase.filter(
         (r) => r.phoneId === matchedPhone.id && r.status === 'approved'
@@ -2825,10 +3001,15 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
       crawlerBodyHtml = `<article><h1>${escapeHtmlAttr(matchedPhone.name)} Full Specifications &amp; Price</h1><p>${escapeHtmlAttr(pageDescription)}</p><ul><li>Brand: ${escapeHtmlAttr(matchedPhone.brand)}</li><li>Price: $${matchedPhone.priceUSD} USD / ₦${matchedPhone.priceNGN.toLocaleString()} NGN</li><li>Display: ${escapeHtmlAttr(matchedPhone.keyHighlights?.display || '')}</li><li>Processor: ${escapeHtmlAttr(matchedPhone.keyHighlights?.processor || '')}</li><li>RAM &amp; Storage: ${escapeHtmlAttr(matchedPhone.keyHighlights?.ram || '')} / ${escapeHtmlAttr(matchedPhone.keyHighlights?.storage || '')}</li><li>Camera: ${escapeHtmlAttr(matchedPhone.keyHighlights?.camera || '')}</li><li>Battery: ${escapeHtmlAttr(matchedPhone.keyHighlights?.battery || '')}</li></ul></article>`;
     }
   } else if (articleQuery) {
+    let decodedArticleQuery = articleQuery;
+    try {
+      decodedArticleQuery = decodeURIComponent(articleQuery);
+    } catch {}
+    const aqLower = decodedArticleQuery.toLowerCase();
     const matchedArticle = articlesDatabase.find(
       (a) =>
-        a.id.toLowerCase() === articleQuery.toLowerCase() ||
-        (a.slug && a.slug.toLowerCase() === articleQuery.toLowerCase())
+        a.id.toLowerCase() === aqLower ||
+        (a.slug && a.slug.toLowerCase() === aqLower)
     );
     if (matchedArticle) {
       const slugOrId = matchedArticle.slug || matchedArticle.id;
@@ -2837,9 +3018,11 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
       pageKeywords = matchedArticle.seoKeywords || (matchedArticle.tags || []).join(', ');
       canonicalUrl = `${origin}/?article=${encodeURIComponent(slugOrId)}`;
       ogType = 'article';
-      if (matchedArticle.coverImage) {
-        ogImage = resolveAbsoluteAssetUrl(origin, matchedArticle.coverImage);
-      }
+      const articleRawImg =
+        matchedArticle.coverImage || extractFirstImgFromHtml(matchedArticle.content) || '';
+      const articleOgEndpoint = `${origin}/api/og-image?type=article&id=${encodeURIComponent(slugOrId)}`;
+      ogImage = resolveAbsoluteAssetUrl(origin, articleRawImg, articleOgEndpoint);
+      ogImageAlt = matchedArticle.title;
 
       const isReview =
         matchedArticle.category?.toLowerCase().includes('review') ||
@@ -2950,7 +3133,7 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
   );
   html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtmlAttr(pageTitle)}</title>`);
   html = html.replace(
-    /<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i,
+    /<meta\s+name="description"[\s\S]*?content="[^"]*"\s*\/?>/i,
     `<meta name="description" content="${escapeHtmlAttr(pageDescription)}" />`
   );
   html = html.replace(
@@ -2962,11 +3145,15 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
     `<meta property="og:type" content="${escapeHtmlAttr(ogType)}" />`
   );
   html = html.replace(
+    /<meta\s+property="og:site_name"\s+content="[^"]*"\s*\/?>/i,
+    `<meta property="og:site_name" content="${escapeHtmlAttr(siteName)}" />`
+  );
+  html = html.replace(
     /<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/i,
     `<meta property="og:title" content="${escapeHtmlAttr(pageTitle)}" />`
   );
   html = html.replace(
-    /<meta\s+property="og:description"\s+content="[^"]*"\s*\/?>/i,
+    /<meta[^>]*property="og:description"[\s\S]*?content="[^"]*"\s*\/?>/i,
     `<meta property="og:description" content="${escapeHtmlAttr(pageDescription)}" />`
   );
   html = html.replace(
@@ -2974,20 +3161,41 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
     `<meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}" />`
   );
   html = html.replace(
-    /<meta\s+property="og:image"\s+content="[^"]*"\s*\/?>/i,
+    /<meta\s+property="og:image"[\s\S]*?content="[^"]*"\s*\/?>/i,
     `<meta property="og:image" content="${escapeHtmlAttr(ogImage)}" />`
   );
+  if (/<meta\s+property="og:image:secure_url"[\s\S]*?content="[^"]*"\s*\/?>/i.test(html)) {
+    html = html.replace(
+      /<meta\s+property="og:image:secure_url"[\s\S]*?content="[^"]*"\s*\/?>/i,
+      `<meta property="og:image:secure_url" content="${escapeHtmlAttr(ogImage)}" />`
+    );
+  } else {
+    html = html.replace(
+      /(<meta\s+property="og:image"\s+content="[^"]*"\s*\/?>)/i,
+      `$1\n    <meta property="og:image:secure_url" content="${escapeHtmlAttr(ogImage)}" />`
+    );
+  }
+  html = html.replace(
+    /<meta\s+property="og:image:alt"[\s\S]*?content="[^"]*"\s*\/?>/i,
+    `<meta property="og:image:alt" content="${escapeHtmlAttr(ogImageAlt)}" />`
+  );
+  html = html.replace(/<meta\s+property="og:image:width"\s+content="[^"]*"\s*\/?>\s*/gi, '');
+  html = html.replace(/<meta\s+property="og:image:height"\s+content="[^"]*"\s*\/?>\s*/gi, '');
   html = html.replace(
     /<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/i,
     `<meta name="twitter:title" content="${escapeHtmlAttr(pageTitle)}" />`
   );
   html = html.replace(
-    /<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/?>/i,
+    /<meta\s+name="twitter:description"[\s\S]*?content="[^"]*"\s*\/?>/i,
     `<meta name="twitter:description" content="${escapeHtmlAttr(pageDescription)}" />`
   );
   html = html.replace(
-    /<meta\s+name="twitter:image"\s+content="[^"]*"\s*\/?>/i,
+    /<meta\s+name="twitter:image"[\s\S]*?content="[^"]*"\s*\/?>/i,
     `<meta name="twitter:image" content="${escapeHtmlAttr(ogImage)}" />`
+  );
+  html = html.replace(
+    /<meta\s+name="twitter:image:alt"[\s\S]*?content="[^"]*"\s*\/?>/i,
+    `<meta name="twitter:image:alt" content="${escapeHtmlAttr(ogImageAlt)}" />`
   );
   html = html.replace(
     /<meta\s+name="robots"\s+content="[^"]*"\s*\/?>/i,

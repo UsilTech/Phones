@@ -12,9 +12,40 @@ export interface SeoMetaProps {
   siteName?: string;
 }
 
-const DEFAULT_OG_IMAGE =
-  'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1200&q=85';
+const DEFAULT_OG_IMAGE = '/assets/images/hero_flagship_phones_1792578844852.jpg';
 const DEFAULT_SITE_NAME = 'GsmScope';
+
+function resolveClientOgImageUrl(origin: string, rawImage: string, canonicalPath?: string): string {
+  const trimmed = (rawImage || '').trim();
+  if (!trimmed) {
+    return `${origin}${DEFAULT_OG_IMAGE}`;
+  }
+  if (trimmed.startsWith('data:')) {
+    // Social platforms cannot read data: URIs — point to the live /api/og-image endpoint
+    if (canonicalPath) {
+      const articleMatch = canonicalPath.match(/[?&]article=([^&]+)/i);
+      if (articleMatch && articleMatch[1]) {
+        return `${origin}/api/og-image?type=article&id=${articleMatch[1]}`;
+      }
+      const phoneMatch = canonicalPath.match(/[?&]phone=([^&]+)/i);
+      if (phoneMatch && phoneMatch[1]) {
+        return `${origin}/api/og-image?type=phone&id=${phoneMatch[1]}`;
+      }
+    }
+    return `${origin}${DEFAULT_OG_IMAGE}`;
+  }
+  if (trimmed.startsWith('//')) {
+    return `https:${trimmed}`;
+  }
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('/src/assets/images/')) {
+    const filename = trimmed.slice('/src/assets/images/'.length);
+    return `${origin}/assets/images/${filename}`;
+  }
+  return `${origin}${trimmed.startsWith('/') ? trimmed : `/${trimmed}`}`;
+}
 
 function upsertMetaTag(attrName: 'name' | 'property', attrValue: string, content: string) {
   if (typeof document === 'undefined') return;
@@ -55,16 +86,13 @@ export function useSeoMeta({
     const resolvedDescription =
       description.length > 165 ? `${description.slice(0, 162).trim()}...` : description;
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://gsmscope.com';
-    const rawImage = image && image.trim().length > 0 ? image.trim() : DEFAULT_OG_IMAGE;
-    const resolvedImage =
-      rawImage.startsWith('http://') || rawImage.startsWith('https://')
-        ? rawImage
-        : `${origin}${rawImage.startsWith('/') ? rawImage : `/${rawImage}`}`;
-    const resolvedImageAlt = imageAlt || resolvedTitle;
     const pathname =
       canonicalPath ||
       (typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : '/');
     const fullUrl = `${origin}${pathname.startsWith('/') ? pathname : `/${pathname}`}`;
+    const rawImage = image && image.trim().length > 0 ? image.trim() : DEFAULT_OG_IMAGE;
+    const resolvedImage = resolveClientOgImageUrl(origin, rawImage, pathname);
+    const resolvedImageAlt = imageAlt || resolvedTitle;
 
     document.title = resolvedTitle;
 
@@ -91,6 +119,7 @@ export function useSeoMeta({
     upsertMetaTag('property', 'og:title', resolvedTitle);
     upsertMetaTag('property', 'og:description', resolvedDescription);
     upsertMetaTag('property', 'og:image', resolvedImage);
+    upsertMetaTag('property', 'og:image:secure_url', resolvedImage);
     upsertMetaTag('property', 'og:image:alt', resolvedImageAlt);
     upsertMetaTag('property', 'og:url', fullUrl);
 

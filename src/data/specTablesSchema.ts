@@ -323,6 +323,13 @@ export function setPhoneSpecEditorValue(phone: Phone, keyPath: string, value: st
   };
 }
 
+function cleanSpecValue(value?: string | null): string {
+  return String(value ?? '')
+    .replace(/\s*\(\s*[,/-]*\s*\)/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export function getPhoneSpecDisplayValue(
   phone: Phone,
   keyPath: string,
@@ -334,40 +341,53 @@ export function getPhoneSpecDisplayValue(
   }
 ): string {
   const specs: any = phone.detailedSpecs || {};
+  let resolved = '';
   switch (keyPath) {
     case 'releaseDate':
-      return phone.releaseDate || String(phone.releaseYear || '');
+      resolved = phone.releaseDate || String(phone.releaseYear || '');
+      break;
     case 'modelNumber':
-      return phone.modelNumber || helpers.getDeviceModelNumber(phone);
+      resolved = phone.modelNumber || helpers.getDeviceModelNumber(phone);
+      break;
     case 'marketStatus':
-      return phone.marketStatus?.toLowerCase().includes('discontinued')
+      resolved = phone.marketStatus?.toLowerCase().includes('discontinued')
         ? 'Discontinued'
         : phone.marketStatus || 'Available';
+      break;
     case 'priceUSD / priceNGN':
-      return `${helpers.formatUSD(phone.priceUSD)} / ${helpers.formatNaira(phone.priceNGN)}`;
+      resolved = `${helpers.formatUSD(phone.priceUSD)} / ${helpers.formatNaira(phone.priceNGN)}`;
+      break;
     case 'memory.ramVariants':
-      return Array.isArray(specs.memory?.ramVariants) && specs.memory.ramVariants.length > 0
-        ? specs.memory.ramVariants.join(', ')
+      resolved = Array.isArray(specs.memory?.ramVariants) && specs.memory.ramVariants.length > 0
+        ? specs.memory.ramVariants.filter(Boolean).join(', ')
         : phone.keyHighlights.ram;
+      break;
     case 'memory.storageVariants': {
-      const variants =
+      const variants = cleanSpecValue(
         Array.isArray(specs.memory?.storageVariants) && specs.memory.storageVariants.length > 0
-          ? specs.memory.storageVariants.join(', ')
-          : phone.keyHighlights.storage;
-      if (!helpers.hasSeparateStorageTypeRow && specs.memory?.storageType) {
-        return `${variants} (${specs.memory.storageType})`;
+          ? specs.memory.storageVariants.filter(Boolean).join(', ')
+          : phone.keyHighlights.storage
+      );
+      const storageType = cleanSpecValue(specs.memory?.storageType);
+      if (!helpers.hasSeparateStorageTypeRow && storageType) {
+        resolved = variants ? `${variants} (${storageType})` : storageType;
+      } else {
+        resolved = variants;
       }
-      return variants;
+      break;
     }
     case 'memory.storageType':
-      return specs.memory?.storageType || 'UFS';
+      resolved = specs.memory?.storageType || 'UFS';
+      break;
     case 'memory.cardSlot':
-      return specs.memory?.cardSlot || 'No';
+      resolved = specs.memory?.cardSlot || 'No';
+      break;
     case 'platform.antutuScore':
-      return specs.platform?.antutuScore || 'N/A';
+      resolved = specs.platform?.antutuScore || 'N/A';
+      break;
     case 'biometrics':
     case 'security.biometrics':
-      return (
+      resolved =
         specs.biometrics ||
         specs.security?.biometrics ||
         (specs.sensors?.toLowerCase().includes('face id')
@@ -376,14 +396,15 @@ export function getPhoneSpecDisplayValue(
           ? specs.sensors?.toLowerCase().includes('under display')
             ? 'Fingerprint (under display, optical/ultrasonic)'
             : 'Fingerprint (side-mounted / capacitive)'
-          : 'Biometric Screen Authentication')
-      );
+          : 'Biometric Screen Authentication');
+      break;
     case 'sensors':
     case 'security.sensors':
-      return specs.sensors || specs.security?.sensors || '';
+      resolved = specs.sensors || specs.security?.sensors || '';
+      break;
     case 'securityHardware':
     case 'security.securityHardware':
-      return (
+      resolved =
         specs.securityHardware ||
         specs.security?.securityHardware ||
         (phone.brand.toLowerCase() === 'apple'
@@ -392,40 +413,50 @@ export function getPhoneSpecDisplayValue(
           ? 'Titan M2 security coprocessor'
           : phone.brand.toLowerCase() === 'samsung'
           ? 'Samsung Knox Vault, EAL5+ certified'
-          : 'Hardware-backed Keystore & ARM TrustZone TEE')
-      );
+          : 'Hardware-backed Keystore & ARM TrustZone TEE');
+      break;
     case 'connectivity.wlan':
-      return specs.connectivity?.wlan || 'Wi-Fi 802.11 a/b/g/n/ac/6, dual-band, Wi-Fi Direct';
+      resolved = specs.connectivity?.wlan || 'Wi-Fi 802.11 a/b/g/n/ac/6, dual-band, Wi-Fi Direct';
+      break;
     case 'connectivity.bluetooth':
-      return specs.connectivity?.bluetooth || '5.3, A2DP, LE';
+      resolved = specs.connectivity?.bluetooth || '5.3, A2DP, LE';
+      break;
     case 'connectivity.nfc':
-      return specs.connectivity?.nfc || 'Yes (market/region dependent)';
+      resolved = specs.connectivity?.nfc || 'Yes (market/region dependent)';
+      break;
     case 'connectivity.usb':
-      return specs.connectivity?.usb || 'USB Type-C 2.0, OTG';
+      resolved = specs.connectivity?.usb || 'USB Type-C 2.0, OTG';
+      break;
     case 'connectivity.infrared':
-      return (
+      resolved =
         specs.connectivity?.infrared ||
         (phone.brand.toLowerCase() === 'xiaomi' || phone.brand.toLowerCase() === 'tecno'
           ? 'Yes'
-          : 'No')
-      );
+          : 'No');
+      break;
     case 'connectivity.positioning':
-      return specs.connectivity?.positioning || 'GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS, NavIC';
+      resolved = specs.connectivity?.positioning || 'GPS (L1+L5), GLONASS, BDS, GALILEO, QZSS, NavIC';
+      break;
     case 'connectivity.radio':
     case 'sound.radio':
-      return specs.connectivity?.radio || specs.sound?.radio || 'No';
+      resolved = specs.connectivity?.radio || specs.sound?.radio || 'No';
+      break;
     case 'sound.loudspeaker':
-      return specs.sound?.loudspeaker || 'Yes, with stereo speakers';
+      resolved = specs.sound?.loudspeaker || 'Yes, with stereo speakers';
+      break;
     case 'sound.jack35mm':
-      return specs.sound?.jack35mm || 'No';
+      resolved = specs.sound?.jack35mm || 'No';
+      break;
     case 'sound.audioSpecs':
-      return (
+      resolved =
         specs.sound?.audioSpecs ||
         (phone.priceUSD >= 700
           ? '32-bit/384kHz Hi-Res audio, Dolby Atmos stereo tuning'
-          : '24-bit/192kHz Hi-Res audio')
-      );
+          : '24-bit/192kHz Hi-Res audio');
+      break;
     default:
-      return getPhoneSpecEditorValue(phone, keyPath);
+      resolved = getPhoneSpecEditorValue(phone, keyPath);
+      break;
   }
+  return cleanSpecValue(resolved);
 }

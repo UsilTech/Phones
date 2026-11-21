@@ -43,6 +43,13 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
+function sanitizeSpecDisplay(value?: string | null): string {
+  return String(value ?? '')
+    .replace(/\s*\(\s*[,/-]*\s*\)/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function getFeaturesSensors(phone: Phone, defaultSensors?: string): string {
   const name = phone.name.toLowerCase();
   const brand = phone.brand.toLowerCase();
@@ -209,7 +216,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
   // Dynamic SEO, OpenGraph image, and X/Twitter card metadata for this phone
   useSeoMeta({
     title: phone.seoTitle || `${phone.name} — Full Specs, Global Price & Review | GsmScope`,
-    description: phone.seoDescription || `${phone.name} (${phone.releaseYear}) full specifications: ${phone.keyHighlights.display}, ${phone.keyHighlights.processor}, ${phone.keyHighlights.camera}, ${phone.keyHighlights.battery}. Global price: $${phone.priceUSD} / ₦${phone.priceNGN.toLocaleString()}.`,
+    description: phone.seoDescription || `${phone.name}${phone.releaseYear ? ` (${phone.releaseYear})` : ''} full specifications: ${[phone.keyHighlights.display, phone.keyHighlights.processor, phone.keyHighlights.camera, phone.keyHighlights.battery].map(sanitizeSpecDisplay).filter(Boolean).join(', ')}. Global price: $${phone.priceUSD} / ₦${phone.priceNGN.toLocaleString()}.`,
     keywords: phone.seoKeywords || `${phone.name}, ${phone.brand}, ${phone.name} specs, ${phone.name} price, ${phone.keyHighlights.processor}, smartphone review`,
     image: phone.image,
     imageAlt: `${phone.name} official device photo and full specifications`,
@@ -469,27 +476,42 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
               </div>
 
               {/* At-a-glance Specs Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-xs">
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
-                  <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-mono uppercase mb-0.5">DISPLAY</span>
-                  <span className="font-bold text-slate-900 dark:text-white line-clamp-1">{phone.keyHighlights.display}</span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
-                  <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-mono uppercase mb-0.5">CHIPSET</span>
-                  <span className="font-bold text-slate-900 dark:text-white line-clamp-1">{phone.keyHighlights.processor}</span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
-                  <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-mono uppercase mb-0.5">CAMERA</span>
-                  <span className="font-bold text-slate-900 dark:text-white line-clamp-1">{phone.keyHighlights.camera}</span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
-                  <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-mono uppercase mb-0.5">BATTERY</span>
-                  <span className="font-bold text-slate-900 dark:text-white line-clamp-1">
-                    {phone.keyHighlights.battery}
-                    {phone.keyHighlights.charging ? ` (${phone.keyHighlights.charging})` : ''}
-                  </span>
-                </div>
-              </div>
+              {(() => {
+                const displayHighlight = sanitizeSpecDisplay(phone.keyHighlights?.display);
+                const chipsetHighlight = sanitizeSpecDisplay(phone.keyHighlights?.processor);
+                const cameraHighlight = sanitizeSpecDisplay(phone.keyHighlights?.camera);
+                const batteryHighlight = sanitizeSpecDisplay(phone.keyHighlights?.battery);
+                const rawCharging = sanitizeSpecDisplay(phone.keyHighlights?.charging);
+                const chargingHighlight =
+                  rawCharging && !['n/a', 'none', '-'].includes(rawCharging.toLowerCase())
+                    ? rawCharging
+                    : '';
+                const batteryDisplay =
+                  batteryHighlight && chargingHighlight
+                    ? `${batteryHighlight} (${chargingHighlight})`
+                    : batteryHighlight || chargingHighlight || 'N/A';
+
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-xs">
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
+                      <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-mono uppercase mb-0.5">DISPLAY</span>
+                      <span className="font-bold text-slate-900 dark:text-white line-clamp-1">{displayHighlight || 'N/A'}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
+                      <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-mono uppercase mb-0.5">CHIPSET</span>
+                      <span className="font-bold text-slate-900 dark:text-white line-clamp-1">{chipsetHighlight || 'N/A'}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
+                      <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-mono uppercase mb-0.5">CAMERA</span>
+                      <span className="font-bold text-slate-900 dark:text-white line-clamp-1">{cameraHighlight || 'N/A'}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
+                      <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-mono uppercase mb-0.5">BATTERY</span>
+                      <span className="font-bold text-slate-900 dark:text-white line-clamp-1">{batteryDisplay}</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Quick Actions */}
@@ -651,10 +673,11 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                             getDeviceModelNumber,
                             hasSeparateStorageTypeRow,
                           });
+                          const cleanedRawVal = sanitizeSpecDisplay(rawVal);
                           const displayVal =
-                            sub.keyPath === 'sensors' && !rawVal
-                              ? getFeaturesSensors(phone, specs.sensors)
-                              : rawVal || 'N/A';
+                            sub.keyPath === 'sensors' && !cleanedRawVal
+                              ? sanitizeSpecDisplay(getFeaturesSensors(phone, specs.sensors)) || 'N/A'
+                              : cleanedRawVal || 'N/A';
 
                           const isAntutu = sub.keyPath === 'platform.antutuScore';
                           const isPrice = sub.keyPath === 'priceUSD / priceNGN';
@@ -676,12 +699,12 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                           return (
                             <div
                               key={sub.id}
-                              className={`grid grid-cols-12 py-2.5 px-3 text-[11px] ${
+                              className={`grid grid-cols-12 gap-x-3 sm:gap-x-4 py-2.5 px-3 text-[12px] ${
                                 isAntutu ? 'bg-emerald-50/50 dark:bg-emerald-950/20' : ''
                               }`}
                             >
                               <span
-                                className={`col-span-4 ${
+                                className={`col-span-4 break-words ${
                                   isAntutu
                                     ? 'text-emerald-700 dark:text-emerald-400 font-semibold'
                                     : 'text-slate-500 dark:text-slate-400 font-medium'
@@ -690,7 +713,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                                 {sub.label}
                               </span>
                               <span
-                                className={`col-span-8 ${
+                                className={`col-span-8 break-words ${
                                   isPrice
                                     ? 'text-emerald-600 dark:text-emerald-400 font-mono font-bold'
                                     : isAntutu

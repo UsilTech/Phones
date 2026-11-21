@@ -1528,6 +1528,145 @@ if ($route === 'stats/track' && $method === 'POST') {
     sendJson(array('success' => true, 'activeUsers' => $activeUsers, 'websiteStats' => $ws));
 }
 
+if ($route === 'og-image' && $method === 'GET') {
+    $type = strtolower(trim($_GET['type'] ?? ''));
+    $rawId = trim($_GET['id'] ?? '');
+    $idLower = strtolower(rawurldecode($rawId));
+    $rawImage = '';
+
+    if ($type === 'article' && $idLower !== '' && !empty($db['articles'])) {
+        foreach ($db['articles'] as $art) {
+            $aId = strtolower(trim($art['id'] ?? ''));
+            $aSlug = strtolower(trim($art['slug'] ?? ''));
+            if ($aId === $idLower || ($aSlug !== '' && $aSlug === $idLower)) {
+                $rawImage = trim($art['coverImage'] ?? '');
+                if ($rawImage === '' && !empty($art['content'])) {
+                    if (preg_match('/<img[^>]+src=["\']([^"\']+)["\']/i', $art['content'], $m)) {
+                        $rawImage = trim($m[1]);
+                    }
+                }
+                break;
+            }
+        }
+    } elseif ($type === 'phone' && $idLower !== '' && !empty($db['phones'])) {
+        foreach ($db['phones'] as $ph) {
+            $pId = strtolower(trim($ph['id'] ?? ''));
+            $pSlug = strtolower(trim($ph['slug'] ?? ''));
+            if ($pId === $idLower || ($pSlug !== '' && $pSlug === $idLower)) {
+                $rawImage = trim($ph['image'] ?? '');
+                if ($rawImage === '' && !empty($ph['gallery'][0])) {
+                    $rawImage = trim($ph['gallery'][0]);
+                }
+                break;
+            }
+        }
+    }
+
+    $sendFileWithMime = function($filePath) {
+        if (!file_exists($filePath) || !is_file($filePath)) return false;
+        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        $mimeMap = array(
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            'gif' => 'image/gif',
+            'svg' => 'image/svg+xml'
+        );
+        $mime = $mimeMap[$ext] ?? 'image/jpeg';
+        header('Content-Type: ' . $mime);
+        header('Cache-Control: public, max-age=86400');
+        header('Content-Length: ' . filesize($filePath));
+        readfile($filePath);
+        exit;
+    };
+
+    if (strpos($rawImage, 'data:image/') === 0 && strpos($rawImage, ';base64,') !== false) {
+        $mime = 'image/jpeg';
+        if (preg_match('/^data:(image\/[a-zA-Z0-9.+-]+);base64,/', $rawImage, $mm)) {
+            $mime = $mm[1];
+        }
+        $parts = explode(';base64,', $rawImage, 2);
+        $bin = base64_decode($parts[1]);
+        if ($bin !== false) {
+            header('Content-Type: ' . $mime);
+            header('Cache-Control: public, max-age=86400');
+            header('Content-Length: ' . strlen($bin));
+            echo $bin;
+            exit;
+        }
+    }
+
+    if (preg_match('/^https?:\/\//i', $rawImage)) {
+        header('Location: ' . $rawImage, true, 302);
+        exit;
+    }
+    if (strpos($rawImage, '//') === 0) {
+        header('Location: https:' . $rawImage, true, 302);
+        exit;
+    }
+
+    if (strpos($rawImage, '/uploads/') === 0 || strpos($rawImage, '/api/uploads/') === 0) {
+        $fname = basename(parse_url($rawImage, PHP_URL_PATH));
+        if ($fname) {
+            foreach ($UPLOAD_DIRS as $uDir) {
+                $sendFileWithMime($uDir . '/' . $fname);
+            }
+            $targetKey = '/uploads/' . $fname;
+            $foundDataUrl = $db['uploadDataUrls'][$targetKey] ?? '';
+            if ($foundDataUrl === '' && !empty($db['mediaLibrary'])) {
+                foreach ($db['mediaLibrary'] as $m) {
+                    if (!empty($m['dataUrl']) && (basename($m['url'] ?? '') === $fname || ($m['url'] ?? '') === $targetKey)) {
+                        $foundDataUrl = $m['dataUrl'];
+                        break;
+                    }
+                }
+            }
+            if ($foundDataUrl !== '' && strpos($foundDataUrl, ';base64,') !== false) {
+                $mime = 'image/jpeg';
+                if (preg_match('/^data:([^;]+);base64,/', $foundDataUrl, $mm)) {
+                    $mime = $mm[1];
+                }
+                $parts = explode(';base64,', $foundDataUrl, 2);
+                $bin = base64_decode($parts[1]);
+                if ($bin !== false) {
+                    writeUploadFileToAllDirs($fname, $bin);
+                    header('Content-Type: ' . $mime);
+                    header('Cache-Control: public, max-age=86400');
+                    header('Content-Length: ' . strlen($bin));
+                    echo $bin;
+                    exit;
+                }
+            }
+        }
+    }
+
+    if (strpos($rawImage, '/assets/') === 0 || strpos($rawImage, '/src/assets/') === 0) {
+        $cleanRel = preg_replace('/^\/(src\/)?assets\//', '', parse_url($rawImage, PHP_URL_PATH));
+        $assetCandidates = array(
+            dirname(__DIR__) . '/assets/' . $cleanRel,
+            $PUBLIC_HTML_DIR . '/assets/' . $cleanRel,
+            $APP_DIR . '/public/assets/' . $cleanRel,
+            $APP_DIR . '/src/assets/' . $cleanRel
+        );
+        foreach ($assetCandidates as $cand) {
+            $sendFileWithMime($cand);
+        }
+    }
+
+    $fallbackCandidates = array(
+        dirname(__DIR__) . '/assets/images/hero_flagship_phones_1792578844852.jpg',
+        $PUBLIC_HTML_DIR . '/assets/images/hero_flagship_phones_1792578844852.jpg',
+        $APP_DIR . '/public/assets/images/hero_flagship_phones_1792578844852.jpg'
+    );
+    foreach ($fallbackCandidates as $cand) {
+        $sendFileWithMime($cand);
+    }
+
+    http_response_code(404);
+    exit;
+}
+
 if ($route === 'currency/rates' && $method === 'GET') {
     sendJson(array(
         'base' => 'USD',

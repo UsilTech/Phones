@@ -588,8 +588,12 @@ export default defineConfig(() => {
               },
               logLevel: 'silent',
             });
-            // Copy identical self-contained CommonJS bundle to app.js so cPanel default startup file (app.js) works with require()
+            // Copy identical self-contained CommonJS bundle to app.js and cpanel_build so cPanel always has the latest server bundle
             fs.copyFileSync(cjsOutPath, path.resolve(rootDir, 'app.js'));
+            if (fs.existsSync(cpanelBuildDir)) {
+              fs.copyFileSync(cjsOutPath, path.resolve(cpanelBuildDir, 'app.cjs'));
+              fs.copyFileSync(cjsOutPath, path.resolve(cpanelBuildDir, 'app.js'));
+            }
 
             const dbJsonPath = path.resolve(rootDir, 'data', 'database.json');
             if (fs.existsSync(dbJsonPath) && fs.existsSync(cpanelBuildDir)) {
