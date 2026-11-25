@@ -87,11 +87,7 @@ export function preloadImages(urls: (string | undefined | null)[]) {
     }
   };
 
-  if ('requestIdleCallback' in window) {
-    (window as any).requestIdleCallback(runPreload, { timeout: 1500 });
-  } else {
-    setTimeout(runPreload, 120);
-  }
+  runPreload();
 }
 
 export interface LazyImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src'> {

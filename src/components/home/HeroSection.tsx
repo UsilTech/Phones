@@ -77,17 +77,17 @@ export default function HeroSection() {
     setActiveSlide(0);
   }, [firstFeaturedId]);
 
-  // Preload all featured carousel images in idle time so slide transitions are instantaneous
+  // Preload all featured carousel images immediately so slide transitions are instantaneous even for large images (>230kb)
   useEffect(() => {
     preloadImages(featuredPhones.map((p) => p.image));
   }, [featuredPhones]);
 
-  // Auto carousel slide every 6s
+  // Auto carousel slide every 4.5s
   useEffect(() => {
     if (featuredPhones.length <= 1) return;
     const interval = setInterval(() => {
       setActiveSlide(prev => (prev + 1) % featuredPhones.length);
-    }, 6000);
+    }, 4500);
     return () => clearInterval(interval);
   }, [featuredPhones.length]);
 

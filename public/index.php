@@ -48,9 +48,12 @@ function gsmLoadDb() {
     $homeDir = gsmResolveHomeDir();
     $candidates = array(
         $homeDir . '/phones_app/data/database.json',
+        $homeDir . '/gsmscope/data/database.json',
+        $homeDir . '/nodejs/data/database.json',
         $homeDir . '/.gsmscope_data/database.json',
         __DIR__ . '/api/data/database.json',
         __DIR__ . '/data/database.json',
+        dirname(__DIR__) . '/data/database.json',
         __DIR__ . '/seed-database.json'
     );
     $bestFile = null;
@@ -85,11 +88,19 @@ function gsmExtractFirstImg($content) {
 function gsmResolveAssetUrl($origin, $rawUrl, $ogEndpointFallback = '') {
     $defaultImg = $origin . '/assets/images/hero_flagship_phones_1792578844852.jpg';
     $trimmed = trim((string)$rawUrl);
-    if ($trimmed === '') {
+    if ($trimmed === '' || strpos($trimmed, 'photo-1511707171634') !== false) {
         return $ogEndpointFallback !== '' ? $ogEndpointFallback : $defaultImg;
     }
     if (strpos($trimmed, 'data:') === 0) {
         return $ogEndpointFallback !== '' ? $ogEndpointFallback : $defaultImg;
+    }
+    if ($ogEndpointFallback !== '' && (
+        strpos($trimmed, '/uploads/') === 0 ||
+        strpos($trimmed, 'uploads/') === 0 ||
+        strpos($trimmed, '/api/uploads/') === 0 ||
+        strpos($trimmed, 'api/uploads/') === 0
+    )) {
+        return $ogEndpointFallback;
     }
     if (strpos($trimmed, '//') === 0) {
         return 'https:' . str_replace(' ', '%20', $trimmed);
@@ -97,7 +108,7 @@ function gsmResolveAssetUrl($origin, $rawUrl, $ogEndpointFallback = '') {
     if (preg_match('/^https?:\/\//i', $trimmed)) {
         return str_replace(' ', '%20', $trimmed);
     }
-    if (strpos($trimmed, '/src/assets/images/') === 0) {
+    if (strpos($trimmed, '/src/assets/images/') === 0 || strpos($trimmed, 'src/assets/images/') === 0) {
         $fname = basename(parse_url($trimmed, PHP_URL_PATH));
         return $origin . '/assets/images/' . rawurlencode($fname);
     }
@@ -121,8 +132,15 @@ $ogType = 'website';
 $ogImage = gsmResolveAssetUrl($origin, $wc['ogImageUrl'] ?? '/assets/images/hero_flagship_phones_1792578844852.jpg');
 $ogImageAlt = $pageTitle;
 
+$reqUriPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $phoneQuery = isset($_GET['phone']) ? trim((string)$_GET['phone']) : '';
 $articleQuery = isset($_GET['article']) ? trim((string)$_GET['article']) : '';
+if ($articleQuery === '' && preg_match('#^/articles?/([^/?\#]+)#i', $reqUriPath, $pm)) {
+    $articleQuery = trim($pm[1]);
+}
+if ($phoneQuery === '' && preg_match('#^/phones?/([^/?\#]+)#i', $reqUriPath, $pm)) {
+    $phoneQuery = trim($pm[1]);
+}
 
 if ($articleQuery !== '' && !empty($db['articles']) && is_array($db['articles'])) {
     $aqLower = strtolower(rawurldecode($articleQuery));
@@ -176,22 +194,26 @@ if ($articleQuery !== '' && !empty($db['articles']) && is_array($db['articles'])
 }
 
 $html = preg_replace('/<title>[\s\S]*?<\/title>/i', '<title>' . gsmEscapeAttr($pageTitle) . '</title>', $html, 1);
-$html = preg_replace('/<meta\s+name="description"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta name="description" content="' . gsmEscapeAttr($pageDescription) . '" />', $html, 1);
-$html = preg_replace('/<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/i', '<link rel="canonical" href="' . gsmEscapeAttr($canonicalUrl) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:type"\s+content="[^"]*"\s*\/?>/i', '<meta property="og:type" content="' . gsmEscapeAttr($ogType) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:site_name"\s+content="[^"]*"\s*\/?>/i', '<meta property="og:site_name" content="' . gsmEscapeAttr($siteName) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/i', '<meta property="og:title" content="' . gsmEscapeAttr($pageTitle) . '" />', $html, 1);
-$html = preg_replace('/<meta[^>]*property="og:description"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta property="og:description" content="' . gsmEscapeAttr($pageDescription) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/i', '<meta property="og:url" content="' . gsmEscapeAttr($canonicalUrl) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:image"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta property="og:image" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:image:secure_url"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta property="og:image:secure_url" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:image:alt"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta property="og:image:alt" content="' . gsmEscapeAttr($ogImageAlt) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:image:width"\s+content="[^"]*"\s*\/?>\s*/i', '', $html);
-$html = preg_replace('/<meta\s+property="og:image:height"\s+content="[^"]*"\s*\/?>\s*/i', '', $html);
-$html = preg_replace('/<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/i', '<meta name="twitter:title" content="' . gsmEscapeAttr($pageTitle) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+name="twitter:description"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta name="twitter:description" content="' . gsmEscapeAttr($pageDescription) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+name="twitter:image"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta name="twitter:image" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+name="twitter:image:alt"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta name="twitter:image:alt" content="' . gsmEscapeAttr($ogImageAlt) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*name=["\']description["\'][^>]*\/?>/i', '<meta name="description" content="' . gsmEscapeAttr($pageDescription) . '" />', $html, 1);
+$html = preg_replace('/<link[^>]*rel=["\']canonical["\'][^>]*\/?>/i', '<link rel="canonical" href="' . gsmEscapeAttr($canonicalUrl) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*property=["\']og:type["\'][^>]*\/?>/i', '<meta property="og:type" content="' . gsmEscapeAttr($ogType) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*property=["\']og:site_name["\'][^>]*\/?>/i', '<meta property="og:site_name" content="' . gsmEscapeAttr($siteName) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*property=["\']og:title["\'][^>]*\/?>/i', '<meta property="og:title" content="' . gsmEscapeAttr($pageTitle) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*property=["\']og:description["\'][^>]*\/?>/i', '<meta property="og:description" content="' . gsmEscapeAttr($pageDescription) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*property=["\']og:url["\'][^>]*\/?>/i', '<meta property="og:url" content="' . gsmEscapeAttr($canonicalUrl) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*property=["\']og:image["\'][^>]*\/?>/i', '<meta property="og:image" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
+if (preg_match('/<meta[^>]*property=["\']og:image:secure_url["\'][^>]*\/?>/i', $html)) {
+    $html = preg_replace('/<meta[^>]*property=["\']og:image:secure_url["\'][^>]*\/?>/i', '<meta property="og:image:secure_url" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
+} else {
+    $html = preg_replace('/(<meta\s+property="og:image"\s+content="[^"]*"\s*\/?>)/i', '$1' . "\n    " . '<meta property="og:image:secure_url" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
+}
+$html = preg_replace('/<meta[^>]*property=["\']og:image:alt["\'][^>]*\/?>/i', '<meta property="og:image:alt" content="' . gsmEscapeAttr($ogImageAlt) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*property=["\']og:image:width["\'][^>]*\/?>\s*/i', '', $html);
+$html = preg_replace('/<meta[^>]*property=["\']og:image:height["\'][^>]*\/?>\s*/i', '', $html);
+$html = preg_replace('/<meta[^>]*name=["\']twitter:title["\'][^>]*\/?>/i', '<meta name="twitter:title" content="' . gsmEscapeAttr($pageTitle) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*name=["\']twitter:description["\'][^>]*\/?>/i', '<meta name="twitter:description" content="' . gsmEscapeAttr($pageDescription) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*name=["\']twitter:image["\'][^>]*\/?>/i', '<meta name="twitter:image" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*name=["\']twitter:image:alt["\'][^>]*\/?>/i', '<meta name="twitter:image:alt" content="' . gsmEscapeAttr($ogImageAlt) . '" />', $html, 1);
 
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-cache, must-revalidate');

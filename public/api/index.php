@@ -1574,6 +1574,9 @@ if ($route === 'og-image' && $method === 'GET') {
             'svg' => 'image/svg+xml'
         );
         $mime = $mimeMap[$ext] ?? 'image/jpeg';
+        if (function_exists('header_remove')) {
+            @header_remove('Pragma');
+        }
         header('Content-Type: ' . $mime);
         header('Cache-Control: public, max-age=86400');
         header('Content-Length: ' . filesize($filePath));
@@ -1606,7 +1609,7 @@ if ($route === 'og-image' && $method === 'GET') {
         exit;
     }
 
-    if (strpos($rawImage, '/uploads/') === 0 || strpos($rawImage, '/api/uploads/') === 0) {
+    if (strpos($rawImage, '/uploads/') === 0 || strpos($rawImage, 'uploads/') === 0 || strpos($rawImage, '/api/uploads/') === 0 || strpos($rawImage, 'api/uploads/') === 0) {
         $fname = basename(parse_url($rawImage, PHP_URL_PATH));
         if ($fname) {
             foreach ($UPLOAD_DIRS as $uDir) {
@@ -1641,8 +1644,8 @@ if ($route === 'og-image' && $method === 'GET') {
         }
     }
 
-    if (strpos($rawImage, '/assets/') === 0 || strpos($rawImage, '/src/assets/') === 0) {
-        $cleanRel = preg_replace('/^\/(src\/)?assets\//', '', parse_url($rawImage, PHP_URL_PATH));
+    if (strpos($rawImage, '/assets/') === 0 || strpos($rawImage, 'assets/') === 0 || strpos($rawImage, '/src/assets/') === 0 || strpos($rawImage, 'src/assets/') === 0) {
+        $cleanRel = preg_replace('/^\/?(src\/)?assets\//', '', parse_url($rawImage, PHP_URL_PATH));
         $assetCandidates = array(
             dirname(__DIR__) . '/assets/' . $cleanRel,
             $PUBLIC_HTML_DIR . '/assets/' . $cleanRel,

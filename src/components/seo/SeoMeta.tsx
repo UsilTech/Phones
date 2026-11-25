@@ -17,11 +17,17 @@ const DEFAULT_SITE_NAME = 'GsmScope';
 
 function resolveClientOgImageUrl(origin: string, rawImage: string, canonicalPath?: string): string {
   const trimmed = (rawImage || '').trim();
-  if (!trimmed) {
+  if (!trimmed || trimmed.includes('photo-1511707171634')) {
     return `${origin}${DEFAULT_OG_IMAGE}`;
   }
-  if (trimmed.startsWith('data:')) {
-    // Social platforms cannot read data: URIs — point to the live /api/og-image endpoint
+  const isDataOrUpload =
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('/uploads/') ||
+    trimmed.startsWith('uploads/') ||
+    trimmed.startsWith('/api/uploads/') ||
+    trimmed.startsWith('api/uploads/');
+  if (isDataOrUpload) {
+    // Route uploaded/base64 images through /api/og-image so social crawlers get real image bytes
     if (canonicalPath) {
       const articleMatch = canonicalPath.match(/[?&]article=([^&]+)/i);
       if (articleMatch && articleMatch[1]) {
@@ -32,7 +38,9 @@ function resolveClientOgImageUrl(origin: string, rawImage: string, canonicalPath
         return `${origin}/api/og-image?type=phone&id=${phoneMatch[1]}`;
       }
     }
-    return `${origin}${DEFAULT_OG_IMAGE}`;
+    if (trimmed.startsWith('data:')) {
+      return `${origin}${DEFAULT_OG_IMAGE}`;
+    }
   }
   if (trimmed.startsWith('//')) {
     return `https:${trimmed}`;
@@ -40,8 +48,8 @@ function resolveClientOgImageUrl(origin: string, rawImage: string, canonicalPath
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return trimmed;
   }
-  if (trimmed.startsWith('/src/assets/images/')) {
-    const filename = trimmed.slice('/src/assets/images/'.length);
+  if (trimmed.startsWith('/src/assets/images/') || trimmed.startsWith('src/assets/images/')) {
+    const filename = trimmed.replace(/^\/?src\/assets\/images\//, '');
     return `${origin}/assets/images/${filename}`;
   }
   return `${origin}${trimmed.startsWith('/') ? trimmed : `/${trimmed}`}`;

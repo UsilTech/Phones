@@ -2574,9 +2574,22 @@ function resolveAbsoluteAssetUrl(origin: string, rawUrl?: string, ogEndpointFall
     return ogEndpointFallback || defaultImg;
   }
   const trimmed = rawUrl.trim();
+  if (trimmed.includes('photo-1511707171634')) {
+    return ogEndpointFallback || defaultImg;
+  }
   if (trimmed.startsWith('data:')) {
     // Social crawlers (Facebook, X, WhatsApp, Telegram) reject inline data: URIs
     return ogEndpointFallback || defaultImg;
+  }
+  if (
+    ogEndpointFallback &&
+    (trimmed.startsWith('/uploads/') ||
+      trimmed.startsWith('uploads/') ||
+      trimmed.startsWith('/api/uploads/') ||
+      trimmed.startsWith('api/uploads/'))
+  ) {
+    // Route uploaded media through /api/og-image so crawlers get guaranteed 200 OK binary bytes from disk or database backup
+    return ogEndpointFallback;
   }
   if (trimmed.startsWith('//')) {
     return `https:${trimmed.replace(/ /g, '%20')}`;
@@ -2584,7 +2597,7 @@ function resolveAbsoluteAssetUrl(origin: string, rawUrl?: string, ogEndpointFall
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return trimmed.replace(/ /g, '%20');
   }
-  if (trimmed.startsWith('/src/assets/images/')) {
+  if (trimmed.startsWith('/src/assets/images/') || trimmed.startsWith('src/assets/images/')) {
     const file = path.basename(trimmed.split('?')[0]);
     return `${origin}/assets/images/${encodeURIComponent(file)}`;
   }
@@ -2670,7 +2683,12 @@ app.get('/api/og-image', (req: Request, res: Response) => {
   }
 
   // 3. Local /uploads/ image (from disk or restored from database base64)
-  if (rawImage.startsWith('/uploads/') || rawImage.startsWith('/api/uploads/')) {
+  if (
+    rawImage.startsWith('/uploads/') ||
+    rawImage.startsWith('uploads/') ||
+    rawImage.startsWith('/api/uploads/') ||
+    rawImage.startsWith('api/uploads/')
+  ) {
     const filename = path.basename(rawImage.split('?')[0]);
     if (filename) {
       for (const dir of [PUBLIC_HTML_UPLOADS_DIR, UPLOADS_DIR, PUBLIC_UPLOADS_DIR]) {
@@ -2701,8 +2719,16 @@ app.get('/api/og-image', (req: Request, res: Response) => {
   }
 
   // 4. Local /assets/ or /src/assets/ image
-  if (rawImage.startsWith('/assets/') || rawImage.startsWith('/src/assets/')) {
-    const cleanRel = rawImage.split('?')[0].replace(/^\/src\/assets\//, '').replace(/^\/assets\//, '');
+  if (
+    rawImage.startsWith('/assets/') ||
+    rawImage.startsWith('assets/') ||
+    rawImage.startsWith('/src/assets/') ||
+    rawImage.startsWith('src/assets/')
+  ) {
+    const cleanRel = rawImage
+      .split('?')[0]
+      .replace(/^\/?src\/assets\//, '')
+      .replace(/^\/?assets\//, '');
     const assetCandidates = [
       path.resolve(APP_ROOT, 'public', 'assets', cleanRel),
       path.resolve(APP_ROOT, 'dist', 'assets', cleanRel),
@@ -2842,8 +2868,15 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
 
   const origin = getRequestOrigin(req);
   const siteName = websiteContentDatabase?.siteName || 'GsmScope';
-  const phoneQuery = typeof req.query.phone === 'string' ? req.query.phone.trim() : '';
-  const articleQuery = typeof req.query.article === 'string' ? req.query.article.trim() : '';
+  const reqPathRaw = req.path || '';
+  const pathPhoneMatch = reqPathRaw.match(/^\/phones?\/([^/?#]+)/i);
+  const pathArticleMatch = reqPathRaw.match(/^\/articles?\/([^/?#]+)/i);
+  const phoneQuery =
+    (typeof req.query.phone === 'string' ? req.query.phone.trim() : '') ||
+    (pathPhoneMatch ? pathPhoneMatch[1].trim() : '');
+  const articleQuery =
+    (typeof req.query.article === 'string' ? req.query.article.trim() : '') ||
+    (pathArticleMatch ? pathArticleMatch[1].trim() : '');
   const tabQuery = typeof req.query.tab === 'string' ? req.query.tab.trim().toLowerCase() : '';
   const brandQuery = typeof req.query.brand === 'string' ? req.query.brand.trim() : '';
 
@@ -3133,40 +3166,40 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
   );
   html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtmlAttr(pageTitle)}</title>`);
   html = html.replace(
-    /<meta\s+name="description"[\s\S]*?content="[^"]*"\s*\/?>/i,
+    /<meta[^>]*name=["']description["'][^>]*\/?>/i,
     `<meta name="description" content="${escapeHtmlAttr(pageDescription)}" />`
   );
   html = html.replace(
-    /<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/i,
+    /<link[^>]*rel=["']canonical["'][^>]*\/?>/i,
     `<link rel="canonical" href="${escapeHtmlAttr(canonicalUrl)}" />`
   );
   html = html.replace(
-    /<meta\s+property="og:type"\s+content="[^"]*"\s*\/?>/i,
+    /<meta[^>]*property=["']og:type["'][^>]*\/?>/i,
     `<meta property="og:type" content="${escapeHtmlAttr(ogType)}" />`
   );
   html = html.replace(
-    /<meta\s+property="og:site_name"\s+content="[^"]*"\s*\/?>/i,
+    /<meta[^>]*property=["']og:site_name["'][^>]*\/?>/i,
     `<meta property="og:site_name" content="${escapeHtmlAttr(siteName)}" />`
   );
   html = html.replace(
-    /<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/i,
+    /<meta[^>]*property=["']og:title["'][^>]*\/?>/i,
     `<meta property="og:title" content="${escapeHtmlAttr(pageTitle)}" />`
   );
   html = html.replace(
-    /<meta[^>]*property="og:description"[\s\S]*?content="[^"]*"\s*\/?>/i,
+    /<meta[^>]*property=["']og:description["'][^>]*\/?>/i,
     `<meta property="og:description" content="${escapeHtmlAttr(pageDescription)}" />`
   );
   html = html.replace(
-    /<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/i,
+    /<meta[^>]*property=["']og:url["'][^>]*\/?>/i,
     `<meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}" />`
   );
   html = html.replace(
-    /<meta\s+property="og:image"[\s\S]*?content="[^"]*"\s*\/?>/i,
+    /<meta[^>]*property=["']og:image["'][^>]*\/?>/i,
     `<meta property="og:image" content="${escapeHtmlAttr(ogImage)}" />`
   );
-  if (/<meta\s+property="og:image:secure_url"[\s\S]*?content="[^"]*"\s*\/?>/i.test(html)) {
+  if (/<meta[^>]*property=["']og:image:secure_url["'][^>]*\/?>/i.test(html)) {
     html = html.replace(
-      /<meta\s+property="og:image:secure_url"[\s\S]*?content="[^"]*"\s*\/?>/i,
+      /<meta[^>]*property=["']og:image:secure_url["'][^>]*\/?>/i,
       `<meta property="og:image:secure_url" content="${escapeHtmlAttr(ogImage)}" />`
     );
   } else {
@@ -3176,25 +3209,25 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
     );
   }
   html = html.replace(
-    /<meta\s+property="og:image:alt"[\s\S]*?content="[^"]*"\s*\/?>/i,
+    /<meta[^>]*property=["']og:image:alt["'][^>]*\/?>/i,
     `<meta property="og:image:alt" content="${escapeHtmlAttr(ogImageAlt)}" />`
   );
-  html = html.replace(/<meta\s+property="og:image:width"\s+content="[^"]*"\s*\/?>\s*/gi, '');
-  html = html.replace(/<meta\s+property="og:image:height"\s+content="[^"]*"\s*\/?>\s*/gi, '');
+  html = html.replace(/<meta[^>]*property=["']og:image:width["'][^>]*\/?>\s*/gi, '');
+  html = html.replace(/<meta[^>]*property=["']og:image:height["'][^>]*\/?>\s*/gi, '');
   html = html.replace(
-    /<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/i,
+    /<meta[^>]*name=["']twitter:title["'][^>]*\/?>/i,
     `<meta name="twitter:title" content="${escapeHtmlAttr(pageTitle)}" />`
   );
   html = html.replace(
-    /<meta\s+name="twitter:description"[\s\S]*?content="[^"]*"\s*\/?>/i,
+    /<meta[^>]*name=["']twitter:description["'][^>]*\/?>/i,
     `<meta name="twitter:description" content="${escapeHtmlAttr(pageDescription)}" />`
   );
   html = html.replace(
-    /<meta\s+name="twitter:image"[\s\S]*?content="[^"]*"\s*\/?>/i,
+    /<meta[^>]*name=["']twitter:image["'][^>]*\/?>/i,
     `<meta name="twitter:image" content="${escapeHtmlAttr(ogImage)}" />`
   );
   html = html.replace(
-    /<meta\s+name="twitter:image:alt"[\s\S]*?content="[^"]*"\s*\/?>/i,
+    /<meta[^>]*name=["']twitter:image:alt["'][^>]*\/?>/i,
     `<meta name="twitter:image:alt" content="${escapeHtmlAttr(ogImageAlt)}" />`
   );
   html = html.replace(

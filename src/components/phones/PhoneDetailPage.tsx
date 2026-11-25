@@ -647,11 +647,31 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
               {activeSpecTables
                 .filter((tbl) => tbl.enabled !== false)
                 .map((tbl, tblIdx, filteredTables) => {
-                  const enabledSubs = (tbl.subtables || []).filter((s) => s.enabled !== false);
-                  if (enabledSubs.length === 0) return null;
-                  const hasSeparateStorageTypeRow = enabledSubs.some(
+                  const hasSeparateStorageTypeRow = (tbl.subtables || []).some(
                     (s) => s.keyPath === 'memory.storageType'
                   );
+                  const enabledSubs = (tbl.subtables || []).filter((s) => {
+                    if (s.enabled === false) return false;
+                    const rawVal = getPhoneSpecDisplayValue(phone, s.keyPath, {
+                      formatUSD,
+                      formatNaira,
+                      getDeviceModelNumber,
+                      hasSeparateStorageTypeRow,
+                    });
+                    const cleanedRawVal = sanitizeSpecDisplay(rawVal);
+                    const displayVal =
+                      s.keyPath === 'sensors' && !cleanedRawVal
+                        ? sanitizeSpecDisplay(getFeaturesSensors(phone, specs.sensors)) || 'N/A'
+                        : cleanedRawVal || 'N/A';
+                    
+                    const upper = displayVal.trim().toUpperCase();
+                    if (!upper || upper === 'N/A' || upper === '-' || upper === 'NONE' || upper === 'N.A') {
+                      return false;
+                    }
+                    return true;
+                  });
+
+                  if (enabledSubs.length === 0) return null;
                   const isLastTable = tblIdx === filteredTables.length - 1;
 
                   return (
@@ -699,7 +719,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                           return (
                             <div
                               key={sub.id}
-                              className={`grid grid-cols-12 gap-x-3 sm:gap-x-4 py-2.5 px-3 text-[12px] ${
+                              className={`grid grid-cols-12 gap-x-6 sm:gap-x-8 py-2.5 px-3 text-[13px] ${
                                 isAntutu ? 'bg-emerald-50/50 dark:bg-emerald-950/20' : ''
                               }`}
                             >
@@ -720,7 +740,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                                     ? 'font-mono text-emerald-600 dark:text-emerald-400 font-bold'
                                     : `text-slate-900 dark:text-slate-200 ${
                                         isMono ? 'font-mono ' : ''
-                                      }${isBold ? 'font-bold ' : isSemibold ? 'font-semibold ' : ''}leading-relaxed`
+                                      }leading-relaxed`
                                 }`}
                               >
                                 {displayVal}
