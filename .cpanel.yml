@@ -2,11 +2,11 @@
 deployment:
   tasks:
     - export DEPLOYPATH=$HOME/phones_app/
-    - /bin/mkdir -p $DEPLOYPATH
-    - /bin/mkdir -p $DEPLOYPATH/data
-    - /bin/mkdir -p $DEPLOYPATH/uploads
-    - /bin/mkdir -p $DEPLOYPATH/public/uploads
-    - /bin/mkdir -p $DEPLOYPATH/tmp
+    - /bin/mkdir -p $DEPLOYPATH $DEPLOYPATH/data $DEPLOYPATH/uploads $DEPLOYPATH/public/uploads $DEPLOYPATH/tmp
+    - /bin/mkdir -p $HOME/.gsmscope_data $HOME/.gsmscope_data/uploads
+    - /bin/mkdir -p $HOME/public_html/assets $HOME/public_html/admin $HOME/public_html/uploads $HOME/public_html/api $HOME/public_html/api/data
+    - /bin/bash -c 'for d in "$HOME/public_html/uploads" "$DEPLOYPATH/uploads" "$DEPLOYPATH/public/uploads"; do [ -d "$d" ] && cp -Ru "$d/." "$HOME/.gsmscope_data/uploads/" 2>/dev/null || true; done'
+    - /bin/bash -c 'newest=""; for f in "$HOME/.gsmscope_data/database.json" "$DEPLOYPATH/data/database.json" "$HOME/public_html/api/data/database.json"; do if [ -s "$f" ] && { [ -z "$newest" ] || [ "$f" -nt "$newest" ]; }; then newest="$f"; fi; done; if [ -n "$newest" ]; then cp -f "$newest" "$HOME/.gsmscope_data/database.json"; cp -f "$newest" "$DEPLOYPATH/data/database.json"; cp -f "$newest" "$HOME/public_html/api/data/database.json"; fi'
     - /bin/cp -Rf app.js $DEPLOYPATH
     - /bin/cp -Rf app.cjs $DEPLOYPATH
     - /bin/cp -Rf server.ts $DEPLOYPATH
@@ -15,10 +15,8 @@ deployment:
     - /bin/cp -Rf cpanel_build $DEPLOYPATH
     - /bin/cp -Rf public $DEPLOYPATH
     - /bin/cp -Rf src $DEPLOYPATH
-    - /bin/mkdir -p $HOME/public_html/assets
-    - /bin/mkdir -p $HOME/public_html/admin
-    - /bin/mkdir -p $HOME/public_html/uploads
-    - /bin/mkdir -p $HOME/public_html/api
+    - /bin/cp -Rf public/index.php $HOME/public_html/index.php
+    - /bin/cp -Rf public/.htaccess $HOME/public_html/.htaccess
     - /bin/cp -Rf cpanel_build/index.html $HOME/public_html/index.html
     - /bin/cp -Rf public/assets/* $HOME/public_html/assets/
     - /bin/cp -Rf cpanel_build/assets/* $HOME/public_html/assets/
@@ -26,5 +24,6 @@ deployment:
     - /bin/cp -Rf public/api/index.php $HOME/public_html/api/index.php
     - /bin/cp -Rf public/api/.htaccess $HOME/public_html/api/.htaccess
     - /bin/cp -Rf cpanel_build/seed-database.json $HOME/public_html/api/seed-database.json
+    - /bin/bash -c '[ -d "$HOME/.gsmscope_data/uploads" ] && cp -Ru "$HOME/.gsmscope_data/uploads/." "$HOME/public_html/uploads/" 2>/dev/null || true; cp -Ru "$HOME/.gsmscope_data/uploads/." "$DEPLOYPATH/uploads/" 2>/dev/null || true; cp -Ru "$HOME/.gsmscope_data/uploads/." "$DEPLOYPATH/public/uploads/" 2>/dev/null || true'
+    - /bin/bash -c 'if [ -s "$HOME/.gsmscope_data/database.json" ]; then cp -f "$HOME/.gsmscope_data/database.json" "$DEPLOYPATH/data/database.json"; cp -f "$HOME/.gsmscope_data/database.json" "$HOME/public_html/api/data/database.json"; fi'
     - /bin/touch $DEPLOYPATH/tmp/restart.txt
-

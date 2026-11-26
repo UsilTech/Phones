@@ -122,15 +122,60 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Uploads & cPanel public_html directories (ensures LiteSpeed Web Server on cPanel serves /uploads/* directly from $HOME/public_html/uploads/* as well as $DEPLOYPATH/uploads/*)
+// Uploads & cPanel persistent directories (survives full public_html & phones_app redeployments on cPanel)
 const HOME_DIR = process.env.HOME || os.homedir() || path.resolve(APP_ROOT, '..');
 const PUBLIC_HTML_DIR = path.resolve(HOME_DIR, 'public_html');
 const PUBLIC_HTML_UPLOADS_DIR = path.resolve(PUBLIC_HTML_DIR, 'uploads');
+const PUBLIC_HTML_API_DB_PATH = path.resolve(PUBLIC_HTML_DIR, 'api', 'data', 'database.json');
+const DATA_DIR = path.resolve(APP_ROOT, 'data');
+const DB_FILE_PATH = path.resolve(DATA_DIR, 'database.json');
+const HOME_BACKUP_DATA_DIR = path.resolve(HOME_DIR, '.gsmscope_data');
+const HOME_BACKUP_DB_PATH = path.resolve(HOME_BACKUP_DATA_DIR, 'database.json');
+const HOME_BACKUP_UPLOADS_DIR = path.resolve(HOME_BACKUP_DATA_DIR, 'uploads');
 const UPLOADS_DIR = path.resolve(APP_ROOT, 'uploads');
 const PUBLIC_UPLOADS_DIR = path.resolve(APP_ROOT, 'public', 'uploads');
+
+function deriveCleanPhoneSlug(phone: { id?: string; slug?: string; name?: string }): string {
+  const rawSlug = typeof phone?.slug === 'string' ? phone.slug.trim().toLowerCase() : '';
+  if (rawSlug && !/-\d{10,14}$/.test(rawSlug)) {
+    return rawSlug;
+  }
+  const strippedId = String(phone?.id || '')
+    .trim()
+    .toLowerCase()
+    .replace(/-\d{10,14}$/, '')
+    .replace(/^-+|-+$/g, '');
+  if (strippedId && strippedId !== 'phone') {
+    return strippedId;
+  }
+  const nameSlug = String(phone?.name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return nameSlug || String(phone?.id || 'phone');
+}
+
+function matchesPhoneParam(phone: { id?: string; slug?: string; name?: string }, query: string): boolean {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return false;
+  const qStripped = q.replace(/-\d{10,14}$/, '');
+  const pId = String(phone?.id || '').trim().toLowerCase();
+  const pSlug = String(phone?.slug || '').trim().toLowerCase();
+  const pClean = deriveCleanPhoneSlug(phone);
+  return (
+    pId === q ||
+    (pSlug !== '' && pSlug === q) ||
+    pClean === q ||
+    pClean === qStripped ||
+    (pId !== '' && pId.replace(/-\d{10,14}$/, '') === qStripped)
+  );
+}
+
 try {
   if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
   if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
+  if (!fs.existsSync(HOME_BACKUP_UPLOADS_DIR)) fs.mkdirSync(HOME_BACKUP_UPLOADS_DIR, { recursive: true });
   if (fs.existsSync(PUBLIC_HTML_DIR) && !fs.existsSync(PUBLIC_HTML_UPLOADS_DIR)) {
     fs.mkdirSync(PUBLIC_HTML_UPLOADS_DIR, { recursive: true });
   }
@@ -142,6 +187,7 @@ function writeFileToAllUploadDirs(filename: string, buffer: Buffer): void {
   const safeName = path.basename(filename);
   if (!safeName) return;
   const targets = [
+    path.resolve(HOME_BACKUP_UPLOADS_DIR, safeName),
     path.resolve(PUBLIC_UPLOADS_DIR, safeName),
     path.resolve(UPLOADS_DIR, safeName),
   ];
@@ -151,6 +197,11 @@ function writeFileToAllUploadDirs(filename: string, buffer: Buffer): void {
         fs.mkdirSync(PUBLIC_HTML_UPLOADS_DIR, { recursive: true });
       }
       targets.push(path.resolve(PUBLIC_HTML_UPLOADS_DIR, safeName));
+    } catch {}
+  }
+  for (const dirTarget of [HOME_BACKUP_UPLOADS_DIR, PUBLIC_UPLOADS_DIR, UPLOADS_DIR]) {
+    try {
+      if (!fs.existsSync(dirTarget)) fs.mkdirSync(dirTarget, { recursive: true });
     } catch {}
   }
   for (const target of targets) {
@@ -164,6 +215,7 @@ function deleteFileFromAllUploadDirs(filename: string): void {
   const safeName = path.basename(filename);
   if (!safeName) return;
   const targets = [
+    path.resolve(HOME_BACKUP_UPLOADS_DIR, safeName),
     path.resolve(PUBLIC_UPLOADS_DIR, safeName),
     path.resolve(UPLOADS_DIR, safeName),
     path.resolve(PUBLIC_HTML_UPLOADS_DIR, safeName),
@@ -254,6 +306,9 @@ app.use('/assets', express.static(CPANEL_BUILD_ASSETS_DIR, { maxAge: 0, etag: tr
 if (fs.existsSync(PUBLIC_HTML_UPLOADS_DIR)) {
   app.use('/uploads', express.static(PUBLIC_HTML_UPLOADS_DIR, { maxAge: '7d', etag: true }));
 }
+if (fs.existsSync(HOME_BACKUP_UPLOADS_DIR)) {
+  app.use('/uploads', express.static(HOME_BACKUP_UPLOADS_DIR, { maxAge: '7d', etag: true }));
+}
 app.use('/uploads', express.static(PUBLIC_UPLOADS_DIR, { maxAge: '7d', etag: true }));
 app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d', etag: true }));
 app.use('/assets', express.static(path.resolve(APP_ROOT, 'public', 'assets'), { maxAge: '7d', etag: true }));
@@ -278,11 +333,7 @@ app.get('/assets/:assetFile', (req: Request, res: Response, next) => {
   next();
 });
 
-// Persistent JSON File Storage (survives Phusion Passenger restarts & app folder redeployments on cPanel)
-const DATA_DIR = path.resolve(APP_ROOT, 'data');
-const DB_FILE_PATH = path.resolve(DATA_DIR, 'database.json');
-const HOME_BACKUP_DATA_DIR = path.resolve(HOME_DIR, '.gsmscope_data');
-const HOME_BACKUP_DB_PATH = path.resolve(HOME_BACKUP_DATA_DIR, 'database.json');
+// Persistent JSON File Storage (constants declared above in cPanel & upload paths block)
 
 interface PersistentDatabaseSchema {
   version: string;
@@ -465,6 +516,42 @@ function updateLastLoadedDbStat(): void {
   } catch {}
 }
 
+function syncMirrorDbWrite(serialized: string): void {
+  try {
+    if (!fs.existsSync(HOME_BACKUP_DATA_DIR)) {
+      fs.mkdirSync(HOME_BACKUP_DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(HOME_BACKUP_DB_PATH, serialized, 'utf-8');
+  } catch {}
+  if (fs.existsSync(PUBLIC_HTML_DIR)) {
+    try {
+      const apiDataDir = path.dirname(PUBLIC_HTML_API_DB_PATH);
+      if (!fs.existsSync(apiDataDir)) {
+        fs.mkdirSync(apiDataDir, { recursive: true });
+      }
+      fs.writeFileSync(PUBLIC_HTML_API_DB_PATH, serialized, 'utf-8');
+    } catch {}
+  }
+}
+
+function getNewestLiveDbCandidate(): string | null {
+  const candidates = [DB_FILE_PATH, HOME_BACKUP_DB_PATH, PUBLIC_HTML_API_DB_PATH];
+  let bestPath: string | null = null;
+  let bestMtime = -1;
+  for (const cand of candidates) {
+    try {
+      if (fs.existsSync(cand)) {
+        const st = fs.statSync(cand);
+        if (st.size > 100 && st.mtimeMs > bestMtime) {
+          bestMtime = st.mtimeMs;
+          bestPath = cand;
+        }
+      }
+    } catch {}
+  }
+  return bestPath;
+}
+
 function saveDatabaseToDisk(): void {
   try {
     if (!fs.existsSync(DATA_DIR)) {
@@ -497,12 +584,7 @@ function saveDatabaseToDisk(): void {
     fs.writeFileSync(tempFile, serialized, 'utf-8');
     fs.renameSync(tempFile, DB_FILE_PATH);
     updateLastLoadedDbStat();
-    try {
-      if (!fs.existsSync(HOME_BACKUP_DATA_DIR)) {
-        fs.mkdirSync(HOME_BACKUP_DATA_DIR, { recursive: true });
-      }
-      fs.writeFileSync(HOME_BACKUP_DB_PATH, serialized, 'utf-8');
-    } catch {}
+    syncMirrorDbWrite(serialized);
   } catch (err) {
     try {
       // Fallback direct write if atomic rename fails across filesystems
@@ -534,12 +616,7 @@ function saveDatabaseToDisk(): void {
       );
       fs.writeFileSync(DB_FILE_PATH, fallbackSerialized, 'utf-8');
       updateLastLoadedDbStat();
-      try {
-        if (!fs.existsSync(HOME_BACKUP_DATA_DIR)) {
-          fs.mkdirSync(HOME_BACKUP_DATA_DIR, { recursive: true });
-        }
-        fs.writeFileSync(HOME_BACKUP_DB_PATH, fallbackSerialized, 'utf-8');
-      } catch {}
+      syncMirrorDbWrite(fallbackSerialized);
     } catch (writeErr) {
       console.error('[Database Persistence] Failed to write data/database.json:', writeErr);
     }
@@ -551,26 +628,21 @@ function loadDatabaseFromDisk(silent = false): void {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    if (fs.existsSync(HOME_BACKUP_DB_PATH) && fs.existsSync(DB_FILE_PATH)) {
+    const newestLive = getNewestLiveDbCandidate();
+    if (newestLive && newestLive !== DB_FILE_PATH) {
       try {
-        const backupStat = fs.statSync(HOME_BACKUP_DB_PATH);
-        const mainStat = fs.statSync(DB_FILE_PATH);
-        if (backupStat.mtimeMs > mainStat.mtimeMs + 50 && backupStat.size > 100) {
-          fs.copyFileSync(HOME_BACKUP_DB_PATH, DB_FILE_PATH);
+        const newestStat = fs.statSync(newestLive);
+        const mainStat = fs.existsSync(DB_FILE_PATH) ? fs.statSync(DB_FILE_PATH) : null;
+        if (!mainStat || newestStat.mtimeMs > mainStat.mtimeMs + 50 || mainStat.size <= 100) {
+          fs.copyFileSync(newestLive, DB_FILE_PATH);
         }
       } catch {}
     } else if (!fs.existsSync(DB_FILE_PATH)) {
-      if (fs.existsSync(HOME_BACKUP_DB_PATH)) {
+      const seedDbFallback = path.resolve(APP_ROOT, 'cpanel_build', 'seed-database.json');
+      if (fs.existsSync(seedDbFallback)) {
         try {
-          fs.copyFileSync(HOME_BACKUP_DB_PATH, DB_FILE_PATH);
+          fs.copyFileSync(seedDbFallback, DB_FILE_PATH);
         } catch {}
-      } else {
-        const seedDbFallback = path.resolve(APP_ROOT, 'cpanel_build', 'seed-database.json');
-        if (fs.existsSync(seedDbFallback)) {
-          try {
-            fs.copyFileSync(seedDbFallback, DB_FILE_PATH);
-          } catch {}
-        }
       }
     }
     if (fs.existsSync(DB_FILE_PATH)) {
@@ -601,14 +673,19 @@ function loadDatabaseFromDisk(silent = false): void {
         reviewsDatabase = parsed.reviews.filter((r) => r && !deletedReviewIdsDatabase.has(r.id));
       }
       if (Array.isArray(parsed.phones) && parsed.phones.length > 0) {
-        const loadedPhones = parsed.phones
-          .filter((p) => p && !deletedPhoneIdsDatabase.has(p.id))
+        const loadedPhones: Phone[] = parsed.phones
+          .filter((p) => {
+            if (!p) return false;
+            const cSlug = deriveCleanPhoneSlug(p);
+            return !deletedPhoneIdsDatabase.has(p.id) && !deletedPhoneIdsDatabase.has(cSlug);
+          })
           .map((p) => {
             const cleanedCats = (p.categories || []).filter(
               (c) => !['best-budget', 'under-200k', 'under-100k', 'under-300k'].includes(String(c).toLowerCase())
             );
             return {
               ...p,
+              slug: deriveCleanPhoneSlug(p),
               categories: cleanedCats.length > 0 ? cleanedCats : ['best-battery'],
             };
           });
@@ -616,7 +693,10 @@ function loadDatabaseFromDisk(silent = false): void {
         const defaultPhones = getDefaultPhones(reviewsDatabase);
         for (const seedPhone of defaultPhones) {
           if (!loadedPhoneIds.has(seedPhone.id) && !deletedPhoneIdsDatabase.has(seedPhone.id)) {
-            loadedPhones.push(seedPhone);
+            loadedPhones.push({
+              ...seedPhone,
+              slug: deriveCleanPhoneSlug(seedPhone),
+            });
           }
         }
         phonesDatabase = loadedPhones;
@@ -644,7 +724,7 @@ function loadDatabaseFromDisk(silent = false): void {
         }
         brandsDatabase = loadedBrands;
       }
-      if (Array.isArray(parsed.articles) && parsed.articles.length > 0) {
+      if (Array.isArray(parsed.articles)) {
         const loadedArticles = parsed.articles
           .filter((a) => a && !deletedArticleIdsDatabase.has(a.id))
           .map((a) => {
@@ -778,12 +858,13 @@ function loadDatabaseFromDisk(silent = false): void {
 function syncDatabaseFromDiskIfChanged(): void {
   try {
     let shouldReload = false;
-    if (fs.existsSync(HOME_BACKUP_DB_PATH) && fs.existsSync(DB_FILE_PATH)) {
+    const newestLive = getNewestLiveDbCandidate();
+    if (newestLive && newestLive !== DB_FILE_PATH && fs.existsSync(DB_FILE_PATH)) {
       try {
-        const backupStat = fs.statSync(HOME_BACKUP_DB_PATH);
+        const backupStat = fs.statSync(newestLive);
         const mainStat = fs.statSync(DB_FILE_PATH);
         if (backupStat.mtimeMs > mainStat.mtimeMs + 50 && backupStat.size > 100) {
-          fs.copyFileSync(HOME_BACKUP_DB_PATH, DB_FILE_PATH);
+          fs.copyFileSync(newestLive, DB_FILE_PATH);
           shouldReload = true;
         }
       } catch {}
@@ -804,6 +885,7 @@ function restoreUploadsFromDatabase(): void {
   try {
     if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
     if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
+    if (!fs.existsSync(HOME_BACKUP_UPLOADS_DIR)) fs.mkdirSync(HOME_BACKUP_UPLOADS_DIR, { recursive: true });
     if (fs.existsSync(PUBLIC_HTML_DIR) && !fs.existsSync(PUBLIC_HTML_UPLOADS_DIR)) {
       fs.mkdirSync(PUBLIC_HTML_UPLOADS_DIR, { recursive: true });
     }
@@ -813,11 +895,12 @@ function restoreUploadsFromDatabase(): void {
       uploadDataUrlsDatabase[urlPath] = dataUrl;
       const filename = path.basename(urlPath.split('?')[0]);
       if (!filename) return;
+      const targetBackup = path.resolve(HOME_BACKUP_UPLOADS_DIR, filename);
       const targetUpload = path.resolve(UPLOADS_DIR, filename);
       const targetPublic = path.resolve(PUBLIC_UPLOADS_DIR, filename);
       const targetPublicHtml = path.resolve(PUBLIC_HTML_UPLOADS_DIR, filename);
       const needsPublicHtml = fs.existsSync(PUBLIC_HTML_DIR) && !fs.existsSync(targetPublicHtml);
-      if (fs.existsSync(targetUpload) && fs.existsSync(targetPublic) && !needsPublicHtml) return;
+      if (fs.existsSync(targetBackup) && fs.existsSync(targetUpload) && fs.existsSync(targetPublic) && !needsPublicHtml) return;
       const base64Data = dataUrl.split(';base64,')[1];
       if (!base64Data) return;
       const buffer = Buffer.from(base64Data, 'base64');
@@ -844,20 +927,25 @@ function restoreUploadsFromDatabase(): void {
       }
     }
 
-    // Also mirror any existing disk files in UPLOADS_DIR / PUBLIC_UPLOADS_DIR into $HOME/public_html/uploads on cPanel
-    if (fs.existsSync(PUBLIC_HTML_DIR)) {
-      for (const srcDir of [UPLOADS_DIR, PUBLIC_UPLOADS_DIR]) {
-        if (fs.existsSync(srcDir)) {
-          const files = fs.readdirSync(srcDir);
-          for (const f of files) {
-            const srcFile = path.resolve(srcDir, f);
-            const destFile = path.resolve(PUBLIC_HTML_UPLOADS_DIR, f);
-            try {
-              if (!fs.existsSync(destFile) && fs.statSync(srcFile).isFile()) {
-                fs.copyFileSync(srcFile, destFile);
-              }
-            } catch {}
-          }
+    // Mirror existing upload binary files bidirectionally across .gsmscope_data/uploads, public_html/uploads, uploads, and public/uploads
+    const allUploadDirs = [HOME_BACKUP_UPLOADS_DIR, PUBLIC_HTML_UPLOADS_DIR, UPLOADS_DIR, PUBLIC_UPLOADS_DIR];
+    for (const srcDir of allUploadDirs) {
+      if (!fs.existsSync(srcDir)) continue;
+      let files: string[] = [];
+      try { files = fs.readdirSync(srcDir); } catch {}
+      for (const f of files) {
+        const srcFile = path.resolve(srcDir, f);
+        try {
+          if (!fs.statSync(srcFile).isFile()) continue;
+        } catch { continue; }
+        for (const destDir of allUploadDirs) {
+          if (destDir === PUBLIC_HTML_UPLOADS_DIR && !fs.existsSync(PUBLIC_HTML_DIR)) continue;
+          const destFile = path.resolve(destDir, f);
+          try {
+            if (!fs.existsSync(destFile)) {
+              fs.copyFileSync(srcFile, destFile);
+            }
+          } catch {}
         }
       }
     }
@@ -896,10 +984,12 @@ app.get(['/uploads/:filename', '/api/uploads/:filename'], (req: Request, res: Re
   if (!filename) return next();
   const targetUrl = `/uploads/${filename}`;
 
+  const backupDiskFile = path.resolve(HOME_BACKUP_UPLOADS_DIR, filename);
   const publicHtmlDiskFile = path.resolve(PUBLIC_HTML_UPLOADS_DIR, filename);
   const diskFile = path.resolve(UPLOADS_DIR, filename);
   const publicDiskFile = path.resolve(PUBLIC_UPLOADS_DIR, filename);
   if (fs.existsSync(publicHtmlDiskFile)) return res.sendFile(publicHtmlDiskFile);
+  if (fs.existsSync(backupDiskFile)) return res.sendFile(backupDiskFile);
   if (fs.existsSync(diskFile)) return res.sendFile(diskFile);
   if (fs.existsSync(publicDiskFile)) return res.sendFile(publicDiskFile);
 
@@ -1199,8 +1289,44 @@ app.get(['/api/health', '/health'], (_req: Request, res: Response) => {
   });
 });
 
+const SERVER_SEED_PHONE_IDS = new Set<string>(getDefaultPhones([]).map((p) => p.id));
+
+function enforceServerMaxFeaturedPhones(promotedPhoneId: string, nowTs: number): void {
+  const otherFeatured = phonesDatabase.filter((p) => p && p.id !== promotedPhoneId && p.isFeatured);
+  otherFeatured.sort((a, b) => {
+    const fA = Number((a as any).featuredAt) || 0;
+    const fB = Number((b as any).featuredAt) || 0;
+    if (fA && fB && fA !== fB) return fB - fA;
+    if (fB && !fA) return 1;
+    if (fA && !fB) return -1;
+    const isCustomA = !SERVER_SEED_PHONE_IDS.has(a.id);
+    const isCustomB = !SERVER_SEED_PHONE_IDS.has(b.id);
+    if (isCustomA && !isCustomB) return -1;
+    if (!isCustomA && isCustomB) return 1;
+    const tA = Number((a as any).createdAt || (a as any).updatedAt || 0);
+    const tB = Number((b as any).createdAt || (b as any).updatedAt || 0);
+    if (tA !== tB) return tB - tA;
+    return 0;
+  });
+
+  const keepFeaturedIds = new Set<string>([
+    promotedPhoneId,
+    ...otherFeatured.slice(0, 2).map((p) => p.id),
+  ]);
+
+  phonesDatabase = phonesDatabase.map((p) => {
+    if (p.isFeatured && !keepFeaturedIds.has(p.id)) {
+      const next = { ...p, isFeatured: false, updatedAt: nowTs } as any;
+      delete next.featuredAt;
+      return next;
+    }
+    return p;
+  });
+}
+
 // 2. Phones API
 app.get('/api/phones', (req: Request, res: Response) => {
+  syncDatabaseFromDiskIfChanged();
   const { search, brand, minPrice, maxPrice, only5G, minBattery, sortBy } = req.query;
 
   let results = [...phonesDatabase];
@@ -1263,7 +1389,7 @@ app.get('/api/phones', (req: Request, res: Response) => {
 });
 
 app.get('/api/phones/:id', (req: Request, res: Response) => {
-  const phone = phonesDatabase.find(p => p.id === req.params.id);
+  const phone = phonesDatabase.find(p => matchesPhoneParam(p, req.params.id));
   if (!phone) {
     return res.status(404).json({ error: 'Phone not found' });
   }
@@ -1274,7 +1400,7 @@ app.get('/api/phones/:id', (req: Request, res: Response) => {
 const recentlyViewedIps = new Map<string, number>();
 
 app.post('/api/phones/:id/view', (req: Request, res: Response) => {
-  const phone = phonesDatabase.find(p => p.id === req.params.id);
+  const phone = phonesDatabase.find(p => matchesPhoneParam(p, req.params.id));
   if (!phone) {
     return res.status(404).json({ error: 'Phone not found' });
   }
@@ -1297,15 +1423,22 @@ app.post('/api/phones/:id/view', (req: Request, res: Response) => {
 
 // Admin: Add new Phone
 app.post('/api/phones', (req: Request, res: Response) => {
+  syncDatabaseFromDiskIfChanged();
   const nowTs = Date.now();
+  const rawBody = req.body || {};
+  const cleanSlug = deriveCleanPhoneSlug({ id: rawBody.id, slug: rawBody.slug, name: rawBody.name });
   const newPhone: Phone = {
-    ...req.body,
-    createdAt: (req.body as any)?.createdAt || nowTs,
-    ...(req.body?.isFeatured ? { featuredAt: (req.body as any)?.featuredAt || nowTs } : {}),
+    ...rawBody,
+    id: rawBody.id || cleanSlug,
+    slug: cleanSlug,
+    createdAt: (rawBody as any)?.createdAt || nowTs,
+    ...(rawBody?.isFeatured ? { featuredAt: (rawBody as any)?.featuredAt || nowTs } : {}),
   } as any;
   if (!newPhone.name || !newPhone.brand || !newPhone.priceNGN) {
     return res.status(400).json({ error: 'Missing required phone fields: name, brand, priceNGN' });
   }
+  if (newPhone.id) deletedPhoneIdsDatabase.delete(newPhone.id);
+  if (newPhone.slug) deletedPhoneIdsDatabase.delete(newPhone.slug);
 
   if (req.body.pushToSubscribers) {
     const recipientsCount = Math.max(newsletterSubscribers.length, 1);
@@ -1314,7 +1447,7 @@ app.post('/api/phones', (req: Request, res: Response) => {
       type: 'phone',
       title: `New Device Alert: ${newPhone.brand} ${newPhone.name}`,
       message: `${newPhone.name} is now added to the GsmScope hardware database. Check complete benchmarks, camera specifications, and live Naira/USD prices.`,
-      actionUrl: `/?phone=${encodeURIComponent(newPhone.id)}`,
+      actionUrl: `/?phone=${encodeURIComponent(newPhone.slug || newPhone.id)}`,
       actionLabel: 'View Phone Specs',
       recipientsCount,
       sentAt: new Date().toISOString(),
@@ -1324,19 +1457,32 @@ app.post('/api/phones', (req: Request, res: Response) => {
 
   const existingIdx = phonesDatabase.findIndex(p => p.id === newPhone.id);
   if (existingIdx !== -1) {
-    const updatedExisting = { ...phonesDatabase[existingIdx], ...newPhone };
+    const prev = phonesDatabase[existingIdx];
+    const justFeatured = Boolean(newPhone.isFeatured && !prev.isFeatured);
+    const updatedExisting = {
+      ...prev,
+      ...newPhone,
+      ...(justFeatured ? { featuredAt: nowTs } : {}),
+    };
     phonesDatabase.splice(existingIdx, 1);
     phonesDatabase.unshift(updatedExisting);
+    if (justFeatured) {
+      enforceServerMaxFeaturedPhones(updatedExisting.id, nowTs);
+    }
     saveDatabaseToDisk();
     return res.status(200).json({ success: true, phone: updatedExisting });
   }
   phonesDatabase.unshift(newPhone);
+  if (newPhone.isFeatured) {
+    enforceServerMaxFeaturedPhones(newPhone.id, nowTs);
+  }
   saveDatabaseToDisk();
   res.status(201).json({ success: true, phone: newPhone });
 });
 
 // Admin: Update Phone (supports both PUT and POST for cPanel firewall compatibility)
 const handleUpdatePhone = (req: Request, res: Response) => {
+  syncDatabaseFromDiskIfChanged();
   const index = phonesDatabase.findIndex(p => p.id === req.params.id);
   const nowTs = Date.now();
   if (index === -1) {
@@ -1351,7 +1497,11 @@ const handleUpdatePhone = (req: Request, res: Response) => {
           ? [req.body.image, ...(Array.isArray(req.body.images) ? req.body.images.filter((u: string) => u !== req.body.image) : [])]
           : (req.body.images || [])
       };
+      deletedPhoneIdsDatabase.delete(created.id);
       phonesDatabase.unshift(created);
+      if (created.isFeatured) {
+        enforceServerMaxFeaturedPhones(created.id, nowTs);
+      }
       saveDatabaseToDisk();
       return res.json({ success: true, phone: created });
     }
@@ -1365,16 +1515,20 @@ const handleUpdatePhone = (req: Request, res: Response) => {
     updatedAt: (req.body as any)?.updatedAt || nowTs,
     ...(justFeatured ? { featuredAt: nowTs } : {}),
   } as any;
+  if (req.body?.isFeatured === false) {
+    delete (mergedPhone as any).featuredAt;
+  }
   if (mergedPhone.image) {
     mergedPhone.images = [
       mergedPhone.image,
       ...(Array.isArray(mergedPhone.images) ? mergedPhone.images.filter(u => u !== mergedPhone.image) : [])
     ];
   }
-  // If phone was newly assigned to Featured, move it to the front
+  // If phone was newly assigned to Featured, move it to the front and auto-remove the 3rd/last featured phone
   if (justFeatured) {
     phonesDatabase.splice(index, 1);
     phonesDatabase.unshift(mergedPhone);
+    enforceServerMaxFeaturedPhones(mergedPhone.id, nowTs);
   } else {
     phonesDatabase[index] = mergedPhone;
   }
@@ -1384,13 +1538,24 @@ const handleUpdatePhone = (req: Request, res: Response) => {
 app.put('/api/phones/:id', handleUpdatePhone);
 app.post('/api/phones/:id', handleUpdatePhone);
 
-// Admin: Delete Phone
-app.delete('/api/phones/:id', (req: Request, res: Response) => {
-  deletedPhoneIdsDatabase.add(req.params.id);
-  phonesDatabase = phonesDatabase.filter(p => p.id !== req.params.id);
-  saveDatabaseToDisk();
-  res.json({ success: true, deletedId: req.params.id });
-});
+// Admin: Delete Phone (supports DELETE and POST fallback)
+const handleDeletePhone = (req: Request, res: Response) => {
+  syncDatabaseFromDiskIfChanged();
+  const targetId = decodeURIComponent(req.params.id || req.body?.id || '').trim();
+  if (targetId) {
+    const matched = phonesDatabase.filter(p => matchesPhoneParam(p, targetId));
+    deletedPhoneIdsDatabase.add(targetId);
+    matched.forEach((m) => {
+      if (m.id) deletedPhoneIdsDatabase.add(m.id);
+      if (m.slug) deletedPhoneIdsDatabase.add(m.slug);
+    });
+    phonesDatabase = phonesDatabase.filter(p => !matchesPhoneParam(p, targetId));
+    saveDatabaseToDisk();
+  }
+  res.json({ success: true, deletedId: targetId });
+};
+app.delete('/api/phones/:id', handleDeletePhone);
+app.post('/api/phones/:id/delete', handleDeletePhone);
 
 // 3. Brands API
 app.get('/api/brands', (_req: Request, res: Response) => {
@@ -1440,8 +1605,9 @@ const handleUpdateBrand = (req: Request, res: Response) => {
 app.put('/api/brands/:id', handleUpdateBrand);
 app.post('/api/brands/:id', handleUpdateBrand);
 
-app.delete('/api/brands/:id', (req: Request, res: Response) => {
-  const target = decodeURIComponent(req.params.id || '').trim().toLowerCase();
+const handleDeleteBrand = (req: Request, res: Response) => {
+  syncDatabaseFromDiskIfChanged();
+  const target = decodeURIComponent(req.params.id || req.body?.id || '').trim().toLowerCase();
   if (target) deletedBrandKeysDatabase.add(target);
   brandsDatabase = brandsDatabase.filter(
     b =>
@@ -1451,20 +1617,27 @@ app.delete('/api/brands/:id', (req: Request, res: Response) => {
   );
   saveDatabaseToDisk();
   res.json({ success: true, deletedId: req.params.id });
-});
+};
+app.delete('/api/brands/:id', handleDeleteBrand);
+app.post('/api/brands/:id/delete', handleDeleteBrand);
 
 // 4. Articles API
 app.get('/api/articles', (req: Request, res: Response) => {
+  syncDatabaseFromDiskIfChanged();
   const { category } = req.query;
+  const visible = articlesDatabase.filter(
+    a => a && !deletedArticleIdsDatabase.has(a.id) && !(a.slug && deletedArticleIdsDatabase.has(a.slug))
+  );
   if (typeof category === 'string' && category !== 'All') {
-    const filtered = articlesDatabase.filter(a => a.category === category);
+    const filtered = visible.filter(a => a.category === category);
     return res.json(filtered);
   }
-  res.json(articlesDatabase);
+  res.json(visible);
 });
 
 app.get('/api/articles/:id', (req: Request, res: Response) => {
-  const article = articlesDatabase.find(a => a.id === req.params.id);
+  syncDatabaseFromDiskIfChanged();
+  const article = articlesDatabase.find(a => a.id === req.params.id || a.slug === req.params.id);
   if (!article) {
     return res.status(404).json({ error: 'Article not found' });
   }
@@ -1472,6 +1645,7 @@ app.get('/api/articles/:id', (req: Request, res: Response) => {
 });
 
 app.post('/api/articles', (req: Request, res: Response) => {
+  syncDatabaseFromDiskIfChanged();
   const newArticle: Article = {
     ...req.body,
     createdAt: (req.body as any)?.createdAt || Date.now(),
@@ -1479,6 +1653,8 @@ app.post('/api/articles', (req: Request, res: Response) => {
   if (!newArticle.title || !newArticle.content) {
     return res.status(400).json({ error: 'Missing article title or content' });
   }
+  if (newArticle.id) deletedArticleIdsDatabase.delete(newArticle.id);
+  if (newArticle.slug) deletedArticleIdsDatabase.delete(newArticle.slug);
 
   if (req.body.pushToSubscribers) {
     const recipientsCount = Math.max(newsletterSubscribers.length, 1);
@@ -1509,8 +1685,11 @@ app.post('/api/articles', (req: Request, res: Response) => {
 });
 
 const handleUpdateArticle = (req: Request, res: Response) => {
+  syncDatabaseFromDiskIfChanged();
   const index = articlesDatabase.findIndex(a => a.id === req.params.id);
   const nowTs = Date.now();
+  deletedArticleIdsDatabase.delete(req.params.id);
+  if (req.body?.slug) deletedArticleIdsDatabase.delete(String(req.body.slug));
   if (index === -1) {
     const created: Article = {
       id: req.params.id,
@@ -1547,12 +1726,23 @@ const handleUpdateArticle = (req: Request, res: Response) => {
 app.put('/api/articles/:id', handleUpdateArticle);
 app.post('/api/articles/:id', handleUpdateArticle);
 
-app.delete('/api/articles/:id', (req: Request, res: Response) => {
-  deletedArticleIdsDatabase.add(req.params.id);
-  articlesDatabase = articlesDatabase.filter(a => a.id !== req.params.id);
-  saveDatabaseToDisk();
-  res.json({ success: true, deletedId: req.params.id });
-});
+const handleDeleteArticle = (req: Request, res: Response) => {
+  syncDatabaseFromDiskIfChanged();
+  const target = decodeURIComponent(req.params.id || req.body?.id || '').trim();
+  if (target) {
+    deletedArticleIdsDatabase.add(target);
+    const matched = articlesDatabase.filter(a => a.id === target || a.slug === target);
+    for (const m of matched) {
+      if (m.id) deletedArticleIdsDatabase.add(m.id);
+      if (m.slug) deletedArticleIdsDatabase.add(m.slug);
+    }
+    articlesDatabase = articlesDatabase.filter(a => a.id !== target && a.slug !== target);
+    saveDatabaseToDisk();
+  }
+  res.json({ success: true, deletedId: target });
+};
+app.delete('/api/articles/:id', handleDeleteArticle);
+app.post('/api/articles/:id/delete', handleDeleteArticle);
 
 app.post('/api/articles/:id/view', (req: Request, res: Response) => {
   const article = articlesDatabase.find(a => a.id === req.params.id || a.slug === req.params.id);
@@ -1699,10 +1889,12 @@ app.patch('/api/reviews/:id/status', (req: Request, res: Response) => {
   res.status(400).json({ error: 'Invalid review status' });
 });
 
-app.delete('/api/reviews/:id', (req: Request, res: Response) => {
-  deletedReviewIdsDatabase.add(req.params.id);
-  const target = reviewsDatabase.find(r => r.id === req.params.id);
-  reviewsDatabase = reviewsDatabase.filter(r => r.id !== req.params.id);
+const handleDeleteReview = (req: Request, res: Response) => {
+  syncDatabaseFromDiskIfChanged();
+  const rid = decodeURIComponent(req.params.id || req.body?.id || '').trim();
+  deletedReviewIdsDatabase.add(rid);
+  const target = reviewsDatabase.find(r => r.id === rid);
+  reviewsDatabase = reviewsDatabase.filter(r => r.id !== rid);
   if (target) {
     const phone = phonesDatabase.find(p => p.id === target.phoneId);
     if (phone) {
@@ -1714,8 +1906,10 @@ app.delete('/api/reviews/:id', (req: Request, res: Response) => {
     }
   }
   saveDatabaseToDisk();
-  res.json({ success: true, deletedId: req.params.id });
-});
+  res.json({ success: true, deletedId: rid });
+};
+app.delete('/api/reviews/:id', handleDeleteReview);
+app.post('/api/reviews/:id/delete', handleDeleteReview);
 
 // 5b. Ad Settings & Database Import/Reset API
 app.get('/api/ad-settings', (_req: Request, res: Response) => {
@@ -1909,9 +2103,40 @@ app.post('/api/media', (req: Request, res: Response) => {
   res.status(201).json({ success: true, media: item });
 });
 
+app.get('/api/database/deleted-ids', (_req: Request, res: Response) => {
+  syncDatabaseFromDiskIfChanged();
+  res.json({
+    deletedArticleIds: Array.from(deletedArticleIdsDatabase),
+    deletedPhoneIds: Array.from(deletedPhoneIdsDatabase),
+    deletedBrandKeys: Array.from(deletedBrandKeysDatabase),
+    deletedReviewIds: Array.from(deletedReviewIdsDatabase),
+  });
+});
+
 app.post('/api/database/sync-vault', (req: Request, res: Response) => {
   try {
-    const { uploadDataUrls, mediaLibrary } = req.body || {};
+    syncDatabaseFromDiskIfChanged();
+    const { uploadDataUrls, mediaLibrary, deletedArticleIds, deletedPhoneIds } = req.body || {};
+    if (Array.isArray(deletedArticleIds)) {
+      for (const did of deletedArticleIds) {
+        if (typeof did === 'string' && did.trim()) {
+          deletedArticleIdsDatabase.add(did.trim());
+        }
+      }
+      articlesDatabase = articlesDatabase.filter(
+        (a) => a && !deletedArticleIdsDatabase.has(a.id) && !(a.slug && deletedArticleIdsDatabase.has(a.slug))
+      );
+    }
+    if (Array.isArray(deletedPhoneIds)) {
+      for (const did of deletedPhoneIds) {
+        if (typeof did === 'string' && did.trim()) {
+          deletedPhoneIdsDatabase.add(did.trim());
+        }
+      }
+      phonesDatabase = phonesDatabase.filter(
+        (p) => p && !deletedPhoneIdsDatabase.has(p.id) && !(p.slug && deletedPhoneIdsDatabase.has(p.slug))
+      );
+    }
     if (uploadDataUrls && typeof uploadDataUrls === 'object') {
       for (const [urlPath, dataUrl] of Object.entries(uploadDataUrls)) {
         if (typeof urlPath === 'string' && typeof dataUrl === 'string' && dataUrl.startsWith('data:')) {
@@ -2581,16 +2806,6 @@ function resolveAbsoluteAssetUrl(origin: string, rawUrl?: string, ogEndpointFall
     // Social crawlers (Facebook, X, WhatsApp, Telegram) reject inline data: URIs
     return ogEndpointFallback || defaultImg;
   }
-  if (
-    ogEndpointFallback &&
-    (trimmed.startsWith('/uploads/') ||
-      trimmed.startsWith('uploads/') ||
-      trimmed.startsWith('/api/uploads/') ||
-      trimmed.startsWith('api/uploads/'))
-  ) {
-    // Route uploaded media through /api/og-image so crawlers get guaranteed 200 OK binary bytes from disk or database backup
-    return ogEndpointFallback;
-  }
   if (trimmed.startsWith('//')) {
     return `https:${trimmed.replace(/ /g, '%20')}`;
   }
@@ -2644,11 +2859,7 @@ app.get('/api/og-image', (req: Request, res: Response) => {
       rawImage = (matchedArticle.coverImage || extractFirstImgFromHtml(matchedArticle.content) || '').trim();
     }
   } else if (type === 'phone' && idLower) {
-    const matchedPhone = phonesDatabase.find(
-      (p) =>
-        p.id.toLowerCase() === idLower ||
-        ((p as any).slug && String((p as any).slug).toLowerCase() === idLower)
-    );
+    const matchedPhone = phonesDatabase.find((p) => matchesPhoneParam(p, decodedId));
     if (matchedPhone) {
       const mpAny = matchedPhone as any;
       rawImage = (
@@ -2691,7 +2902,7 @@ app.get('/api/og-image', (req: Request, res: Response) => {
   ) {
     const filename = path.basename(rawImage.split('?')[0]);
     if (filename) {
-      for (const dir of [PUBLIC_HTML_UPLOADS_DIR, UPLOADS_DIR, PUBLIC_UPLOADS_DIR]) {
+      for (const dir of [PUBLIC_HTML_UPLOADS_DIR, HOME_BACKUP_UPLOADS_DIR, UPLOADS_DIR, PUBLIC_UPLOADS_DIR]) {
         const candidate = path.resolve(dir, filename);
         if (sendBinaryAssetFile(res, candidate)) return;
       }
@@ -2830,7 +3041,8 @@ app.get('/sitemap.xml', (req: Request, res: Response) => {
 
   // Add all live phones with image tags
   for (const phone of phonesDatabase) {
-    const phoneLoc = `${origin}/?phone=${encodeURIComponent(phone.id)}`;
+    const phoneSlugOrId = deriveCleanPhoneSlug(phone);
+    const phoneLoc = `${origin}/?phone=${encodeURIComponent(phoneSlugOrId)}`;
     const imageUrl = resolveAbsoluteAssetUrl(origin, phone.image);
     urlNodes.push(
       `  <url>\n    <loc>${escapeXml(phoneLoc)}</loc>\n    <lastmod>${todayIso}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>\n    <image:image>\n      <image:loc>${escapeXml(imageUrl)}</image:loc>\n      <image:title>${escapeXml(`${phone.name} Full Specifications and Price`)}</image:title>\n    </image:image>\n  </url>`
@@ -2947,14 +3159,9 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
     try {
       decodedPhoneQuery = decodeURIComponent(phoneQuery);
     } catch {}
-    const pqLower = decodedPhoneQuery.toLowerCase();
-    const matchedPhone = phonesDatabase.find(
-      (p) =>
-        p.id.toLowerCase() === pqLower ||
-        ((p as any).slug && String((p as any).slug).toLowerCase() === pqLower)
-    );
+    const matchedPhone = phonesDatabase.find((p) => matchesPhoneParam(p, decodedPhoneQuery));
     if (matchedPhone) {
-      const phoneSlugOrId = (matchedPhone as any).slug || matchedPhone.id;
+      const phoneSlugOrId = deriveCleanPhoneSlug(matchedPhone);
       pageTitle =
         matchedPhone.seoTitle ||
         `${matchedPhone.name} Full Specifications, Reviews & Price ($${matchedPhone.priceUSD} / ₦${matchedPhone.priceNGN.toLocaleString()}) — ${siteName}`;
@@ -3108,7 +3315,7 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
     .slice(0, 25)
     .map(
       (p) =>
-        `<li><a href="/?phone=${encodeURIComponent(p.id)}">${escapeHtmlAttr(p.name)} — $${p.priceUSD} / ₦${p.priceNGN.toLocaleString()} (${escapeHtmlAttr(p.keyHighlights?.processor || '')})</a></li>`
+        `<li><a href="/?phone=${encodeURIComponent(deriveCleanPhoneSlug(p))}">${escapeHtmlAttr(p.name)} — $${p.priceUSD} / ₦${p.priceNGN.toLocaleString()} (${escapeHtmlAttr(p.keyHighlights?.processor || '')})</a></li>`
     )
     .join('');
   const articleLinksHtml = articlesDatabase

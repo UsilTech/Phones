@@ -1128,7 +1128,32 @@ export default function AdminDashboardModal() {
       return;
     }
 
-    const slug = phoneDraft.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const baseSlug =
+      phoneDraft.name
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'phone';
+
+    const takenPhoneKeys = new Set<string>();
+    phones.forEach((p) => {
+      if (editingPhoneId && p.id === editingPhoneId) return;
+      if (p.id) takenPhoneKeys.add(p.id.toLowerCase());
+      if (p.slug) takenPhoneKeys.add(p.slug.toLowerCase());
+    });
+
+    let uniqueSlug = baseSlug;
+    let suffix = 2;
+    while (takenPhoneKeys.has(uniqueSlug.toLowerCase())) {
+      uniqueSlug = `${baseSlug}-${suffix}`;
+      suffix += 1;
+    }
+
+    const existingSlugClean = (phoneDraft.slug || '').trim().toLowerCase().replace(/-\d{10,14}$/, '').replace(/^-+|-+$/g, '');
+    const resolvedSlug = editingPhoneId
+      ? (existingSlugClean && !takenPhoneKeys.has(existingSlugClean) ? existingSlugClean : uniqueSlug)
+      : uniqueSlug;
+
     const ramArr = ramVariantsText
       .split(',')
       .map((s) => s.trim())
@@ -1172,7 +1197,8 @@ export default function AdminDashboardModal() {
 
     const finalPhone: Phone = {
       ...phoneDraft,
-      id: editingPhoneId || `${slug}-${Date.now()}`,
+      id: editingPhoneId || resolvedSlug,
+      slug: resolvedSlug,
       name: phoneDraft.name.trim(),
       brand: phoneDraft.brand.trim() || 'Samsung',
       priceNGN,

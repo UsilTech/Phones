@@ -44,26 +44,75 @@ function gsmGetOrigin() {
     return $proto . '://' . $host;
 }
 
+function gsmSlugify($str) {
+    $s = strtolower(trim((string)$str));
+    $s = preg_replace('/[^a-z0-9]+/', '-', $s);
+    return trim((string)$s, '-');
+}
+
+function gsmCleanPhoneSlug($ph) {
+    $rawSlug = isset($ph['slug']) ? trim((string)$ph['slug']) : '';
+    if ($rawSlug !== '' && !preg_match('/-\d{10,14}$/', $rawSlug)) {
+        return strtolower($rawSlug);
+    }
+    $strippedId = trim(preg_replace('/-\d{10,14}$/', '', strtolower(trim((string)($ph['id'] ?? '')))), '-');
+    if ($strippedId !== '' && $strippedId !== 'phone') {
+        return $strippedId;
+    }
+    $byName = gsmSlugify($ph['name'] ?? '');
+    return $byName !== '' ? $byName : strtolower((string)($ph['id'] ?? 'phone'));
+}
+
+function gsmMatchesPhone($ph, $query) {
+    $q = strtolower(trim(rawurldecode((string)$query)));
+    if ($q === '') return false;
+    $qStripped = preg_replace('/-\d{10,14}$/', '', $q);
+    $pId = strtolower(trim((string)($ph['id'] ?? '')));
+    $pSlug = strtolower(trim((string)($ph['slug'] ?? '')));
+    $pClean = gsmCleanPhoneSlug($ph);
+    return (
+        $pId === $q ||
+        ($pSlug !== '' && $pSlug === $q) ||
+        $pClean === $q ||
+        $pClean === $qStripped ||
+        ($pId !== '' && preg_replace('/-\d{10,14}$/', '', $pId) === $qStripped)
+    );
+}
+
 function gsmLoadDb() {
     $homeDir = gsmResolveHomeDir();
-    $candidates = array(
+    // Always pick the newest LIVE database.json first; never let freshly deployed seed-database.json override live content
+    $liveCandidates = array(
+        $homeDir . '/.gsmscope_data/database.json',
         $homeDir . '/phones_app/data/database.json',
+        $homeDir . '/public_html/api/data/database.json',
+        __DIR__ . '/api/data/database.json',
         $homeDir . '/gsmscope/data/database.json',
         $homeDir . '/nodejs/data/database.json',
-        $homeDir . '/.gsmscope_data/database.json',
-        __DIR__ . '/api/data/database.json',
         __DIR__ . '/data/database.json',
-        dirname(__DIR__) . '/data/database.json',
-        __DIR__ . '/seed-database.json'
+        dirname(__DIR__) . '/data/database.json'
     );
     $bestFile = null;
     $bestMtime = -1;
-    foreach ($candidates as $cand) {
-        if (file_exists($cand) && filesize($cand) > 50) {
+    foreach ($liveCandidates as $cand) {
+        if (file_exists($cand) && @filesize($cand) > 100) {
             $mt = @filemtime($cand);
             if ($bestFile === null || $mt > $bestMtime) {
                 $bestFile = $cand;
                 $bestMtime = $mt;
+            }
+        }
+    }
+    if ($bestFile === null) {
+        $seedCandidates = array(
+            __DIR__ . '/api/seed-database.json',
+            __DIR__ . '/seed-database.json',
+            $homeDir . '/phones_app/cpanel_build/seed-database.json'
+        );
+        foreach ($seedCandidates as $sc) {
+            if (file_exists($sc) && @filesize($sc) > 50) {
+                $bestFile = $sc;
+                break;
             }
         }
     }
@@ -93,14 +142,6 @@ function gsmResolveAssetUrl($origin, $rawUrl, $ogEndpointFallback = '') {
     }
     if (strpos($trimmed, 'data:') === 0) {
         return $ogEndpointFallback !== '' ? $ogEndpointFallback : $defaultImg;
-    }
-    if ($ogEndpointFallback !== '' && (
-        strpos($trimmed, '/uploads/') === 0 ||
-        strpos($trimmed, 'uploads/') === 0 ||
-        strpos($trimmed, '/api/uploads/') === 0 ||
-        strpos($trimmed, 'api/uploads/') === 0
-    )) {
-        return $ogEndpointFallback;
     }
     if (strpos($trimmed, '//') === 0) {
         return 'https:' . str_replace(' ', '%20', $trimmed);
@@ -147,7 +188,8 @@ if ($articleQuery !== '' && !empty($db['articles']) && is_array($db['articles'])
     foreach ($db['articles'] as $art) {
         $aId = strtolower(trim((string)($art['id'] ?? '')));
         $aSlug = strtolower(trim((string)($art['slug'] ?? '')));
-        if ($aId === $aqLower || ($aSlug !== '' && $aSlug === $aqLower)) {
+        $aTitleSlug = gsmSlugify($art['title'] ?? '');
+        if ($aId === $aqLower || ($aSlug !== '' && $aSlug === $aqLower) || ($aTitleSlug !== '' && $aTitleSlug === $aqLower)) {
             $slugOrId = !empty($art['slug']) ? $art['slug'] : $art['id'];
             $pageTitle = !empty($art['seoTitle']) ? $art['seoTitle'] : (($art['title'] ?? 'Article') . ' — ' . $siteName);
             $pageDescription = !empty($art['seoDescription']) ? $art['seoDescription'] : ($art['summary'] ?? $pageDescription);
@@ -164,12 +206,9 @@ if ($articleQuery !== '' && !empty($db['articles']) && is_array($db['articles'])
         }
     }
 } elseif ($phoneQuery !== '' && !empty($db['phones']) && is_array($db['phones'])) {
-    $pqLower = strtolower(rawurldecode($phoneQuery));
     foreach ($db['phones'] as $ph) {
-        $pId = strtolower(trim((string)($ph['id'] ?? '')));
-        $pSlug = strtolower(trim((string)($ph['slug'] ?? '')));
-        if ($pId === $pqLower || ($pSlug !== '' && $pSlug === $pqLower)) {
-            $slugOrId = !empty($ph['slug']) ? $ph['slug'] : $ph['id'];
+        if (gsmMatchesPhone($ph, $phoneQuery)) {
+            $slugOrId = gsmCleanPhoneSlug($ph);
             $priceUsd = isset($ph['priceUSD']) ? $ph['priceUSD'] : '';
             $priceNgn = isset($ph['priceNGN']) ? number_format((float)$ph['priceNGN']) : '';
             $pageTitle = !empty($ph['seoTitle'])
@@ -182,6 +221,9 @@ if ($articleQuery !== '' && !empty($db['articles']) && is_array($db['articles'])
             $canonicalUrl = $origin . '/?phone=' . rawurlencode($slugOrId);
             $ogType = 'product';
             $rawImg = trim((string)($ph['image'] ?? ''));
+            if ($rawImg === '' && !empty($ph['images'][0])) {
+                $rawImg = trim((string)$ph['images'][0]);
+            }
             if ($rawImg === '' && !empty($ph['gallery'][0])) {
                 $rawImg = trim((string)$ph['gallery'][0]);
             }
@@ -217,4 +259,5 @@ $html = preg_replace('/<meta[^>]*name=["\']twitter:image:alt["\'][^>]*\/?>/i', '
 
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-cache, must-revalidate');
+header('X-LiteSpeed-Cache-Control: no-cache');
 echo $html;

@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "updatedAt": "2026-11-20T20:03:18.342Z",
+  "updatedAt": "2026-11-25T23:17:09.011Z",
   "phones": [
     {
       "id": "smart-20",
@@ -111,7 +111,8 @@
       },
       "images": [
         "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
-      ]
+      ],
+      "slug": "smart-20"
     },
     {
       "id": "oneplus-12r",
@@ -224,7 +225,8 @@
       },
       "images": [
         "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
-      ]
+      ],
+      "slug": "oneplus-12r"
     },
     {
       "id": "google-pixel-8-pro",
@@ -338,7 +340,8 @@
       },
       "images": [
         "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
-      ]
+      ],
+      "slug": "google-pixel-8-pro"
     },
     {
       "id": "xiaomi-redmi-13c",
@@ -450,7 +453,8 @@
       },
       "images": [
         "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
-      ]
+      ],
+      "slug": "xiaomi-redmi-13c"
     },
     {
       "id": "xiaomi-redmi-note-13-pro-5g",
@@ -563,7 +567,8 @@
       },
       "images": [
         "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
-      ]
+      ],
+      "slug": "xiaomi-redmi-note-13-pro-5g"
     },
     {
       "id": "samsung-galaxy-s24-ultra",
@@ -678,7 +683,8 @@
       },
       "images": [
         "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
-      ]
+      ],
+      "slug": "samsung-galaxy-s24-ultra"
     },
     {
       "id": "apple-iphone-16-pro-max",
@@ -793,7 +799,8 @@
       },
       "images": [
         "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
-      ]
+      ],
+      "slug": "apple-iphone-16-pro-max"
     },
     {
       "id": "tecno-camon-30-pro-5g",
@@ -906,7 +913,8 @@
       },
       "images": [
         "/src/assets/images/hero_flagship_phones_1792578844852.jpg"
-      ]
+      ],
+      "slug": "tecno-camon-30-pro-5g"
     },
     {
       "id": "umidigi-g5-mecha",
@@ -1009,7 +1017,8 @@
           "infrared": "No"
         },
         "sensors": "Fingerprint (side-mounted), accelerometer, compass"
-      }
+      },
+      "slug": "umidigi-g5-mecha"
     }
   ],
   "brands": [

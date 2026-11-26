@@ -38,6 +38,7 @@ $DATA_DIR = is_dir($APP_DIR) ? ($APP_DIR . '/data') : (__DIR__ . '/data');
 $DB_FILE = $DATA_DIR . '/database.json';
 $BACKUP_DIR = $HOME_DIR . '/.gsmscope_data';
 $BACKUP_DB_FILE = $BACKUP_DIR . '/database.json';
+$BACKUP_UPLOADS_DIR = $BACKUP_DIR . '/uploads';
 $SEED_Candidates = array(
     __DIR__ . '/seed-database.json',
     $APP_DIR . '/cpanel_build/seed-database.json',
@@ -47,16 +48,55 @@ $SEED_Candidates = array(
 );
 
 $UPLOAD_DIRS = array(
+    $BACKUP_UPLOADS_DIR,
     $PUBLIC_HTML_DIR . '/uploads',
     $APP_DIR . '/uploads',
     $APP_DIR . '/public/uploads',
     dirname(__DIR__) . '/uploads'
 );
 
+if (!is_dir($BACKUP_DIR)) {
+    @mkdir($BACKUP_DIR, 0755, true);
+}
 foreach ($UPLOAD_DIRS as $uDir) {
     if (!is_dir($uDir)) {
         @mkdir($uDir, 0755, true);
     }
+}
+
+function gsmPhpSlugify($str) {
+    $s = strtolower(trim((string)$str));
+    $s = preg_replace('/[^a-z0-9]+/', '-', $s);
+    return trim((string)$s, '-');
+}
+
+function gsmPhpCleanPhoneSlug($phone) {
+    $rawSlug = isset($phone['slug']) ? trim((string)$phone['slug']) : '';
+    if ($rawSlug !== '' && !preg_match('/-\d{10,14}$/', $rawSlug)) {
+        return strtolower($rawSlug);
+    }
+    $strippedId = trim(preg_replace('/-\d{10,14}$/', '', strtolower(trim((string)($phone['id'] ?? '')))), '-');
+    if ($strippedId !== '' && $strippedId !== 'phone') {
+        return $strippedId;
+    }
+    $byName = gsmPhpSlugify($phone['name'] ?? '');
+    return $byName !== '' ? $byName : strtolower((string)($phone['id'] ?? 'phone'));
+}
+
+function gsmPhpMatchesPhone($phone, $query) {
+    $q = strtolower(trim((string)$query));
+    if ($q === '') return false;
+    $qStripped = preg_replace('/-\d{10,14}$/', '', $q);
+    $pId = strtolower(trim((string)($phone['id'] ?? '')));
+    $pSlug = strtolower(trim((string)($phone['slug'] ?? '')));
+    $pClean = gsmPhpCleanPhoneSlug($phone);
+    return (
+        $pId === $q ||
+        ($pSlug !== '' && $pSlug === $q) ||
+        $pClean === $q ||
+        $pClean === $qStripped ||
+        ($pId !== '' && preg_replace('/-\d{10,14}$/', '', $pId) === $qStripped)
+    );
 }
 
 function writeUploadFileToAllDirs($filename, $binaryData) {
@@ -136,16 +176,21 @@ function loadDatabase() {
         @mkdir($BACKUP_DIR, 0755, true);
     }
 
+    $liveCandidates = array($DB_FILE, $BACKUP_DB_FILE, __DIR__ . '/data/database.json');
     $targetToRead = null;
-    if (file_exists($DB_FILE) && file_exists($BACKUP_DB_FILE)) {
-        $targetToRead = (@filemtime($BACKUP_DB_FILE) > @filemtime($DB_FILE)) ? $BACKUP_DB_FILE : $DB_FILE;
-    } elseif (file_exists($DB_FILE)) {
-        $targetToRead = $DB_FILE;
-    } elseif (file_exists($BACKUP_DB_FILE)) {
-        $targetToRead = $BACKUP_DB_FILE;
-    } else {
+    $bestMtime = -1;
+    foreach ($liveCandidates as $cand) {
+        if (file_exists($cand) && @filesize($cand) > 100) {
+            $mt = @filemtime($cand);
+            if ($targetToRead === null || $mt > $bestMtime) {
+                $targetToRead = $cand;
+                $bestMtime = $mt;
+            }
+        }
+    }
+    if ($targetToRead === null) {
         foreach ($SEED_Candidates as $candidate) {
-            if (file_exists($candidate)) {
+            if (file_exists($candidate) && @filesize($candidate) > 50) {
                 $targetToRead = $candidate;
                 break;
             }
@@ -475,18 +520,56 @@ if ($route === 'phones' && $method === 'GET') {
     sendJson(array('total' => count($results), 'phones' => $results));
 }
 
+function enforcePhpMaxFeaturedPhones(&$db, $promotedId, $nowTs) {
+    $seedIds = array('smart-20', 'oneplus-12r', 'google-pixel-8-pro', 'samsung-galaxy-s24-ultra', 'apple-iphone-16-pro-max', 'tecno-camon-30-pro-5g');
+    $otherFeatured = array();
+    foreach ($db['phones'] as $p) {
+        if (!empty($p['id']) && $p['id'] !== $promotedId && !empty($p['isFeatured'])) {
+            $otherFeatured[] = $p;
+        }
+    }
+    usort($otherFeatured, function ($a, $b) use ($seedIds) {
+        $fA = isset($a['featuredAt']) ? floatval($a['featuredAt']) : 0;
+        $fB = isset($b['featuredAt']) ? floatval($b['featuredAt']) : 0;
+        if ($fA > 0 && $fB > 0 && $fA !== $fB) return ($fB > $fA) ? 1 : -1;
+        if ($fB > 0 && $fA <= 0) return 1;
+        if ($fA > 0 && $fB <= 0) return -1;
+        $isCustomA = !in_array($a['id'] ?? '', $seedIds);
+        $isCustomB = !in_array($b['id'] ?? '', $seedIds);
+        if ($isCustomA && !$isCustomB) return -1;
+        if (!$isCustomA && $isCustomB) return 1;
+        $tA = floatval($a['createdAt'] ?? ($a['updatedAt'] ?? 0));
+        $tB = floatval($b['createdAt'] ?? ($b['updatedAt'] ?? 0));
+        if ($tA !== $tB) return ($tB > $tA) ? 1 : -1;
+        return 0;
+    });
+    $keepIds = array($promotedId);
+    foreach (array_slice($otherFeatured, 0, 2) as $kf) {
+        if (!empty($kf['id'])) $keepIds[] = $kf['id'];
+    }
+    foreach ($db['phones'] as $idx => $p) {
+        if (!empty($p['isFeatured']) && !in_array($p['id'] ?? '', $keepIds)) {
+            $db['phones'][$idx]['isFeatured'] = false;
+            $db['phones'][$idx]['updatedAt'] = $nowTs;
+            unset($db['phones'][$idx]['featuredAt']);
+        }
+    }
+}
+
 if ($route === 'phones' && $method === 'POST') {
     $body = getJsonBody();
     if (empty($body['name']) || empty($body['brand'])) {
         sendJson(array('error' => 'Missing required phone fields'), 400);
     }
     $nowTs = round(microtime(true) * 1000);
-    if (empty($body['id'])) $body['id'] = 'phone-' . $nowTs;
+    $cleanSlug = gsmPhpCleanPhoneSlug($body);
+    if (empty($body['slug'])) $body['slug'] = $cleanSlug;
+    if (empty($body['id'])) $body['id'] = $cleanSlug ?: ('phone-' . $nowTs);
     if (empty($body['createdAt'])) $body['createdAt'] = $nowTs;
     if (empty($body['updatedAt'])) $body['updatedAt'] = $nowTs;
     if (!empty($body['isFeatured']) && empty($body['featuredAt'])) $body['featuredAt'] = $nowTs;
 
-    $db['deletedPhoneIds'] = array_values(array_diff($db['deletedPhoneIds'], array($body['id'])));
+    $db['deletedPhoneIds'] = array_values(array_diff($db['deletedPhoneIds'], array($body['id'], $body['slug'])));
 
     $existingIdx = -1;
     foreach ($db['phones'] as $idx => $p) {
@@ -496,14 +579,23 @@ if ($route === 'phones' && $method === 'POST') {
         }
     }
     if ($existingIdx !== -1) {
-        $updated = array_merge($db['phones'][$existingIdx], $body);
+        $prev = $db['phones'][$existingIdx];
+        $justFeatured = !empty($body['isFeatured']) && empty($prev['isFeatured']);
+        $updated = array_merge($prev, $body);
         $updated['updatedAt'] = !empty($body['updatedAt']) ? $body['updatedAt'] : $nowTs;
+        if ($justFeatured) $updated['featuredAt'] = $nowTs;
         array_splice($db['phones'], $existingIdx, 1);
         array_unshift($db['phones'], $updated);
+        if ($justFeatured) {
+            enforcePhpMaxFeaturedPhones($db, $updated['id'], $nowTs);
+        }
         saveDatabase($db);
         sendJson(array('success' => true, 'phone' => $updated), 200);
     } else {
         array_unshift($db['phones'], $body);
+        if (!empty($body['isFeatured'])) {
+            enforcePhpMaxFeaturedPhones($db, $body['id'], $nowTs);
+        }
         saveDatabase($db);
         sendJson(array('success' => true, 'phone' => $body), 201);
     }
@@ -512,27 +604,50 @@ if ($route === 'phones' && $method === 'POST') {
 if (preg_match('#^phones/([^/]+)/view$#', $route, $m) && $method === 'POST') {
     $id = urldecode($m[1]);
     foreach ($db['phones'] as &$p) {
-        if (isset($p['id']) && $p['id'] === $id) {
+        if (gsmPhpMatchesPhone($p, $id)) {
             $p['viewsCount'] = (isset($p['viewsCount']) ? intval($p['viewsCount']) : 0) + 1;
             $views = $p['viewsCount'];
             saveDatabase($db);
-            sendJson(array('success' => true, 'phoneId' => $id, 'viewsCount' => $views));
+            sendJson(array('success' => true, 'phoneId' => $p['id'] ?? $id, 'viewsCount' => $views));
         }
     }
     sendJson(array('error' => 'Phone not found'), 404);
+}
+
+if (preg_match('#^phones/([^/]+)/delete$#', $route, $m) && $method === 'POST') {
+    $id = urldecode($m[1]);
+    if (!in_array($id, $db['deletedPhoneIds'])) {
+        $db['deletedPhoneIds'][] = $id;
+    }
+    foreach ($db['phones'] as $p) {
+        if (gsmPhpMatchesPhone($p, $id)) {
+            if (!empty($p['id']) && !in_array($p['id'], $db['deletedPhoneIds'])) {
+                $db['deletedPhoneIds'][] = $p['id'];
+            }
+            if (!empty($p['slug']) && !in_array($p['slug'], $db['deletedPhoneIds'])) {
+                $db['deletedPhoneIds'][] = $p['slug'];
+            }
+        }
+    }
+    $db['phones'] = array_values(array_filter($db['phones'], function ($p) use ($id) {
+        return !gsmPhpMatchesPhone($p, $id);
+    }));
+    saveDatabase($db);
+    sendJson(array('success' => true, 'deletedId' => $id));
 }
 
 if (preg_match('#^phones/([^/]+)$#', $route, $m)) {
     $id = urldecode($m[1]);
     if ($method === 'GET') {
         foreach ($db['phones'] as $p) {
-            if (isset($p['id']) && $p['id'] === $id) sendJson($p);
+            if (gsmPhpMatchesPhone($p, $id)) sendJson($p);
         }
         sendJson(array('error' => 'Phone not found'), 404);
     }
     if ($method === 'PUT' || $method === 'POST') {
         $body = getJsonBody();
         $nowTs = round(microtime(true) * 1000);
+        $db['deletedPhoneIds'] = array_values(array_diff($db['deletedPhoneIds'], array($id)));
         foreach ($db['phones'] as $idx => $p) {
             if (isset($p['id']) && $p['id'] === $id) {
                 $justFeatured = !empty($body['isFeatured']) && empty($p['isFeatured']);
@@ -540,6 +655,9 @@ if (preg_match('#^phones/([^/]+)$#', $route, $m)) {
                 $merged['id'] = $id;
                 $merged['updatedAt'] = !empty($body['updatedAt']) ? $body['updatedAt'] : $nowTs;
                 if ($justFeatured) $merged['featuredAt'] = $nowTs;
+                if (isset($body['isFeatured']) && !$body['isFeatured']) {
+                    unset($merged['featuredAt']);
+                }
                 if (!empty($merged['image'])) {
                     $imgs = isset($merged['images']) && is_array($merged['images']) ? $merged['images'] : array();
                     $imgs = array_values(array_filter($imgs, function ($u) use ($merged) { return $u !== $merged['image']; }));
@@ -549,6 +667,7 @@ if (preg_match('#^phones/([^/]+)$#', $route, $m)) {
                 if ($justFeatured) {
                     array_splice($db['phones'], $idx, 1);
                     array_unshift($db['phones'], $merged);
+                    enforcePhpMaxFeaturedPhones($db, $id, $nowTs);
                 } else {
                     $db['phones'][$idx] = $merged;
                 }
@@ -560,7 +679,11 @@ if (preg_match('#^phones/([^/]+)$#', $route, $m)) {
             $body['id'] = $id;
             if (empty($body['createdAt'])) $body['createdAt'] = $nowTs;
             if (empty($body['updatedAt'])) $body['updatedAt'] = $nowTs;
+            if (!empty($body['isFeatured']) && empty($body['featuredAt'])) $body['featuredAt'] = $nowTs;
             array_unshift($db['phones'], $body);
+            if (!empty($body['isFeatured'])) {
+                enforcePhpMaxFeaturedPhones($db, $id, $nowTs);
+            }
             saveDatabase($db);
             sendJson(array('success' => true, 'phone' => $body));
         }
@@ -652,16 +775,37 @@ if (preg_match('#^brands/([^/]+)$#', $route, $m)) {
     }
 }
 
+if (preg_match('#^brands/([^/]+)/delete$#', $route, $m) && $method === 'POST') {
+    $id = urldecode($m[1]);
+    $targetLower = strtolower(trim($id));
+    if ($targetLower && !in_array($targetLower, $db['deletedBrandKeys'])) {
+        $db['deletedBrandKeys'][] = $targetLower;
+    }
+    $db['brands'] = array_values(array_filter($db['brands'], function ($b) use ($targetLower) {
+        return strtolower($b['id'] ?? '') !== $targetLower &&
+               strtolower($b['slug'] ?? '') !== $targetLower &&
+               strtolower($b['name'] ?? '') !== $targetLower;
+    }));
+    saveDatabase($db);
+    sendJson(array('success' => true, 'deletedId' => $id));
+}
+
 // 4. Articles API (/api/articles, /api/articles/:id, /api/articles/:id/view)
 if ($route === 'articles' && $method === 'GET') {
+    $deletedSet = array_flip($db['deletedArticleIds']);
+    $visible = array_values(array_filter($db['articles'], function ($a) use ($deletedSet) {
+        $aid = $a['id'] ?? '';
+        $aslug = $a['slug'] ?? '';
+        return ($aid === '' || !isset($deletedSet[$aid])) && ($aslug === '' || !isset($deletedSet[$aslug]));
+    }));
     $cat = isset($_GET['category']) ? trim($_GET['category']) : '';
     if ($cat !== '' && $cat !== 'All') {
-        $filtered = array_values(array_filter($db['articles'], function ($a) use ($cat) {
+        $filtered = array_values(array_filter($visible, function ($a) use ($cat) {
             return isset($a['category']) && $a['category'] === $cat;
         }));
         sendJson($filtered);
     }
-    sendJson($db['articles']);
+    sendJson($visible);
 }
 
 if ($route === 'articles' && $method === 'POST') {
@@ -674,7 +818,9 @@ if ($route === 'articles' && $method === 'POST') {
     if (empty($body['createdAt'])) $body['createdAt'] = $nowTs;
     if (empty($body['updatedAt'])) $body['updatedAt'] = $nowTs;
 
-    $db['deletedArticleIds'] = array_values(array_diff($db['deletedArticleIds'], array($body['id'])));
+    $toClear = array($body['id']);
+    if (!empty($body['slug'])) $toClear[] = $body['slug'];
+    $db['deletedArticleIds'] = array_values(array_diff($db['deletedArticleIds'], $toClear));
 
     $existingIdx = -1;
     foreach ($db['articles'] as $idx => $a) {
@@ -708,17 +854,47 @@ if (preg_match('#^articles/([^/]+)/view$#', $route, $m) && $method === 'POST') {
     sendJson(array('error' => 'Article not found'), 404);
 }
 
+$phpDeleteArticleById = function($id) use (&$db) {
+    if ($id !== '' && !in_array($id, $db['deletedArticleIds'])) {
+        $db['deletedArticleIds'][] = $id;
+    }
+    foreach ($db['articles'] as $a) {
+        if ((isset($a['id']) && $a['id'] === $id) || (isset($a['slug']) && $a['slug'] === $id)) {
+            if (!empty($a['id']) && !in_array($a['id'], $db['deletedArticleIds'])) {
+                $db['deletedArticleIds'][] = $a['id'];
+            }
+            if (!empty($a['slug']) && !in_array($a['slug'], $db['deletedArticleIds'])) {
+                $db['deletedArticleIds'][] = $a['slug'];
+            }
+        }
+    }
+    $db['articles'] = array_values(array_filter($db['articles'], function ($a) use ($id) {
+        $aid = $a['id'] ?? '';
+        $aslug = $a['slug'] ?? '';
+        return $aid !== $id && $aslug !== $id;
+    }));
+    saveDatabase($db);
+    sendJson(array('success' => true, 'deletedId' => $id));
+};
+
+if (preg_match('#^articles/([^/]+)/delete$#', $route, $m) && $method === 'POST') {
+    $phpDeleteArticleById(urldecode($m[1]));
+}
+
 if (preg_match('#^articles/([^/]+)$#', $route, $m)) {
     $id = urldecode($m[1]);
     if ($method === 'GET') {
         foreach ($db['articles'] as $a) {
-            if (isset($a['id']) && $a['id'] === $id) sendJson($a);
+            if ((isset($a['id']) && $a['id'] === $id) || (isset($a['slug']) && $a['slug'] === $id)) sendJson($a);
         }
         sendJson(array('error' => 'Article not found'), 404);
     }
     if ($method === 'PUT' || $method === 'POST') {
         $body = getJsonBody();
         $nowTs = round(microtime(true) * 1000);
+        $toClear = array($id);
+        if (!empty($body['slug'])) $toClear[] = $body['slug'];
+        $db['deletedArticleIds'] = array_values(array_diff($db['deletedArticleIds'], $toClear));
         foreach ($db['articles'] as $idx => $a) {
             if (isset($a['id']) && $a['id'] === $id) {
                 $db['articles'][$idx] = array_merge($a, $body);
@@ -736,14 +912,7 @@ if (preg_match('#^articles/([^/]+)$#', $route, $m)) {
         sendJson(array('success' => true, 'article' => $body));
     }
     if ($method === 'DELETE') {
-        if (!in_array($id, $db['deletedArticleIds'])) {
-            $db['deletedArticleIds'][] = $id;
-        }
-        $db['articles'] = array_values(array_filter($db['articles'], function ($a) use ($id) {
-            return isset($a['id']) && $a['id'] !== $id;
-        }));
-        saveDatabase($db);
-        sendJson(array('success' => true, 'deletedId' => $id));
+        $phpDeleteArticleById($id);
     }
 }
 
@@ -812,6 +981,18 @@ if (preg_match('#^reviews/([^/]+)/status$#', $route, $m) && $method === 'PATCH')
         }
     }
     sendJson(array('error' => 'Review not found'), 404);
+}
+
+if (preg_match('#^reviews/([^/]+)/delete$#', $route, $m) && $method === 'POST') {
+    $id = urldecode($m[1]);
+    if (!in_array($id, $db['deletedReviewIds'])) {
+        $db['deletedReviewIds'][] = $id;
+    }
+    $db['reviews'] = array_values(array_filter($db['reviews'], function ($r) use ($id) {
+        return isset($r['id']) && $r['id'] !== $id;
+    }));
+    saveDatabase($db);
+    sendJson(array('success' => true, 'deletedId' => $id));
 }
 
 if (preg_match('#^reviews/([^/]+)$#', $route, $m)) {
@@ -1332,8 +1513,43 @@ if ($route === 'database/import' && $method === 'POST') {
     sendJson(array('success' => true));
 }
 
+if ($route === 'database/deleted-ids' && $method === 'GET') {
+    sendJson(array(
+        'deletedArticleIds' => array_values($db['deletedArticleIds']),
+        'deletedPhoneIds' => array_values($db['deletedPhoneIds']),
+        'deletedBrandKeys' => array_values($db['deletedBrandKeys']),
+        'deletedReviewIds' => array_values($db['deletedReviewIds'])
+    ));
+}
+
 if ($route === 'database/sync-vault' && $method === 'POST') {
     $body = getJsonBody();
+    if (!empty($body['deletedArticleIds']) && is_array($body['deletedArticleIds'])) {
+        foreach ($body['deletedArticleIds'] as $did) {
+            if (is_string($did) && trim($did) !== '' && !in_array(trim($did), $db['deletedArticleIds'])) {
+                $db['deletedArticleIds'][] = trim($did);
+            }
+        }
+        $delArtSet = array_flip($db['deletedArticleIds']);
+        $db['articles'] = array_values(array_filter($db['articles'], function ($a) use ($delArtSet) {
+            $aid = $a['id'] ?? '';
+            $aslug = $a['slug'] ?? '';
+            return ($aid === '' || !isset($delArtSet[$aid])) && ($aslug === '' || !isset($delArtSet[$aslug]));
+        }));
+    }
+    if (!empty($body['deletedPhoneIds']) && is_array($body['deletedPhoneIds'])) {
+        foreach ($body['deletedPhoneIds'] as $did) {
+            if (is_string($did) && trim($did) !== '' && !in_array(trim($did), $db['deletedPhoneIds'])) {
+                $db['deletedPhoneIds'][] = trim($did);
+            }
+        }
+        $delPhoneSet = array_flip($db['deletedPhoneIds']);
+        $db['phones'] = array_values(array_filter($db['phones'], function ($p) use ($delPhoneSet) {
+            $pid = $p['id'] ?? '';
+            $pslug = $p['slug'] ?? '';
+            return ($pid === '' || !isset($delPhoneSet[$pid])) && ($pslug === '' || !isset($delPhoneSet[$pslug]));
+        }));
+    }
     if (!empty($body['uploadDataUrls']) && is_array($body['uploadDataUrls'])) {
         foreach ($body['uploadDataUrls'] as $urlPath => $dataUrl) {
             if (is_string($urlPath) && is_string($dataUrl) && strpos($dataUrl, 'data:') === 0) {
@@ -1550,10 +1766,11 @@ if ($route === 'og-image' && $method === 'GET') {
         }
     } elseif ($type === 'phone' && $idLower !== '' && !empty($db['phones'])) {
         foreach ($db['phones'] as $ph) {
-            $pId = strtolower(trim($ph['id'] ?? ''));
-            $pSlug = strtolower(trim($ph['slug'] ?? ''));
-            if ($pId === $idLower || ($pSlug !== '' && $pSlug === $idLower)) {
+            if (gsmPhpMatchesPhone($ph, rawurldecode($rawId))) {
                 $rawImage = trim($ph['image'] ?? '');
+                if ($rawImage === '' && !empty($ph['images'][0])) {
+                    $rawImage = trim($ph['images'][0]);
+                }
                 if ($rawImage === '' && !empty($ph['gallery'][0])) {
                     $rawImage = trim($ph['gallery'][0]);
                 }

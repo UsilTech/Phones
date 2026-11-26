@@ -76,6 +76,7 @@ export interface PhoneDetailedSpecs {
 
 export interface Phone {
   id: string;
+  slug?: string;
   name: string;
   brand: string;
   priceNGN: number;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useApp, SEED_PHONE_IDS, getRecordTimestamp } from '../../context/AppContext';
+import { useApp, getRecordTimestamp, sortFeaturedPhonesForHero } from '../../context/AppContext';
 import {
   WebsiteStatsData,
   getLocalWebsiteStats,
@@ -50,20 +50,9 @@ export default function HeroSection() {
     };
   }, []);
 
-  // Featured phones: prioritize newly added custom phones marked isFeatured first (sorted newest-first), then featured catalog phones, plus fallback IDs
+  // Featured phones: strictly keep the 3 most recently assigned featured phones (newest featuredAt first, fallback to IDs only if <3)
   const defaultFeaturedIds = ['smart-20', 'oneplus-12r', 'google-pixel-8-pro', 'tecno-camon-30-pro-5g', 'samsung-galaxy-s24-ultra'];
-  const customFeatured = [...phones.filter(p => !SEED_PHONE_IDS.has(p.id) && p.isFeatured)].sort((a, b) => {
-    const tsB = Number((b as any).featuredAt) || getRecordTimestamp(b);
-    const tsA = Number((a as any).featuredAt) || getRecordTimestamp(a);
-    if (tsB && tsA && tsB !== tsA) return tsB - tsA;
-    return 0;
-  });
-  const seedFeatured = [...phones.filter(p => SEED_PHONE_IDS.has(p.id) && p.isFeatured)].sort((a, b) => {
-    const tsB = Number((b as any).featuredAt) || 0;
-    const tsA = Number((a as any).featuredAt) || 0;
-    return tsB - tsA;
-  });
-  const adminFeatured = [...customFeatured, ...seedFeatured];
+  const adminFeatured = sortFeaturedPhonesForHero(phones.filter((p) => p.isFeatured));
   const fallbackFeatured = defaultFeaturedIds
     .map(id => phones.find(p => p.id === id))
     .filter((p): p is typeof phones[number] => Boolean(p && !adminFeatured.some(af => af.id === p.id)));

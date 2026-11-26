@@ -57,7 +57,8 @@ import {
   addMediaItemApi,
   deleteMediaItemApi,
   syncContactInquiriesWithServer,
-  syncVaultWithServerApi
+  syncVaultWithServerApi,
+  fetchDeletedIdsFromApi
 } from '../services/api';
 import {
   safeSetLocalStorage,
@@ -281,8 +282,22 @@ function normalizePhoneRecord(raw: any): Phone {
     ? ['256GB']
     : [];
 
+  const rawSlug = typeof raw?.slug === 'string' ? raw.slug.trim() : '';
+  const strippedIdSlug = String(id).replace(/-\d{10,14}$/, '').replace(/^-+|-+$/g, '').toLowerCase();
+  const nameSlug = String(raw?.name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const cleanSlug =
+    (rawSlug && !/-\d{10,14}$/.test(rawSlug) ? rawSlug.toLowerCase() : '') ||
+    (strippedIdSlug && strippedIdSlug !== 'phone' ? strippedIdSlug : '') ||
+    nameSlug ||
+    id;
+
   return {
     id,
+    slug: cleanSlug,
     name: raw?.name || 'Smartphone',
     brand: raw?.brand || 'Samsung',
     priceNGN,
@@ -585,6 +600,49 @@ function getDeletedArticleIds(): Set<string> {
   } catch {
     return new Set<string>();
   }
+}
+
+export function sortFeaturedPhonesForHero(featuredPhones: Phone[]): Phone[] {
+  return [...featuredPhones].sort((a, b) => {
+    const fA = Number((a as any).featuredAt) || 0;
+    const fB = Number((b as any).featuredAt) || 0;
+    if (fA > 0 && fB > 0 && fA !== fB) return fB - fA;
+    if (fB > 0 && fA <= 0) return 1;
+    if (fA > 0 && fB <= 0) return -1;
+    const isCustomA = !SEED_PHONE_IDS.has(a.id);
+    const isCustomB = !SEED_PHONE_IDS.has(b.id);
+    if (isCustomA && !isCustomB) return -1;
+    if (!isCustomA && isCustomB) return 1;
+    const tsA = getRecordTimestamp(a);
+    const tsB = getRecordTimestamp(b);
+    if (tsA && tsB && tsA !== tsB) return tsB - tsA;
+    return 0;
+  });
+}
+
+function applyMaxFeaturedPhonesLimit(
+  phonesList: Phone[],
+  promotedId: string,
+  nowTs: number
+): { nextPhones: Phone[]; demotedPhones: Phone[] } {
+  const otherFeatured = sortFeaturedPhonesForHero(
+    phonesList.filter((p) => p && p.id !== promotedId && p.isFeatured)
+  );
+  const keepFeaturedIds = new Set<string>([
+    promotedId,
+    ...otherFeatured.slice(0, 2).map((p) => p.id),
+  ]);
+  const demotedPhones: Phone[] = [];
+  const nextPhones = phonesList.map((p) => {
+    if (p.isFeatured && !keepFeaturedIds.has(p.id)) {
+      const demoted: Phone = { ...p, isFeatured: false, updatedAt: nowTs } as any;
+      delete (demoted as any).featuredAt;
+      demotedPhones.push(demoted);
+      return demoted;
+    }
+    return p;
+  });
+  return { nextPhones, demotedPhones };
 }
 
 function getDeletedReviewIds(): Set<string> {
@@ -1009,7 +1067,7 @@ function mergeArticlesAndSync(
   // For public visitors (!isAdmin), server apiArticles is 100% authoritative
   if (!isAdmin) {
     const serverArticles = apiArticles
-      .filter(Boolean)
+      .filter((raw) => raw && !deletedIds.has(raw.id) && !(raw.slug && deletedIds.has(raw.slug)))
       .map((raw) => {
         const norm = normalizeArticleRecord(raw);
         const assignedUrl = assignedMediaByArticleId.get(norm.id);
@@ -1042,12 +1100,12 @@ function mergeArticlesAndSync(
   }
 
   const normalizedLocal = localArticles
-    .filter((a) => a && !deletedIds.has(a.id))
+    .filter((a) => a && !deletedIds.has(a.id) && !(a.slug && deletedIds.has(a.slug)))
     .map(normalizeArticleRecord);
   const normalizedApi: Article[] = [];
   for (const rawApiArt of apiArticles) {
     if (!rawApiArt) continue;
-    if (deletedIds.has(rawApiArt.id)) {
+    if (deletedIds.has(rawApiArt.id) || (rawApiArt.slug && deletedIds.has(rawApiArt.slug))) {
       deleteArticleApi(rawApiArt.id).catch(() => {});
       continue;
     }
@@ -2087,10 +2145,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const phoneParam = params.get('phone');
         if (phoneParam) {
           const lower = phoneParam.toLowerCase();
+          const strippedLower = lower.replace(/-\d{10,14}$/, '');
           const matched = phones.find(
             (p) =>
               p.id.toLowerCase() === lower ||
-              ((p as any).slug && String((p as any).slug).toLowerCase() === lower)
+              (p.slug && p.slug.toLowerCase() === lower) ||
+              p.id.toLowerCase().replace(/-\d{10,14}$/, '') === strippedLower
           );
           if (matched) return matched;
         }
@@ -2520,18 +2580,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const phoneParam = params.get('phone');
       if (phoneParam) {
         const lower = phoneParam.toLowerCase();
+        const strippedLower = lower.replace(/-\d{10,14}$/, '');
         const matchedPhone =
           phonesRef.current.find(
             (p) =>
               p.id.toLowerCase() === lower ||
-              ((p as any).slug && String((p as any).slug).toLowerCase() === lower)
+              (p.slug && p.slug.toLowerCase() === lower) ||
+              p.id.toLowerCase().replace(/-\d{10,14}$/, '') === strippedLower
           ) ||
           navStackRef.current.find(
             (s) =>
               s.selectedPhoneData &&
               (s.selectedPhoneData.id.toLowerCase() === lower ||
-                ((s.selectedPhoneData as any).slug &&
-                  String((s.selectedPhoneData as any).slug).toLowerCase() === lower))
+                (s.selectedPhoneData.slug && s.selectedPhoneData.slug.toLowerCase() === lower) ||
+                s.selectedPhoneData.id.toLowerCase().replace(/-\d{10,14}$/, '') === strippedLower)
           )?.selectedPhoneData ||
           null;
         if (matchedPhone) {
@@ -2806,23 +2868,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
 
         // 3. Fetch and merge with backend API
-        const [apiPhones, apiBrands, apiArticles, apiReviews, apiAdSettings, apiSettings, apiMedia] = await Promise.all([
+        const [apiPhones, apiBrands, apiArticles, apiReviews, apiAdSettings, apiSettings, apiMedia, apiDeletedIds] = await Promise.all([
           fetchPhonesFromApi(),
           fetchBrandsFromApi(),
           fetchArticlesFromApi(),
           fetchReviewsFromApi(),
           fetchAdSettingsFromApi(),
           fetchWebsiteContentApi(),
-          fetchMediaItemsApi()
+          fetchMediaItemsApi(),
+          fetchDeletedIdsFromApi()
         ]);
+        if (apiDeletedIds) {
+          try {
+            if (Array.isArray(apiDeletedIds.deletedArticleIds) && apiDeletedIds.deletedArticleIds.length > 0) {
+              const mergedDelArts = getDeletedArticleIds();
+              apiDeletedIds.deletedArticleIds.forEach((did) => mergedDelArts.add(did));
+              safeSetLocalStorage('gsmscope_deleted_article_ids', JSON.stringify(Array.from(mergedDelArts)));
+            }
+            if (Array.isArray(apiDeletedIds.deletedPhoneIds) && apiDeletedIds.deletedPhoneIds.length > 0) {
+              const mergedDelPhones = getDeletedPhoneIds();
+              apiDeletedIds.deletedPhoneIds.forEach((did) => mergedDelPhones.add(did));
+              safeSetLocalStorage('gsmscope_deleted_phone_ids_v1', JSON.stringify(Array.from(mergedDelPhones)));
+            }
+          } catch {}
+        }
         if (isMounted) {
-          if (apiPhones && apiPhones.length > 0) {
+          if (Array.isArray(apiPhones)) {
             setPhones(prev => mergePhonesAndSync(prev, apiPhones, apiMedia || undefined));
           }
           if (apiBrands && apiBrands.length > 0) {
             setBrands(prev => mergeBrandsAndSync(prev, apiBrands));
           }
-          if (apiArticles && apiArticles.length > 0) {
+          if (Array.isArray(apiArticles)) {
             setArticles(prev => mergeArticlesAndSync(prev, apiArticles, apiMedia || undefined));
           }
           if (apiReviews && apiReviews.length > 0) {
@@ -2931,13 +3008,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fetchBrandsFromApi(),
         fetchAdSettingsFromApi(),
         fetchWebsiteContentApi(),
+        fetchDeletedIdsFromApi(),
       ])
-        .then(([srvPhones, srvArticles, srvReviews, srvBrands, srvAds, srvContent]) => {
+        .then(([srvPhones, srvArticles, srvReviews, srvBrands, srvAds, srvContent, srvDeletedIds]) => {
           if (!isMounted) return;
-          if (srvPhones && srvPhones.length > 0) {
+          if (srvDeletedIds) {
+            try {
+              if (Array.isArray(srvDeletedIds.deletedArticleIds) && srvDeletedIds.deletedArticleIds.length > 0) {
+                const mergedDelArts = getDeletedArticleIds();
+                srvDeletedIds.deletedArticleIds.forEach((did) => mergedDelArts.add(did));
+                safeSetLocalStorage('gsmscope_deleted_article_ids', JSON.stringify(Array.from(mergedDelArts)));
+              }
+              if (Array.isArray(srvDeletedIds.deletedPhoneIds) && srvDeletedIds.deletedPhoneIds.length > 0) {
+                const mergedDelPhones = getDeletedPhoneIds();
+                srvDeletedIds.deletedPhoneIds.forEach((did) => mergedDelPhones.add(did));
+                safeSetLocalStorage('gsmscope_deleted_phone_ids_v1', JSON.stringify(Array.from(mergedDelPhones)));
+              }
+            } catch {}
+          }
+          if (Array.isArray(srvPhones)) {
             setPhones((prev) => mergePhonesAndSync(prev, srvPhones));
           }
-          if (srvArticles && srvArticles.length > 0) {
+          if (Array.isArray(srvArticles)) {
             setArticles((prev) => mergeArticlesAndSync(prev, srvArticles));
           }
           if (srvReviews && srvReviews.length > 0) {
@@ -3204,8 +3296,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const nowTs = Date.now();
     try {
       const deletedIds = getDeletedPhoneIds();
+      let changed = false;
       if (deletedIds.has(newPhone.id)) {
         deletedIds.delete(newPhone.id);
+        changed = true;
+      }
+      if (newPhone.slug && deletedIds.has(newPhone.slug)) {
+        deletedIds.delete(newPhone.slug);
+        changed = true;
+      }
+      if (changed) {
         safeSetLocalStorage('gsmscope_deleted_phone_ids_v1', JSON.stringify(Array.from(deletedIds)));
       }
     } catch {}
@@ -3216,9 +3316,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ...(newPhone.isFeatured ? { featuredAt: (newPhone as any).featuredAt || nowTs } : {}),
     });
     setPhones(prev => {
-      const next = [normalized, ...prev.filter(p => p.id !== normalized.id)];
+      const combined = [normalized, ...prev.filter(p => p.id !== normalized.id)];
+      let next = combined;
+      let demotedPhones: Phone[] = [];
+      if (normalized.isFeatured) {
+        const enforced = applyMaxFeaturedPhonesLimit(combined, normalized.id, nowTs);
+        next = enforced.nextPhones;
+        demotedPhones = enforced.demotedPhones;
+      }
       safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(next));
       safeSetLocalStorage('gsmscope_admin_browser_v1', 'true');
+      demotedPhones.forEach((dp) => {
+        updatePhoneApi(dp.id, dp).catch(console.warn);
+      });
       return next;
     });
     createPhoneApi(normalized).catch(console.warn);
@@ -3243,33 +3353,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ? [updated.image, ...(updated.images || []).filter(u => u !== updated.image)]
           : updated.images
       });
-      const next = justFeatured
+      const combined = justFeatured
         ? [normalized, ...prev.filter(p => p.id !== normalized.id)]
         : prev.map(p => p.id === normalized.id ? normalized : p);
+      let next = combined;
+      let demotedPhones: Phone[] = [];
+      if (justFeatured) {
+        const enforced = applyMaxFeaturedPhonesLimit(combined, normalized.id, nowTs);
+        next = enforced.nextPhones;
+        demotedPhones = enforced.demotedPhones;
+      }
       safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(next));
       safeSetLocalStorage('gsmscope_admin_browser_v1', 'true');
       setSelectedPhoneState(sel => (sel && sel.id === normalized.id ? normalized : sel));
       updatePhoneApi(normalized.id, normalized).catch(console.warn);
+      demotedPhones.forEach((dp) => {
+        updatePhoneApi(dp.id, dp).catch(console.warn);
+      });
       return next;
     });
   };
 
   const deletePhone = (id: string) => {
+    const targetPhone = phones.find((p) => p.id === id || p.slug === id);
+    const idsToMark = [id, ...(targetPhone?.slug && targetPhone.slug !== id ? [targetPhone.slug] : [])];
     try {
       const deletedIds = getDeletedPhoneIds();
-      deletedIds.add(id);
+      idsToMark.forEach((did) => deletedIds.add(did));
       safeSetLocalStorage('gsmscope_deleted_phone_ids_v1', JSON.stringify(Array.from(deletedIds)));
     } catch {}
     setPhones(prev => {
-      const next = prev.filter(p => p.id !== id);
+      const next = prev.filter(p => p.id !== id && p.slug !== id);
       safeSetLocalStorage('gsmscope_phones_v3', JSON.stringify(next));
       return next;
     });
     setCompareList(prev => prev.filter(cid => cid !== id));
-    if (selectedPhone?.id === id) {
+    if (selectedPhone?.id === id || selectedPhone?.slug === id) {
       setSelectedPhone(null);
     }
     deletePhoneApi(id).catch(console.warn);
+    syncVaultWithServerApi({ deletedPhoneIds: idsToMark }).catch(() => {});
   };
 
   const updatePhonePrice = (id: string, newPriceNGN: number, newPriceUSD?: number, notes?: string) => {
@@ -3422,21 +3545,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteArticle = (id: string) => {
+    const targetArticle = articles.find((a) => a.id === id || a.slug === id);
+    const idsToMark = [id, ...(targetArticle?.slug && targetArticle.slug !== id ? [targetArticle.slug] : [])];
     try {
-      const deletedRaw = localStorage.getItem('gsmscope_deleted_article_ids');
-      const deletedIds = new Set<string>(deletedRaw ? JSON.parse(deletedRaw) : []);
-      deletedIds.add(id);
+      const deletedIds = getDeletedArticleIds();
+      idsToMark.forEach((did) => deletedIds.add(did));
       safeSetLocalStorage('gsmscope_deleted_article_ids', JSON.stringify(Array.from(deletedIds)));
     } catch {}
     setArticles(prev => {
-      const next = prev.filter(a => a.id !== id);
+      const next = prev.filter(a => a.id !== id && a.slug !== id);
       safeSetLocalStorage('gsmscope_articles_v2', JSON.stringify(next));
       return next;
     });
-    if (selectedArticle?.id === id) {
+    if (selectedArticle?.id === id || selectedArticle?.slug === id) {
       setSelectedArticle(null);
     }
     deleteArticleApi(id).catch(console.warn);
+    syncVaultWithServerApi({ deletedArticleIds: idsToMark }).catch(() => {});
   };
 
   const lastArticleViewRef = useRef<{ id: string; ts: number }>({ id: '', ts: 0 });

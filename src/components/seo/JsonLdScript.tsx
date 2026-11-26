@@ -76,7 +76,7 @@ export default function JsonLdScript() {
     const graph: Record<string, unknown>[] = [organizationNode, webSiteNode];
 
     if (selectedPhone) {
-      const phoneUrl = `${origin}/?phone=${encodeURIComponent(selectedPhone.id)}`;
+      const phoneUrl = `${origin}/?phone=${encodeURIComponent(selectedPhone.slug || selectedPhone.id)}`;
       const availabilityUrl =
         selectedPhone.marketStatus === 'Pre-order'
           ? 'https://schema.org/PreOrder'
@@ -423,7 +423,7 @@ export default function JsonLdScript() {
             itemListElement: brandPhones.slice(0, 20).map((phone, index) => ({
               '@type': 'ListItem',
               position: index + 1,
-              url: `${origin}/?phone=${encodeURIComponent(phone.id)}`,
+              url: `${origin}/?phone=${encodeURIComponent(phone.slug || phone.id)}`,
               name: phone.name,
             })),
           },
@@ -468,7 +468,7 @@ export default function JsonLdScript() {
           itemListElement: phones.slice(0, 15).map((phone, index) => ({
             '@type': 'ListItem',
             position: index + 1,
-            url: `${origin}/?phone=${encodeURIComponent(phone.id)}`,
+            url: `${origin}/?phone=${encodeURIComponent(phone.slug || phone.id)}`,
             name: phone.name,
           })),
         },
@@ -555,7 +555,7 @@ export default function JsonLdScript() {
           itemListElement: phones.slice(0, 8).map((phone, index) => ({
             '@type': 'ListItem',
             position: index + 1,
-            url: `${origin}/?phone=${encodeURIComponent(phone.id)}`,
+            url: `${origin}/?phone=${encodeURIComponent(phone.slug || phone.id)}`,
             name: phone.name,
           })),
         });

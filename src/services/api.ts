@@ -122,9 +122,19 @@ export async function deletePhoneApi(id: string): Promise<boolean> {
     const res = await fetch(`/api/phones/${encodeURIComponent(id)}`, {
       method: 'DELETE'
     });
-    return res.ok;
+    if (res.ok) return true;
   } catch (err) {
-    console.warn('API deletePhone failed:', err);
+    console.warn('API DELETE phone failed, trying POST fallback:', err);
+  }
+  try {
+    const fallbackRes = await fetch(`/api/phones/${encodeURIComponent(id)}/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    return fallbackRes.ok;
+  } catch (err) {
+    console.warn('API POST deletePhone fallback failed:', err);
     return false;
   }
 }
@@ -209,9 +219,19 @@ export async function deleteArticleApi(id: string): Promise<boolean> {
     const res = await fetch(`/api/articles/${encodeURIComponent(id)}`, {
       method: 'DELETE'
     });
-    return res.ok;
+    if (res.ok) return true;
   } catch (err) {
-    console.warn('API deleteArticle failed:', err);
+    console.warn('API DELETE article failed, trying POST fallback:', err);
+  }
+  try {
+    const fallbackRes = await fetch(`/api/articles/${encodeURIComponent(id)}/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    return fallbackRes.ok;
+  } catch (err) {
+    console.warn('API POST deleteArticle fallback failed:', err);
     return false;
   }
 }
@@ -277,9 +297,19 @@ export async function deleteBrandApi(id: string): Promise<boolean> {
     const res = await fetch(`/api/brands/${encodeURIComponent(id)}`, {
       method: 'DELETE'
     });
-    return res.ok;
+    if (res.ok) return true;
   } catch (err) {
-    console.warn('API deleteBrand failed:', err);
+    console.warn('API DELETE brand failed, trying POST fallback:', err);
+  }
+  try {
+    const fallbackRes = await fetch(`/api/brands/${encodeURIComponent(id)}/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    return fallbackRes.ok;
+  } catch (err) {
+    console.warn('API POST deleteBrand fallback failed:', err);
     return false;
   }
 }
@@ -348,9 +378,19 @@ export async function deleteReviewApi(id: string): Promise<boolean> {
     const res = await fetch(`/api/reviews/${encodeURIComponent(id)}`, {
       method: 'DELETE'
     });
-    return res.ok;
+    if (res.ok) return true;
   } catch (err) {
-    console.warn('API deleteReview failed:', err);
+    console.warn('API DELETE review failed, trying POST fallback:', err);
+  }
+  try {
+    const fallbackRes = await fetch(`/api/reviews/${encodeURIComponent(id)}/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    return fallbackRes.ok;
+  } catch (err) {
+    console.warn('API POST deleteReview fallback failed:', err);
     return false;
   }
 }
@@ -412,9 +452,33 @@ export async function importDatabaseApi(payload: {
   }
 }
 
+export async function fetchDeletedIdsFromApi(): Promise<{
+  deletedArticleIds: string[];
+  deletedPhoneIds: string[];
+  deletedBrandKeys: string[];
+  deletedReviewIds: string[];
+} | null> {
+  try {
+    const res = await fetch('/api/database/deleted-ids', { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      deletedArticleIds: Array.isArray(data?.deletedArticleIds) ? data.deletedArticleIds : [],
+      deletedPhoneIds: Array.isArray(data?.deletedPhoneIds) ? data.deletedPhoneIds : [],
+      deletedBrandKeys: Array.isArray(data?.deletedBrandKeys) ? data.deletedBrandKeys : [],
+      deletedReviewIds: Array.isArray(data?.deletedReviewIds) ? data.deletedReviewIds : [],
+    };
+  } catch (err) {
+    console.warn('API fetchDeletedIds failed:', err);
+    return null;
+  }
+}
+
 export async function syncVaultWithServerApi(payload: {
   uploadDataUrls?: Record<string, string>;
   mediaLibrary?: MediaItem[];
+  deletedArticleIds?: string[];
+  deletedPhoneIds?: string[];
 }): Promise<boolean> {
   try {
     const res = await fetch('/api/database/sync-vault', {

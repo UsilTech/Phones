@@ -735,7 +735,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                               <span
                                 className={`col-span-8 break-words ${
                                   isPrice
-                                    ? 'text-emerald-600 dark:text-emerald-400 font-mono font-bold'
+                                    ? 'text-emerald-600 dark:text-emerald-400 font-bold tabular-nums'
                                     : isAntutu
                                     ? 'font-mono text-emerald-600 dark:text-emerald-400 font-bold'
                                     : `text-slate-900 dark:text-slate-200 ${
