@@ -77,6 +77,22 @@ function upsertCanonicalLink(url: string) {
   link.setAttribute('href', url);
 }
 
+export function stripTrailingSiteNameSuffix(rawTitle: string, siteName: string = DEFAULT_SITE_NAME): string {
+  let cleaned = String(rawTitle || '').trim();
+  if (!cleaned) return '';
+  const escapedSite = (siteName || DEFAULT_SITE_NAME).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(
+    `\\s*(?:\\||—|–|-|•)+\\s*(?:GsmScope|${escapedSite})(?:\\s+(?:CMS|Guides))?\\s*$`,
+    'i'
+  );
+  let prev = '';
+  while (cleaned !== prev) {
+    prev = cleaned;
+    cleaned = cleaned.replace(pattern, '').trim();
+  }
+  return cleaned || String(rawTitle || '').trim();
+}
+
 export function useSeoMeta({
   title,
   description,
@@ -90,7 +106,7 @@ export function useSeoMeta({
 }: SeoMetaProps) {
   useEffect(() => {
     const brandLabel = siteName || DEFAULT_SITE_NAME;
-    const resolvedTitle = title.includes(brandLabel) ? title : `${title} — ${brandLabel}`;
+    const resolvedTitle = stripTrailingSiteNameSuffix(title, brandLabel);
     const resolvedDescription =
       description.length > 165 ? `${description.slice(0, 162).trim()}...` : description;
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://gsmscope.com';

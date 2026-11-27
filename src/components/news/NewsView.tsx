@@ -109,8 +109,8 @@ export default function NewsView() {
   useSeoMeta({
     title:
       selectedCategory === 'All'
-        ? 'Mobile Technology News, Launches & Reviews | GsmScope'
-        : `${selectedCategory} — Mobile Technology News | GsmScope`,
+        ? 'Mobile Technology News, Launches & Reviews'
+        : `${selectedCategory} — Mobile Technology News`,
     description:
       featuredArticle?.summary ||
       'Stay updated with the latest smartphone launches, 5G network coverage, hardware reviews, and mobile tech news on GsmScope.',

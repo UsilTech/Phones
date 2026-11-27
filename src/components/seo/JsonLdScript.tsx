@@ -434,7 +434,7 @@ export default function JsonLdScript() {
           '@type': 'CollectionPage',
           '@id': `${brandsUrl}#collection`,
           url: brandsUrl,
-          name: 'All Mobile Phone Brands Directory — GsmScope',
+          name: 'All Mobile Phone Brands Directory',
           description: 'Explore smartphone manufacturers, popular device series, and full specifications.',
           mainEntity: {
             '@type': 'ItemList',
@@ -456,10 +456,10 @@ export default function JsonLdScript() {
         url: pageUrl,
         name:
           activeTab === 'best-phones'
-            ? 'Best Smartphones by Category & Budget — GsmScope'
+            ? 'Best Smartphones by Category & Budget'
             : filterState.categoryPreset
-              ? `${filterState.categoryPreset} — GsmScope`
-              : 'World Mobile Phone Database — GsmScope',
+              ? `${filterState.categoryPreset}`
+              : 'World Mobile Phone Database',
         description:
           'Explore the complete GsmScope smartphone database with full technical specifications, 5G bands, battery ratings, and live global prices.',
         mainEntity: {
@@ -481,8 +481,8 @@ export default function JsonLdScript() {
         url: `${origin}/?tab=compare`,
         name:
           comparePhones.length > 0
-            ? `Compare ${comparePhones.map((p) => p.name).join(' vs ')} — GsmScope`
-            : 'Side-by-Side Smartphone Specs Comparison Tool — GsmScope',
+            ? `Compare ${comparePhones.map((p) => p.name).join(' vs ')}`
+            : 'Side-by-Side Smartphone Specs Comparison Tool',
         description:
           'Compare up to 3 smartphones side-by-side across display, chipset, camera, battery, 5G bands, and global prices.',
       });
@@ -494,10 +494,10 @@ export default function JsonLdScript() {
         url: pageUrl,
         name:
           activeTab === 'reviews'
-            ? 'In-Depth Smartphone Hardware Reviews — GsmScope'
+            ? 'In-Depth Smartphone Hardware Reviews'
             : activeTab === 'guides'
-              ? 'Smartphone Buying Guides & Recommendations — GsmScope'
-              : 'Latest Mobile Technology & Smartphone News — GsmScope',
+              ? 'Smartphone Buying Guides & Recommendations'
+              : 'Latest Mobile Technology & Smartphone News',
         mainEntity: {
           '@type': 'ItemList',
           numberOfItems: articles.length,

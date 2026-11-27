@@ -50,6 +50,21 @@ function sanitizeSpecDisplay(value?: string | null): string {
     .trim();
 }
 
+function renderTightPriceText(text: string): React.ReactNode {
+  if (!text || !text.includes(',')) return text;
+  const parts = text.split(',');
+  return parts.map((part, idx) => {
+    if (idx === parts.length - 1) return part;
+    const isNumericComma = /\d$/.test(part) && /^\d/.test(parts[idx + 1] || '');
+    return (
+      <React.Fragment key={idx}>
+        {part}
+        {isNumericComma ? <span className="price-comma-tight">,</span> : ','}
+      </React.Fragment>
+    );
+  });
+}
+
 function getFeaturesSensors(phone: Phone, defaultSensors?: string): string {
   const name = phone.name.toLowerCase();
   const brand = phone.brand.toLowerCase();
@@ -215,7 +230,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
 
   // Dynamic SEO, OpenGraph image, and X/Twitter card metadata for this phone
   useSeoMeta({
-    title: phone.seoTitle || `${phone.name} — Full Specs, Global Price & Review | GsmScope`,
+    title: phone.seoTitle || `${phone.name} — Full Specs, Global Price & Review`,
     description: phone.seoDescription || `${phone.name}${phone.releaseYear ? ` (${phone.releaseYear})` : ''} full specifications: ${[phone.keyHighlights.display, phone.keyHighlights.processor, phone.keyHighlights.camera, phone.keyHighlights.battery].map(sanitizeSpecDisplay).filter(Boolean).join(', ')}. Global price: $${phone.priceUSD} / ₦${phone.priceNGN.toLocaleString()}.`,
     keywords: phone.seoKeywords || `${phone.name}, ${phone.brand}, ${phone.name} specs, ${phone.name} price, ${phone.keyHighlights.processor}, smartphone review`,
     image: phone.image,
@@ -735,7 +750,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                               <span
                                 className={`col-span-8 break-words ${
                                   isPrice
-                                    ? 'text-emerald-600 dark:text-emerald-400 font-bold tabular-nums'
+                                    ? 'text-emerald-600 dark:text-emerald-400 font-bold price-value-tight'
                                     : isAntutu
                                     ? 'font-mono text-emerald-600 dark:text-emerald-400 font-bold'
                                     : `text-slate-900 dark:text-slate-200 ${
@@ -743,7 +758,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                                       }leading-relaxed`
                                 }`}
                               >
-                                {displayVal}
+                                {isPrice ? renderTightPriceText(displayVal) : displayVal}
                               </span>
                             </div>
                           );
@@ -756,7 +771,7 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
               {/* SOCIAL MEDIA SHARING ROW ABOVE REVIEW CARD */}
               <div className="!mt-[25px]">
                 <SocialShareBar
-                  title={`${phone.name} Full Specifications, Review & Price — GsmScope`}
+                  title={`${phone.name} Full Specifications, Review & Price`}
                   path={`/?phone=${encodeURIComponent(((phone as any).slug || phone.id))}`}
                 />
               </div>

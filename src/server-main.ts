@@ -3151,7 +3151,7 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
 
   const reqPathClean = (req.path || '').toLowerCase().replace(/\/+$/, '');
   if (reqPathClean === '/admin' || reqPathClean.startsWith('/admin/')) {
-    pageTitle = `Admin Dashboard — ${siteName}`;
+    pageTitle = 'Admin Dashboard';
     robotsDirective = 'noindex, nofollow';
     canonicalUrl = `${origin}/admin`;
   } else if (phoneQuery) {
@@ -3164,7 +3164,7 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
       const phoneSlugOrId = deriveCleanPhoneSlug(matchedPhone);
       pageTitle =
         matchedPhone.seoTitle ||
-        `${matchedPhone.name} Full Specifications, Reviews & Price ($${matchedPhone.priceUSD} / ₦${matchedPhone.priceNGN.toLocaleString()}) — ${siteName}`;
+        `${matchedPhone.name} Full Specifications, Reviews & Price ($${matchedPhone.priceUSD} / ₦${matchedPhone.priceNGN.toLocaleString()})`;
       pageDescription =
         matchedPhone.seoDescription ||
         `${matchedPhone.name} complete specifications: ${matchedPhone.keyHighlights?.display || ''} display, ${matchedPhone.keyHighlights?.processor || ''} processor, ${matchedPhone.keyHighlights?.camera || ''} camera, ${matchedPhone.keyHighlights?.battery || ''} battery, and verified price.`;
@@ -3253,7 +3253,7 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
     );
     if (matchedArticle) {
       const slugOrId = matchedArticle.slug || matchedArticle.id;
-      pageTitle = matchedArticle.seoTitle || `${matchedArticle.title} — ${siteName}`;
+      pageTitle = matchedArticle.seoTitle || matchedArticle.title;
       pageDescription = matchedArticle.seoDescription || matchedArticle.summary;
       pageKeywords = matchedArticle.seoKeywords || (matchedArticle.tags || []).join(', ');
       canonicalUrl = `${origin}/?article=${encodeURIComponent(slugOrId)}`;
@@ -3290,24 +3290,36 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
       ? `${origin}/?tab=${encodeURIComponent(tabQuery)}&brand=${encodeURIComponent(brandQuery)}`
       : `${origin}/?tab=${encodeURIComponent(tabQuery)}`;
     const tabTitles: Record<string, string> = {
-      phones: `All Smartphones Database — Full Specs & Prices | ${siteName}`,
-      'best-phones': `Best Smartphones by Budget, Camera & Battery | ${siteName}`,
-      compare: `Compare Phone Specifications Side-by-Side | ${siteName}`,
+      phones: 'All Smartphones Database — Full Specs & Prices',
+      'best-phones': 'Best Smartphones by Budget, Camera & Battery',
+      compare: 'Compare Phone Specifications Side-by-Side',
       brands: brandQuery
-        ? `${brandQuery} Smartphones — Full Specs & Prices | ${siteName}`
-        : `All Mobile Phone Brands Directory | ${siteName}`,
-      news: `Latest Mobile Technology & Smartphone News | ${siteName}`,
-      reviews: `In-Depth Smartphone Hardware Reviews & Benchmarks | ${siteName}`,
-      guides: `Smartphone Buying Guides & Recommendations | ${siteName}`,
+        ? `${brandQuery} Smartphones — Full Specs & Prices`
+        : 'All Mobile Phone Brands Directory',
+      news: 'Latest Mobile Technology & Smartphone News',
+      reviews: 'In-Depth Smartphone Hardware Reviews & Benchmarks',
+      guides: 'Smartphone Buying Guides & Recommendations',
       about: `About ${siteName} — Mobile Phone Specifications Database`,
       contact: `Contact ${siteName} Editorial & Support Team`,
       advertise: `Advertise with ${siteName}`,
-      privacy: `Privacy Policy — ${siteName}`,
-      terms: `Terms of Service — ${siteName}`,
+      privacy: 'Privacy Policy',
+      terms: 'Terms of Service',
     };
     if (tabTitles[tabQuery]) {
       pageTitle = tabTitles[tabQuery];
     }
+  }
+
+  // Strip trailing separator + site title suffix from non-home or stored seoTitles
+  const escapedSiteForRegex = siteName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const trailingSitePattern = new RegExp(
+    `\\s*(?:\\||—|–|-|•)+\\s*(?:GsmScope|${escapedSiteForRegex})(?:\\s+(?:CMS|Guides))?\\s*$`,
+    'i'
+  );
+  let prevTitle = '';
+  while (pageTitle !== prevTitle) {
+    prevTitle = pageTitle;
+    pageTitle = pageTitle.replace(trailingSitePattern, '').trim();
   }
 
   // Build crawlable directory list of phones and articles for <noscript>

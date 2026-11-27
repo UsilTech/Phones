@@ -7,7 +7,7 @@ export default function TermsOfServiceView() {
   const { websiteContent } = useApp();
 
   useSeoMeta({
-    title: 'Terms of Service — Platform Usage & Legal Agreement | GsmScope',
+    title: 'Terms of Service — Platform Usage & Legal Agreement',
     description:
       'Review the GsmScope Terms of Service governing access to our smartphone specification database, price trackers, comparison tools, and user reviews.',
     type: 'website',

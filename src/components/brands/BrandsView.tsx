@@ -29,8 +29,8 @@ export default function BrandsView() {
 
   useSeoMeta({
     title: selectedBrand
-      ? `${selectedBrand.name} Phones — Full Specs, Latest Models & Prices | GsmScope`
-      : 'Smartphone Brands Directory — Apple, Samsung, Xiaomi & More | GsmScope',
+      ? `${selectedBrand.name} Phones — Full Specs, Latest Models & Prices`
+      : 'Smartphone Brands Directory — Apple, Samsung, Xiaomi & More',
     description: selectedBrand
       ? `Explore all ${selectedBrand.name} smartphones with full hardware specifications, 5G compatibility, battery ratings, and live prices in Naira and USD.`
       : 'Browse official smartphone brands on GsmScope including Apple, Samsung, Google, Xiaomi, OnePlus, Honor, Oppo, and more with complete device archives.',

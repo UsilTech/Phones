@@ -3,10 +3,27 @@ DirectoryIndex index.php index.html
 <IfModule mod_rewrite.c>
 RewriteEngine On
 
+# Force HTTPS on live domain while keeping AutoSSL verification and local dev intact
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
+RewriteCond %{HTTP_HOST} !^localhost [NC]
+RewriteCond %{HTTP_HOST} !^127\.0\.0\.1 [NC]
+RewriteCond %{REQUEST_URI} !^/\.well-known/ [NC]
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
 # Route /api/* requests to api/index.php when served directly via Apache/LiteSpeed PHP
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^api/(.*)$ api/index.php?_route=$1 [QSA,L]
 
+# Fallback /uploads/* to api/index.php if file isn't directly on disk
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^uploads/(.*)$ api/index.php?_route=uploads/$1 [QSA,L]
+
 # Serve /src/assets/images/* from /assets/images/*
 RewriteRule ^src/assets/images/(.*)$ assets/images/$1 [L]
+
+# Route clean SPA paths (/article/*, /phone/*, /admin) to index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
 </IfModule>

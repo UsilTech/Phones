@@ -239,5 +239,17 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   animation: compare-pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+.price-value-tight {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-variant-numeric: proportional-nums;
+  -webkit-font-feature-settings: "tnum" 0, "pnum" 1;
+  font-feature-settings: "tnum" 0, "pnum" 1;
+  letter-spacing: 0;
+  word-spacing: normal;
+}
 
-
+.price-comma-tight {
+  letter-spacing: 0;
+  margin-left: -0.02em;
+  margin-right: -0.02em;
+}

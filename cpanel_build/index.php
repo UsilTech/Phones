@@ -44,23 +44,75 @@ function gsmGetOrigin() {
     return $proto . '://' . $host;
 }
 
+function gsmSlugify($str) {
+    $s = strtolower(trim((string)$str));
+    $s = preg_replace('/[^a-z0-9]+/', '-', $s);
+    return trim((string)$s, '-');
+}
+
+function gsmCleanPhoneSlug($ph) {
+    $rawSlug = isset($ph['slug']) ? trim((string)$ph['slug']) : '';
+    if ($rawSlug !== '' && !preg_match('/-\d{10,14}$/', $rawSlug)) {
+        return strtolower($rawSlug);
+    }
+    $strippedId = trim(preg_replace('/-\d{10,14}$/', '', strtolower(trim((string)($ph['id'] ?? '')))), '-');
+    if ($strippedId !== '' && $strippedId !== 'phone') {
+        return $strippedId;
+    }
+    $byName = gsmSlugify($ph['name'] ?? '');
+    return $byName !== '' ? $byName : strtolower((string)($ph['id'] ?? 'phone'));
+}
+
+function gsmMatchesPhone($ph, $query) {
+    $q = strtolower(trim(rawurldecode((string)$query)));
+    if ($q === '') return false;
+    $qStripped = preg_replace('/-\d{10,14}$/', '', $q);
+    $pId = strtolower(trim((string)($ph['id'] ?? '')));
+    $pSlug = strtolower(trim((string)($ph['slug'] ?? '')));
+    $pClean = gsmCleanPhoneSlug($ph);
+    return (
+        $pId === $q ||
+        ($pSlug !== '' && $pSlug === $q) ||
+        $pClean === $q ||
+        $pClean === $qStripped ||
+        ($pId !== '' && preg_replace('/-\d{10,14}$/', '', $pId) === $qStripped)
+    );
+}
+
 function gsmLoadDb() {
     $homeDir = gsmResolveHomeDir();
-    $candidates = array(
-        $homeDir . '/phones_app/data/database.json',
+    // Always pick the newest LIVE database.json first; never let freshly deployed seed-database.json override live content
+    $liveCandidates = array(
         $homeDir . '/.gsmscope_data/database.json',
+        $homeDir . '/phones_app/data/database.json',
+        $homeDir . '/public_html/api/data/database.json',
         __DIR__ . '/api/data/database.json',
+        $homeDir . '/gsmscope/data/database.json',
+        $homeDir . '/nodejs/data/database.json',
         __DIR__ . '/data/database.json',
-        __DIR__ . '/seed-database.json'
+        dirname(__DIR__) . '/data/database.json'
     );
     $bestFile = null;
     $bestMtime = -1;
-    foreach ($candidates as $cand) {
-        if (file_exists($cand) && filesize($cand) > 50) {
+    foreach ($liveCandidates as $cand) {
+        if (file_exists($cand) && @filesize($cand) > 100) {
             $mt = @filemtime($cand);
             if ($bestFile === null || $mt > $bestMtime) {
                 $bestFile = $cand;
                 $bestMtime = $mt;
+            }
+        }
+    }
+    if ($bestFile === null) {
+        $seedCandidates = array(
+            __DIR__ . '/api/seed-database.json',
+            __DIR__ . '/seed-database.json',
+            $homeDir . '/phones_app/cpanel_build/seed-database.json'
+        );
+        foreach ($seedCandidates as $sc) {
+            if (file_exists($sc) && @filesize($sc) > 50) {
+                $bestFile = $sc;
+                break;
             }
         }
     }
@@ -85,7 +137,7 @@ function gsmExtractFirstImg($content) {
 function gsmResolveAssetUrl($origin, $rawUrl, $ogEndpointFallback = '') {
     $defaultImg = $origin . '/assets/images/hero_flagship_phones_1792578844852.jpg';
     $trimmed = trim((string)$rawUrl);
-    if ($trimmed === '') {
+    if ($trimmed === '' || strpos($trimmed, 'photo-1511707171634') !== false) {
         return $ogEndpointFallback !== '' ? $ogEndpointFallback : $defaultImg;
     }
     if (strpos($trimmed, 'data:') === 0) {
@@ -97,7 +149,7 @@ function gsmResolveAssetUrl($origin, $rawUrl, $ogEndpointFallback = '') {
     if (preg_match('/^https?:\/\//i', $trimmed)) {
         return str_replace(' ', '%20', $trimmed);
     }
-    if (strpos($trimmed, '/src/assets/images/') === 0) {
+    if (strpos($trimmed, '/src/assets/images/') === 0 || strpos($trimmed, 'src/assets/images/') === 0) {
         $fname = basename(parse_url($trimmed, PHP_URL_PATH));
         return $origin . '/assets/images/' . rawurlencode($fname);
     }
@@ -121,17 +173,25 @@ $ogType = 'website';
 $ogImage = gsmResolveAssetUrl($origin, $wc['ogImageUrl'] ?? '/assets/images/hero_flagship_phones_1792578844852.jpg');
 $ogImageAlt = $pageTitle;
 
+$reqUriPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $phoneQuery = isset($_GET['phone']) ? trim((string)$_GET['phone']) : '';
 $articleQuery = isset($_GET['article']) ? trim((string)$_GET['article']) : '';
+if ($articleQuery === '' && preg_match('#^/articles?/([^/?\#]+)#i', $reqUriPath, $pm)) {
+    $articleQuery = trim($pm[1]);
+}
+if ($phoneQuery === '' && preg_match('#^/phones?/([^/?\#]+)#i', $reqUriPath, $pm)) {
+    $phoneQuery = trim($pm[1]);
+}
 
 if ($articleQuery !== '' && !empty($db['articles']) && is_array($db['articles'])) {
     $aqLower = strtolower(rawurldecode($articleQuery));
     foreach ($db['articles'] as $art) {
         $aId = strtolower(trim((string)($art['id'] ?? '')));
         $aSlug = strtolower(trim((string)($art['slug'] ?? '')));
-        if ($aId === $aqLower || ($aSlug !== '' && $aSlug === $aqLower)) {
+        $aTitleSlug = gsmSlugify($art['title'] ?? '');
+        if ($aId === $aqLower || ($aSlug !== '' && $aSlug === $aqLower) || ($aTitleSlug !== '' && $aTitleSlug === $aqLower)) {
             $slugOrId = !empty($art['slug']) ? $art['slug'] : $art['id'];
-            $pageTitle = !empty($art['seoTitle']) ? $art['seoTitle'] : (($art['title'] ?? 'Article') . ' — ' . $siteName);
+            $pageTitle = !empty($art['seoTitle']) ? $art['seoTitle'] : ($art['title'] ?? 'Article');
             $pageDescription = !empty($art['seoDescription']) ? $art['seoDescription'] : ($art['summary'] ?? $pageDescription);
             $canonicalUrl = $origin . '/?article=' . rawurlencode($slugOrId);
             $ogType = 'article';
@@ -146,17 +206,14 @@ if ($articleQuery !== '' && !empty($db['articles']) && is_array($db['articles'])
         }
     }
 } elseif ($phoneQuery !== '' && !empty($db['phones']) && is_array($db['phones'])) {
-    $pqLower = strtolower(rawurldecode($phoneQuery));
     foreach ($db['phones'] as $ph) {
-        $pId = strtolower(trim((string)($ph['id'] ?? '')));
-        $pSlug = strtolower(trim((string)($ph['slug'] ?? '')));
-        if ($pId === $pqLower || ($pSlug !== '' && $pSlug === $pqLower)) {
-            $slugOrId = !empty($ph['slug']) ? $ph['slug'] : $ph['id'];
+        if (gsmMatchesPhone($ph, $phoneQuery)) {
+            $slugOrId = gsmCleanPhoneSlug($ph);
             $priceUsd = isset($ph['priceUSD']) ? $ph['priceUSD'] : '';
             $priceNgn = isset($ph['priceNGN']) ? number_format((float)$ph['priceNGN']) : '';
             $pageTitle = !empty($ph['seoTitle'])
                 ? $ph['seoTitle']
-                : (($ph['name'] ?? 'Phone') . ' Full Specifications, Reviews & Price ($' . $priceUsd . ' / ₦' . $priceNgn . ') — ' . $siteName);
+                : (($ph['name'] ?? 'Phone') . ' Full Specifications, Reviews & Price ($' . $priceUsd . ' / ₦' . $priceNgn . ')');
             $kh = isset($ph['keyHighlights']) && is_array($ph['keyHighlights']) ? $ph['keyHighlights'] : array();
             $pageDescription = !empty($ph['seoDescription'])
                 ? $ph['seoDescription']
@@ -164,6 +221,9 @@ if ($articleQuery !== '' && !empty($db['articles']) && is_array($db['articles'])
             $canonicalUrl = $origin . '/?phone=' . rawurlencode($slugOrId);
             $ogType = 'product';
             $rawImg = trim((string)($ph['image'] ?? ''));
+            if ($rawImg === '' && !empty($ph['images'][0])) {
+                $rawImg = trim((string)$ph['images'][0]);
+            }
             if ($rawImg === '' && !empty($ph['gallery'][0])) {
                 $rawImg = trim((string)$ph['gallery'][0]);
             }
@@ -175,24 +235,40 @@ if ($articleQuery !== '' && !empty($db['articles']) && is_array($db['articles'])
     }
 }
 
+$escapedSiteRegex = preg_quote((string)$siteName, '/');
+$cleanTitlePattern = '/\s*(?:\||—|–|-|•)+\s*(?:GsmScope|' . $escapedSiteRegex . ')(?:\s+(?:CMS|Guides))?\s*$/iu';
+$prevTitle = '';
+while ($pageTitle !== $prevTitle) {
+    $prevTitle = $pageTitle;
+    $pageTitle = trim((string)preg_replace($cleanTitlePattern, '', (string)$pageTitle));
+}
+if ($pageTitle === '') {
+    $pageTitle = $siteName;
+}
+
 $html = preg_replace('/<title>[\s\S]*?<\/title>/i', '<title>' . gsmEscapeAttr($pageTitle) . '</title>', $html, 1);
-$html = preg_replace('/<meta\s+name="description"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta name="description" content="' . gsmEscapeAttr($pageDescription) . '" />', $html, 1);
-$html = preg_replace('/<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/i', '<link rel="canonical" href="' . gsmEscapeAttr($canonicalUrl) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:type"\s+content="[^"]*"\s*\/?>/i', '<meta property="og:type" content="' . gsmEscapeAttr($ogType) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:site_name"\s+content="[^"]*"\s*\/?>/i', '<meta property="og:site_name" content="' . gsmEscapeAttr($siteName) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/i', '<meta property="og:title" content="' . gsmEscapeAttr($pageTitle) . '" />', $html, 1);
-$html = preg_replace('/<meta[^>]*property="og:description"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta property="og:description" content="' . gsmEscapeAttr($pageDescription) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/i', '<meta property="og:url" content="' . gsmEscapeAttr($canonicalUrl) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:image"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta property="og:image" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:image:secure_url"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta property="og:image:secure_url" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:image:alt"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta property="og:image:alt" content="' . gsmEscapeAttr($ogImageAlt) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+property="og:image:width"\s+content="[^"]*"\s*\/?>\s*/i', '', $html);
-$html = preg_replace('/<meta\s+property="og:image:height"\s+content="[^"]*"\s*\/?>\s*/i', '', $html);
-$html = preg_replace('/<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/i', '<meta name="twitter:title" content="' . gsmEscapeAttr($pageTitle) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+name="twitter:description"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta name="twitter:description" content="' . gsmEscapeAttr($pageDescription) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+name="twitter:image"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta name="twitter:image" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
-$html = preg_replace('/<meta\s+name="twitter:image:alt"[\s\S]*?content="[^"]*"\s*\/?>/i', '<meta name="twitter:image:alt" content="' . gsmEscapeAttr($ogImageAlt) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*name=["\']description["\'][^>]*\/?>/i', '<meta name="description" content="' . gsmEscapeAttr($pageDescription) . '" />', $html, 1);
+$html = preg_replace('/<link[^>]*rel=["\']canonical["\'][^>]*\/?>/i', '<link rel="canonical" href="' . gsmEscapeAttr($canonicalUrl) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*property=["\']og:type["\'][^>]*\/?>/i', '<meta property="og:type" content="' . gsmEscapeAttr($ogType) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*property=["\']og:site_name["\'][^>]*\/?>/i', '<meta property="og:site_name" content="' . gsmEscapeAttr($siteName) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*property=["\']og:title["\'][^>]*\/?>/i', '<meta property="og:title" content="' . gsmEscapeAttr($pageTitle) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*property=["\']og:description["\'][^>]*\/?>/i', '<meta property="og:description" content="' . gsmEscapeAttr($pageDescription) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*property=["\']og:url["\'][^>]*\/?>/i', '<meta property="og:url" content="' . gsmEscapeAttr($canonicalUrl) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*property=["\']og:image["\'][^>]*\/?>/i', '<meta property="og:image" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
+if (preg_match('/<meta[^>]*property=["\']og:image:secure_url["\'][^>]*\/?>/i', $html)) {
+    $html = preg_replace('/<meta[^>]*property=["\']og:image:secure_url["\'][^>]*\/?>/i', '<meta property="og:image:secure_url" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
+} else {
+    $html = preg_replace('/(<meta\s+property="og:image"\s+content="[^"]*"\s*\/?>)/i', '$1' . "\n    " . '<meta property="og:image:secure_url" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
+}
+$html = preg_replace('/<meta[^>]*property=["\']og:image:alt["\'][^>]*\/?>/i', '<meta property="og:image:alt" content="' . gsmEscapeAttr($ogImageAlt) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*property=["\']og:image:width["\'][^>]*\/?>\s*/i', '', $html);
+$html = preg_replace('/<meta[^>]*property=["\']og:image:height["\'][^>]*\/?>\s*/i', '', $html);
+$html = preg_replace('/<meta[^>]*name=["\']twitter:title["\'][^>]*\/?>/i', '<meta name="twitter:title" content="' . gsmEscapeAttr($pageTitle) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*name=["\']twitter:description["\'][^>]*\/?>/i', '<meta name="twitter:description" content="' . gsmEscapeAttr($pageDescription) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*name=["\']twitter:image["\'][^>]*\/?>/i', '<meta name="twitter:image" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
+$html = preg_replace('/<meta[^>]*name=["\']twitter:image:alt["\'][^>]*\/?>/i', '<meta name="twitter:image:alt" content="' . gsmEscapeAttr($ogImageAlt) . '" />', $html, 1);
 
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-cache, must-revalidate');
+header('X-LiteSpeed-Cache-Control: no-cache');
 echo $html;

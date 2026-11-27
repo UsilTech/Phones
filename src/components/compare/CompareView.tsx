@@ -14,6 +14,21 @@ import {
   TrendingUp
 } from 'lucide-react';
 
+function renderTightPriceText(text: string): React.ReactNode {
+  if (!text || !text.includes(',')) return text;
+  const parts = text.split(',');
+  return parts.map((part, idx) => {
+    if (idx === parts.length - 1) return part;
+    const isNumericComma = /\d$/.test(part) && /^\d/.test(parts[idx + 1] || '');
+    return (
+      <React.Fragment key={idx}>
+        {part}
+        {isNumericComma ? <span className="price-comma-tight">,</span> : ','}
+      </React.Fragment>
+    );
+  });
+}
+
 export default function CompareView() {
   const { 
     compareList, 
@@ -70,8 +85,8 @@ export default function CompareView() {
   useSeoMeta({
     title:
       comparedPhones.length >= 2
-        ? `${comparedPhones.map((p) => p.name).join(' vs ')} — Specs & Price Comparison | GsmScope`
-        : 'Compare Smartphones Side-by-Side — Specs, Camera & Battery | GsmScope',
+        ? `${comparedPhones.map((p) => p.name).join(' vs ')} — Specs & Price Comparison`
+        : 'Compare Smartphones Side-by-Side — Specs, Camera & Battery',
     description:
       comparedPhones.length >= 2
         ? `Compare ${comparedPhones.map((p) => p.name).join(' vs ')} side-by-side: display, processor, RAM, cameras, battery life, and current Naira & USD prices.`
@@ -293,7 +308,9 @@ export default function CompareView() {
                     : 'text-slate-800 dark:text-slate-200'
                 }
               >
-                <span className="break-words">{values[idx]}</span>
+                <span className={`break-words ${label === 'Price' ? 'price-value-tight' : ''}`}>
+                  {label === 'Price' ? renderTightPriceText(values[idx]) : values[idx]}
+                </span>
                 {isWinningSpec && (
                   <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 inline-block ml-1 -mt-0.5 shrink-0" />
                 )}
@@ -431,10 +448,10 @@ export default function CompareView() {
                             {phone.name}
                           </h4>
 
-                          <div className="text-xs sm:text-sm lg:text-base font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums mb-1.5 break-words">
-                            {formatUSD(phone.priceUSD)}{' '}
+                          <div className="text-xs sm:text-sm lg:text-base font-bold text-emerald-600 dark:text-emerald-400 price-value-tight mb-1.5 break-words">
+                            {renderTightPriceText(formatUSD(phone.priceUSD))}{' '}
                             <span className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-normal block sm:inline">
-                              / {formatNaira(phone.priceNGN)}
+                              / {renderTightPriceText(formatNaira(phone.priceNGN))}
                             </span>
                           </div>
 

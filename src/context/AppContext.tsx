@@ -85,6 +85,7 @@ interface AppContextType {
   setSelectedArticle: (article: Article | null) => void;
   selectedBrand: Brand | null;
   setSelectedBrand: (brand: Brand | null) => void;
+  isResolvingDeepLink: boolean;
   goBack: () => void;
   filterState: FilterState;
   setFilterState: React.Dispatch<React.SetStateAction<FilterState>>;
@@ -1318,9 +1319,92 @@ function mergeReviewsAndSync(localReviews: Review[], apiReviews: Review[]): Revi
   return finalReviews;
 }
 
+function slugifyMatch(val?: string | null): string {
+  return String(val || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function matchesPhoneParamClient(p: Phone, query: string): boolean {
+  let decoded = String(query || '');
+  try {
+    decoded = decodeURIComponent(decoded);
+  } catch {}
+  const q = decoded.trim().toLowerCase();
+  if (!q) return false;
+  const qStripped = q.replace(/-\d{10,14}$/, '');
+  const pId = String(p.id || '').trim().toLowerCase();
+  const pSlug = String((p as any).slug || '').trim().toLowerCase();
+  const pIdStripped = pId.replace(/-\d{10,14}$/, '');
+  const pNameSlug = slugifyMatch(p.name);
+  return (
+    pId === q ||
+    (pSlug !== '' && pSlug === q) ||
+    (pIdStripped !== '' && pIdStripped === qStripped) ||
+    (pNameSlug !== '' && (pNameSlug === q || pNameSlug === qStripped))
+  );
+}
+
+function matchesArticleParamClient(a: Article, query: string): boolean {
+  let decoded = String(query || '');
+  try {
+    decoded = decodeURIComponent(decoded);
+  } catch {}
+  const q = decoded.trim().toLowerCase();
+  if (!q) return false;
+  const aId = String(a.id || '').trim().toLowerCase();
+  const aSlug = String(a.slug || '').trim().toLowerCase();
+  const aTitleSlug = slugifyMatch(a.title);
+  return (
+    aId === q ||
+    (aSlug !== '' && aSlug === q) ||
+    (aTitleSlug !== '' && aTitleSlug === q)
+  );
+}
+
+function extractUrlDeepLink(): {
+  phone: string | null;
+  article: string | null;
+  brand: string | null;
+  tab: string | null;
+} {
+  if (typeof window === 'undefined') {
+    return { phone: null, article: null, brand: null, tab: null };
+  }
+  const params = new URLSearchParams(window.location.search);
+  const rawPath = window.location.pathname || '/';
+  const phonePathMatch = rawPath.match(/^\/phones?\/([^/?#]+)/i);
+  const articlePathMatch = rawPath.match(/^\/articles?\/([^/?#]+)/i);
+  let phoneParam = params.get('phone');
+  if (!phoneParam && phonePathMatch && phonePathMatch[1]) {
+    try {
+      phoneParam = decodeURIComponent(phonePathMatch[1]);
+    } catch {
+      phoneParam = phonePathMatch[1];
+    }
+  }
+  let articleParam = params.get('article');
+  if (!articleParam && articlePathMatch && articlePathMatch[1]) {
+    try {
+      articleParam = decodeURIComponent(articlePathMatch[1]);
+    } catch {
+      articleParam = articlePathMatch[1];
+    }
+  }
+  return {
+    phone: phoneParam || null,
+    article: articleParam || null,
+    brand: params.get('brand'),
+    tab: params.get('tab'),
+  };
+}
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const initialDeepLinkRef = useRef(extractUrlDeepLink());
   // Theme state: defaults to 'light' so only header and hero section remain dark by default
   const [theme, setThemeState] = useState<ThemeMode>(() => {
     try {
@@ -2075,63 +2159,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [selectedPhone, setSelectedPhoneState] = useState<Phone | null>(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const phoneParam = params.get('phone');
-      if (phoneParam) {
-        const lower = phoneParam.toLowerCase();
-        return (
-          phones.find(
-            (p) =>
-              p.id.toLowerCase() === lower ||
-              ((p as any).slug && String((p as any).slug).toLowerCase() === lower)
-          ) || null
-        );
-      }
+    const phoneParam = initialDeepLinkRef.current.phone;
+    if (phoneParam) {
+      return phones.find((p) => matchesPhoneParamClient(p, phoneParam)) || null;
     }
     return null;
   });
 
   const [selectedArticle, setSelectedArticleState] = useState<Article | null>(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const articleParam = params.get('article');
-      if (articleParam) {
-        const lower = articleParam.toLowerCase();
-        return (
-          articles.find(
-            (a) =>
-              a.id.toLowerCase() === lower ||
-              (a.slug && a.slug.toLowerCase() === lower)
-          ) || null
-        );
-      }
+    const articleParam = initialDeepLinkRef.current.article;
+    if (articleParam) {
+      return articles.find((a) => matchesArticleParamClient(a, articleParam)) || null;
     }
     return null;
   });
 
+  const [isResolvingDeepLink, setIsResolvingDeepLink] = useState<boolean>(() => {
+    return Boolean(
+      (initialDeepLinkRef.current.phone && !selectedPhone) ||
+      (initialDeepLinkRef.current.article && !selectedArticle)
+    );
+  });
+
   const [selectedBrand, setSelectedBrandState] = useState<Brand | null>(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const brandParam = params.get('brand');
-      const tabParam = params.get('tab');
-      if (brandParam && (!tabParam || tabParam === 'brands')) {
-        const lower = brandParam.toLowerCase();
-        return (
-          brands.find(
-            (b) =>
-              b.id.toLowerCase() === lower ||
-              b.slug.toLowerCase() === lower ||
-              b.name.toLowerCase() === lower
-          ) || null
-        );
-      }
+    const brandParam = initialDeepLinkRef.current.brand;
+    const tabParam = initialDeepLinkRef.current.tab;
+    if (brandParam && (!tabParam || tabParam === 'brands')) {
+      const lower = brandParam.toLowerCase();
+      return (
+        brands.find(
+          (b) =>
+            b.id.toLowerCase() === lower ||
+            b.slug.toLowerCase() === lower ||
+            b.name.toLowerCase() === lower
+        ) || null
+      );
     }
     return null;
   });
 
   // Automatically keep selectedPhone, selectedArticle, and selectedBrand reactive whenever phones, articles, or brands state updates
   useEffect(() => {
+    const urlLink = extractUrlDeepLink();
+    const targetPhoneParam = urlLink.phone || initialDeepLinkRef.current.phone;
     setSelectedPhoneState((prev) => {
       if (prev) {
         const latest = phones.find((p) => p.id === prev.id);
@@ -2140,19 +2210,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         return prev;
       }
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        const phoneParam = params.get('phone');
-        if (phoneParam) {
-          const lower = phoneParam.toLowerCase();
-          const strippedLower = lower.replace(/-\d{10,14}$/, '');
-          const matched = phones.find(
-            (p) =>
-              p.id.toLowerCase() === lower ||
-              (p.slug && p.slug.toLowerCase() === lower) ||
-              p.id.toLowerCase().replace(/-\d{10,14}$/, '') === strippedLower
-          );
-          if (matched) return matched;
+      if (targetPhoneParam) {
+        const matched = phones.find((p) => matchesPhoneParamClient(p, targetPhoneParam));
+        if (matched) {
+          initialDeepLinkRef.current.phone = null;
+          setIsResolvingDeepLink(false);
+          return matched;
         }
       }
       return prev;
@@ -2160,6 +2223,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [phones]);
 
   useEffect(() => {
+    const urlLink = extractUrlDeepLink();
+    const targetArticleParam = urlLink.article || initialDeepLinkRef.current.article;
     setSelectedArticleState((prev) => {
       if (prev) {
         const latest = articles.find((a) => a.id === prev.id);
@@ -2168,17 +2233,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         return prev;
       }
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        const articleParam = params.get('article');
-        if (articleParam) {
-          const lower = articleParam.toLowerCase();
-          const matched = articles.find(
-            (a) =>
-              a.id.toLowerCase() === lower ||
-              (a.slug && a.slug.toLowerCase() === lower)
-          );
-          if (matched) return matched;
+      if (targetArticleParam) {
+        const matched = articles.find((a) => matchesArticleParamClient(a, targetArticleParam));
+        if (matched) {
+          initialDeepLinkRef.current.article = null;
+          setIsResolvingDeepLink(false);
+          return matched;
         }
       }
       return prev;
@@ -2186,11 +2246,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [articles]);
 
   useEffect(() => {
+    const targetBrandParam = extractUrlDeepLink().brand || initialDeepLinkRef.current.brand;
+    const targetTabParam = extractUrlDeepLink().tab || initialDeepLinkRef.current.tab;
     setSelectedBrandState((prev) => {
-      if (!prev) return prev;
-      const latest = brands.find((b) => b.id === prev.id || b.slug === prev.slug);
-      if (latest && JSON.stringify(latest) !== JSON.stringify(prev)) {
-        return latest;
+      if (prev) {
+        const latest = brands.find((b) => b.id === prev.id || b.slug === prev.slug);
+        if (latest && JSON.stringify(latest) !== JSON.stringify(prev)) {
+          return latest;
+        }
+        return prev;
+      }
+      if (targetBrandParam && (!targetTabParam || targetTabParam === 'brands')) {
+        const lower = targetBrandParam.toLowerCase();
+        const matched = brands.find(
+          (b) =>
+            b.id.toLowerCase() === lower ||
+            b.slug.toLowerCase() === lower ||
+            b.name.toLowerCase() === lower
+        );
+        if (matched) {
+          initialDeepLinkRef.current.brand = null;
+          return matched;
+        }
       }
       return prev;
     });
@@ -2428,6 +2505,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Synchronize React navigation state changes to browser history (pushState / replaceState)
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    // Never overwrite a shared deep-link URL (?phone= or ?article=) with '/' while backend data is still hydrating
+    if (isResolvingDeepLink) {
+      return;
+    }
     const currentSnap = computeNavSnapshot(
       activeTab,
       selectedPhone,
@@ -2517,6 +2598,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     adminSection,
     adminSubView,
     computeNavSnapshot,
+    isResolvingDeepLink,
   ]);
 
   // Listen to browser Back / Forward navigation (popstate & hashchange)
@@ -2548,20 +2630,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const articleParam = params.get('article');
+      const urlDeep = extractUrlDeepLink();
+      const articleParam = urlDeep.article;
       if (articleParam) {
-        const lower = articleParam.toLowerCase();
         const matchedArticle =
-          articlesRef.current.find(
-            (a) =>
-              a.id.toLowerCase() === lower || (a.slug && a.slug.toLowerCase() === lower)
-          ) ||
+          articlesRef.current.find((a) => matchesArticleParamClient(a, articleParam)) ||
           navStackRef.current.find(
             (s) =>
               s.selectedArticleData &&
-              (s.selectedArticleData.id.toLowerCase() === lower ||
-                (s.selectedArticleData.slug &&
-                  s.selectedArticleData.slug.toLowerCase() === lower))
+              matchesArticleParamClient(s.selectedArticleData, articleParam)
           )?.selectedArticleData ||
           null;
         if (matchedArticle) {
@@ -2577,23 +2654,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      const phoneParam = params.get('phone');
+      const phoneParam = urlDeep.phone;
       if (phoneParam) {
-        const lower = phoneParam.toLowerCase();
-        const strippedLower = lower.replace(/-\d{10,14}$/, '');
         const matchedPhone =
-          phonesRef.current.find(
-            (p) =>
-              p.id.toLowerCase() === lower ||
-              (p.slug && p.slug.toLowerCase() === lower) ||
-              p.id.toLowerCase().replace(/-\d{10,14}$/, '') === strippedLower
-          ) ||
+          phonesRef.current.find((p) => matchesPhoneParamClient(p, phoneParam)) ||
           navStackRef.current.find(
             (s) =>
               s.selectedPhoneData &&
-              (s.selectedPhoneData.id.toLowerCase() === lower ||
-                (s.selectedPhoneData.slug && s.selectedPhoneData.slug.toLowerCase() === lower) ||
-                s.selectedPhoneData.id.toLowerCase().replace(/-\d{10,14}$/, '') === strippedLower)
+              matchesPhoneParamClient(s.selectedPhoneData, phoneParam)
           )?.selectedPhoneData ||
           null;
         if (matchedPhone) {
@@ -2894,13 +2962,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         if (isMounted) {
           if (Array.isArray(apiPhones)) {
-            setPhones(prev => mergePhonesAndSync(prev, apiPhones, apiMedia || undefined));
+            const mergedPhonesList = mergePhonesAndSync(phonesRef.current, apiPhones, apiMedia || undefined);
+            setPhones(mergedPhonesList);
+            const pendingPhone = initialDeepLinkRef.current.phone;
+            if (pendingPhone) {
+              const matched = mergedPhonesList.find((p) => matchesPhoneParamClient(p, pendingPhone));
+              if (matched) {
+                setSelectedPhoneState(matched);
+                initialDeepLinkRef.current.phone = null;
+              }
+            }
           }
           if (apiBrands && apiBrands.length > 0) {
             setBrands(prev => mergeBrandsAndSync(prev, apiBrands));
           }
           if (Array.isArray(apiArticles)) {
-            setArticles(prev => mergeArticlesAndSync(prev, apiArticles, apiMedia || undefined));
+            const mergedArticlesList = mergeArticlesAndSync(articlesRef.current, apiArticles, apiMedia || undefined);
+            setArticles(mergedArticlesList);
+            const pendingArticle = initialDeepLinkRef.current.article;
+            if (pendingArticle) {
+              const matched = mergedArticlesList.find((a) => matchesArticleParamClient(a, pendingArticle));
+              if (matched) {
+                setSelectedArticleState(matched);
+                initialDeepLinkRef.current.article = null;
+              }
+            }
           }
           if (apiReviews && apiReviews.length > 0) {
             setReviews(prev => mergeReviewsAndSync(prev, apiReviews));
@@ -2961,6 +3047,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.warn('Backend synchronization warning:', err);
+      } finally {
+        if (isMounted) {
+          initialDeepLinkRef.current.phone = null;
+          initialDeepLinkRef.current.article = null;
+          setIsResolvingDeepLink(false);
+        }
       }
     }
     loadBackendData();
@@ -4017,6 +4109,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSelectedArticle,
         selectedBrand,
         setSelectedBrand,
+        isResolvingDeepLink,
         goBack,
         filterState,
         setFilterState,

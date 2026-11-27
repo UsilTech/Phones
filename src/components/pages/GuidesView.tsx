@@ -137,8 +137,8 @@ export default function GuidesView() {
 
   useSeoMeta({
     title: activeGuide
-      ? `${activeGuide.title} — GsmScope Guides`
-      : 'Smartphone Buying Guides, Battery Care & Mobile Tips | GsmScope',
+      ? activeGuide.title
+      : 'Smartphone Buying Guides, Battery Care & Mobile Tips',
     description: activeGuide
       ? activeGuide.summary
       : 'Expert smartphone buying guides, battery health optimization tips, servicing tools, and mobile security tutorials from GsmScope.',
@@ -425,7 +425,7 @@ export default function GuidesView() {
 
             {/* Social Media Sharing Row after Guide Content */}
             <SocialShareBar
-              title={`${activeGuide.title} — GsmScope Guides`}
+              title={activeGuide.title}
               path={`/?tab=guides&guide=${encodeURIComponent(activeGuide.id)}`}
             />
 

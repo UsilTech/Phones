@@ -1191,7 +1191,7 @@ export default function AdminDashboardModal() {
       ? Number(yearMatch[1])
       : Number(phoneDraft.releaseYear) || new Date().getFullYear();
 
-    const defaultSeoTitle = `${phoneDraft.name.trim()} Full Specifications & Price in USD / NGN | ${websiteContent.siteName || 'GsmScope'}`;
+    const defaultSeoTitle = `${phoneDraft.name.trim()} Full Specifications & Price in USD / NGN`;
     const defaultSeoKeywords = `${phoneDraft.name.trim()}, ${phoneDraft.brand.trim()}, ${phoneDraft.name.trim()} specs, ${phoneDraft.name.trim()} price in Nigeria, ${phoneDraft.name.trim()} USD price, ${phoneDraft.keyHighlights.processor}, ${phoneDraft.keyHighlights.camera}`;
     const defaultSeoDescription = `Explore full hardware specifications for ${phoneDraft.name.trim()} (${derivedReleaseYear}): ${phoneDraft.keyHighlights.display}, ${phoneDraft.keyHighlights.processor}, ${phoneDraft.keyHighlights.camera}, ${phoneDraft.keyHighlights.battery} battery, and verified price.`;
 
@@ -1482,7 +1482,7 @@ export default function AdminDashboardModal() {
         ? brandForm.popularSeries.split(',').map((s) => s.trim()).filter(Boolean)
         : [`${brandForm.name} Series`],
       warrantyPartner: brandForm.warrantyPartner || 'Authorized Service Center',
-      seoTitle: brandForm.seoTitle.trim() || `${brandForm.name.trim()} Phones, Specs & Prices | GsmScope`,
+      seoTitle: brandForm.seoTitle.trim() || `${brandForm.name.trim()} Phones, Specs & Prices`,
       seoKeywords:
         brandForm.seoKeywords.trim() ||
         `${brandForm.name.trim()} phones, ${brandForm.name.trim()} price in Nigeria, ${brandForm.name.trim()} specs`,
@@ -1522,7 +1522,7 @@ export default function AdminDashboardModal() {
       .filter(Boolean);
 
     const computedSeoTitle =
-      articleForm.seoTitle.trim() || `${articleForm.title.trim()} | ${websiteContent.siteName || 'GsmScope'}`;
+      articleForm.seoTitle.trim() || articleForm.title.trim();
     const computedSeoKeywords =
       articleForm.seoKeywords.trim() ||
       (tagsArr.length > 0 ? tagsArr.join(', ') : `${articleForm.category}, Smartphones, GsmScope`);
@@ -1647,7 +1647,7 @@ export default function AdminDashboardModal() {
       imageUrl: reviewForm.imageUrl.trim() || undefined,
       seoTitle:
         reviewForm.seoTitle.trim() ||
-        `${phoneObj?.name || 'Smartphone'} Review: ${reviewForm.title.trim() || 'Hands-On Verdict'} | GsmScope`,
+        `${phoneObj?.name || 'Smartphone'} Review: ${reviewForm.title.trim() || 'Hands-On Verdict'}`,
       seoKeywords:
         reviewForm.seoKeywords.trim() ||
         `${phoneObj?.name || 'Smartphone'} review, ${phoneObj?.brand || ''} user review, camera test, battery life`,
@@ -2199,7 +2199,7 @@ export default function AdminDashboardModal() {
                     seoTitle: e.target.value,
                   }))
                 }
-                placeholder={`${draft.name || 'Phone Model'} Full Specifications & Price | GsmScope`}
+                placeholder={`${draft.name || 'Phone Model'} Full Specifications & Price`}
                 className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
               />
             </div>
@@ -2686,7 +2686,7 @@ export default function AdminDashboardModal() {
                         <img src={p.image} alt={p.name} className="w-10 h-10 rounded-lg object-cover shrink-0 bg-slate-900" />
                         <div className="min-w-0">
                           <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{p.name}</div>
-                          <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">
+                          <div className="text-[11px] text-emerald-600 dark:text-emerald-400 price-value-tight">
                             {formatUSD(p.priceUSD)} / {formatNaira(p.priceNGN)}
                           </div>
                         </div>
@@ -3228,7 +3228,7 @@ export default function AdminDashboardModal() {
                           </span>
                           <div className="text-[11px] text-slate-400 mt-0.5">{phone.releaseDate || phone.releaseYear}</div>
                         </td>
-                        <td className="py-3 px-3 font-mono">
+                        <td className="py-3 px-3 price-value-tight">
                           <div className="font-bold text-slate-900 dark:text-white">
                             {formatUSD(phone.priceUSD || Math.round(phone.priceNGN / 1500))}
                           </div>
@@ -3558,7 +3558,7 @@ export default function AdminDashboardModal() {
                             {phone.name}
                             <div className="text-[10px] text-slate-400 font-normal">{phone.brand}</div>
                           </td>
-                          <td className="py-3 px-3 font-mono">
+                          <td className="py-3 px-3 price-value-tight">
                             <div className="font-bold text-emerald-600 dark:text-emerald-400">
                               {formatUSD(phone.priceUSD || Math.round(phone.priceNGN / 1500))}
                             </div>
@@ -3814,7 +3814,7 @@ export default function AdminDashboardModal() {
                         type="text"
                         value={brandForm.seoTitle}
                         onChange={(e) => setBrandForm({ ...brandForm, seoTitle: e.target.value })}
-                        placeholder={`${brandForm.name || 'Brand'} Phones, Specs & Prices | GsmScope`}
+                        placeholder={`${brandForm.name || 'Brand'} Phones, Specs & Prices`}
                         className="w-full px-2.5 py-1.5 rounded bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
                       />
                     </div>
@@ -4447,7 +4447,7 @@ export default function AdminDashboardModal() {
                         type="text"
                         value={articleForm.seoTitle}
                         onChange={(e) => setArticleForm({ ...articleForm, seoTitle: e.target.value })}
-                        placeholder={`${articleForm.title || 'Post Title'} | GsmScope`}
+                        placeholder={`${articleForm.title || 'Post Title'}`}
                         className="w-full px-2.5 py-1.5 rounded bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
                       />
                     </div>

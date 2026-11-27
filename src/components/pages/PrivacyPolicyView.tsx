@@ -7,7 +7,7 @@ export default function PrivacyPolicyView() {
   const { websiteContent } = useApp();
 
   useSeoMeta({
-    title: 'Privacy Policy — Data Protection & Transparency | GsmScope',
+    title: 'Privacy Policy — Data Protection & Transparency',
     description:
       'Read the GsmScope Privacy Policy to understand how we protect visitor privacy, handle newsletter subscriptions, and secure community review data.',
     type: 'website',

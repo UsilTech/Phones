@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, Link2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { stripTrailingSiteNameSuffix } from '../seo/SeoMeta';
 
 interface SocialShareBarProps {
   title?: string;
@@ -37,13 +38,13 @@ export default function SocialShareBar({ title, path, className = '' }: SocialSh
 
   const shareUrl = `${origin}${resolvedPath.startsWith('/') ? resolvedPath : `/${resolvedPath}`}`;
 
-  // Resolve share title dynamically if not explicitly provided
+  // Resolve clean share title without trailing separator or site title
   const shareTitle = (() => {
-    if (title) return title;
-    if (selectedArticle) return `${selectedArticle.title} — GsmScope`;
-    if (selectedPhone) return `${selectedPhone.name} Full Specifications & Price — GsmScope`;
-    if (activeTab === 'brands' && selectedBrand) return `${selectedBrand.name} Smartphones — GsmScope`;
-    if (typeof document !== 'undefined' && document.title) return document.title;
+    if (title) return stripTrailingSiteNameSuffix(title);
+    if (selectedArticle) return stripTrailingSiteNameSuffix(selectedArticle.title);
+    if (selectedPhone) return `${selectedPhone.name} Full Specifications & Price`;
+    if (activeTab === 'brands' && selectedBrand) return `${selectedBrand.name} Smartphones`;
+    if (typeof document !== 'undefined' && document.title) return stripTrailingSiteNameSuffix(document.title);
     return 'GsmScope — Global Phone Specs, Reviews and Prices';
   })();
 

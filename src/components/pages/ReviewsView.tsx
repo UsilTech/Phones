@@ -30,7 +30,7 @@ export default function ReviewsView() {
   const leadReviewedPhone = phones.find((p) => p.id === approvedReviews[0]?.phoneId) || phones[0];
 
   useSeoMeta({
-    title: 'Smartphone User Reviews & Verified Owner Ratings | GsmScope',
+    title: 'Smartphone User Reviews & Verified Owner Ratings',
     description:
       'Read verified hands-on smartphone user reviews covering real-world battery endurance, camera quality, gaming performance, and daily reliability.',
     image: leadReviewedPhone?.image,

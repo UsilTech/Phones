@@ -17,6 +17,7 @@ deployment:
     - /bin/cp -Rf src $DEPLOYPATH
     - /bin/cp -Rf public/index.php $HOME/public_html/index.php
     - /bin/cp -Rf public/.htaccess $HOME/public_html/.htaccess
+    - /bin/cp -Rf public/favicon.ico $HOME/public_html/favicon.ico
     - /bin/cp -Rf cpanel_build/index.html $HOME/public_html/index.html
     - /bin/cp -Rf public/assets/* $HOME/public_html/assets/
     - /bin/cp -Rf cpanel_build/assets/* $HOME/public_html/assets/

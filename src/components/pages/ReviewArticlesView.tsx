@@ -129,8 +129,8 @@ export default function ReviewArticlesView() {
   useSeoMeta({
     title:
       selectedFilter === 'All'
-        ? 'Smartphone Reviews, Lab Benchmarks & Camera Tests | GsmScope'
-        : `${selectedFilter} Smartphone Reviews | GsmScope`,
+        ? 'Smartphone Reviews, Lab Benchmarks & Camera Tests'
+        : `${selectedFilter} Smartphone Reviews`,
     description:
       featuredReview?.summary ||
       'Read in-depth smartphone hardware reviews, real-world battery endurance reports, camera lab evaluations, and performance benchmarks on GsmScope.',

@@ -11,7 +11,7 @@
       name="description"
       content="Browse smartphone specifications with current Nigerian naira and USD prices, compare devices, read technology news and find the best phones for every budget."
     />
-    <link rel="canonical" href="https://ais-pre-ak3v56t2ooowlfwyaxsoiw-699624557374.europe-west1.run.app/" />
+    <link rel="canonical" href="https://gsmscope.com/" />
 
     <!-- OpenGraph Social Share Metadata -->
     <meta property="og:type" content="website" />
@@ -47,12 +47,12 @@
         "@graph": [
           {
             "@type": "Organization",
-            "@id": "https://ais-pre-ak3v56t2ooowlfwyaxsoiw-699624557374.europe-west1.run.app/#organization",
+            "@id": "https://gsmscope.com/#organization",
             "name": "GsmScope",
-            "url": "https://ais-pre-ak3v56t2ooowlfwyaxsoiw-699624557374.europe-west1.run.app/",
+            "url": "https://gsmscope.com/",
             "logo": {
               "@type": "ImageObject",
-              "url": "https://ais-pre-ak3v56t2ooowlfwyaxsoiw-699624557374.europe-west1.run.app/assets/aistudio/GsmScope_header_logo_dark.webp"
+              "url": "https://gsmscope.com/assets/aistudio/GsmScope_header_logo_dark.webp"
             },
             "address": {
               "@type": "PostalAddress",
@@ -71,25 +71,25 @@
           },
           {
             "@type": "WebSite",
-            "@id": "https://ais-pre-ak3v56t2ooowlfwyaxsoiw-699624557374.europe-west1.run.app/#website",
-            "url": "https://ais-pre-ak3v56t2ooowlfwyaxsoiw-699624557374.europe-west1.run.app/",
+            "@id": "https://gsmscope.com/#website",
+            "url": "https://gsmscope.com/",
             "name": "GsmScope — Phone Specs and Prices in Naira and USD",
             "description": "Browse smartphone specifications with current Nigerian naira and USD prices, compare devices, read technology news and find the best phones for every budget.",
             "publisher": {
-              "@id": "https://ais-pre-ak3v56t2ooowlfwyaxsoiw-699624557374.europe-west1.run.app/#organization"
+              "@id": "https://gsmscope.com/#organization"
             },
             "potentialAction": {
               "@type": "SearchAction",
               "target": {
                 "@type": "EntryPoint",
-                "urlTemplate": "https://ais-pre-ak3v56t2ooowlfwyaxsoiw-699624557374.europe-west1.run.app/?tab=phones&q={search_term_string}"
+                "urlTemplate": "https://gsmscope.com/?tab=phones&q={search_term_string}"
               },
               "query-input": "required name=search_term_string"
             }
           },
           {
             "@type": "WebApplication",
-            "@id": "https://ais-pre-ak3v56t2ooowlfwyaxsoiw-699624557374.europe-west1.run.app/#webapp",
+            "@id": "https://gsmscope.com/#webapp",
             "name": "GsmScope — Phone Specs and Prices in Naira and USD",
             "applicationCategory": "ReferenceApplication",
             "operatingSystem": "All",
@@ -103,8 +103,8 @@
         ]
       }
     </script>
-    <script defer src="/assets/app-bundle.js?v=mwvx5eff" onerror="var s=document.createElement('script');s.src='/api/client-bundle?v=mwvx5eff';document.head.appendChild(s);"></script>
-    <link rel="stylesheet" href="/assets/app-styles.css?v=mwvx5eff">
+    <script defer src="/assets/app-bundle.js?v=mwz0u5vr" onerror="var s=document.createElement('script');s.src='/api/client-bundle?v=mwz0u5vr';document.head.appendChild(s);"></script>
+    <link rel="stylesheet" href="/assets/app-styles.css?v=mwz0u5vr">
     <style id="gsmscope-inline-css">*, :before, :after {
   --tw-translate-x: 0;
   --tw-translate-y: 0;
@@ -371,6 +371,7 @@
   --font-weight-extrabold: 800;
   --font-weight-black: 900;
   --tracking-tight: -.025em;
+  --tracking-normal: 0em;
   --tracking-wide: .025em;
   --tracking-wider: .05em;
   --leading-tight: 1.25;
@@ -508,6 +509,7 @@
   --font-weight-extrabold: 800;
   --font-weight-black: 900;
   --tracking-tight: -.025em;
+  --tracking-normal: 0em;
   --tracking-wide: .025em;
   --tracking-wider: .05em;
   --leading-tight: 1.25;
@@ -1631,6 +1633,10 @@ button:active:not(:disabled) {
 
 .min-h-\[50vh\] {
   min-height: 50vh;
+}
+
+.min-h-\[55vh\] {
+  min-height: 55vh;
 }
 
 .min-h-\[100dvh\] {
@@ -3603,6 +3609,10 @@ button:active:not(:disabled) {
   font-family: var(--font-sans);
 }
 
+.\[font-feature-settings\:\"tnum\"_0\,\"pnum\"_1\] {
+  font-feature-settings: "tnum" 0,"pnum" 1;
+}
+
 .text-2xl {
   font-size: var(--text-2xl);
   line-height: var(--tw-leading, var(--text-2xl--line-height));
@@ -3721,6 +3731,11 @@ button:active:not(:disabled) {
 .font-semibold {
   --tw-font-weight: var(--font-weight-semibold);
   font-weight: var(--font-weight-semibold);
+}
+
+.tracking-normal {
+  --tw-tracking: var(--tracking-normal);
+  letter-spacing: var(--tracking-normal);
 }
 
 .tracking-tight {
@@ -3946,9 +3961,18 @@ button:active:not(:disabled) {
   font-style: italic;
 }
 
+.proportional-nums {
+  --tw-numeric-spacing: proportional-nums;
+  font-variant-numeric: var(--tw-ordinal, ) var(--tw-slashed-zero, ) var(--tw-numeric-figure, ) var(--tw-numeric-spacing, ) var(--tw-numeric-fraction, );
+}
+
 .tabular-nums {
   --tw-numeric-spacing: tabular-nums;
   font-variant-numeric: var(--tw-ordinal, ) var(--tw-slashed-zero, ) var(--tw-numeric-figure, ) var(--tw-numeric-spacing, ) var(--tw-numeric-fraction, );
+}
+
+.\[font-variant-numeric\:proportional-nums\] {
+  font-variant-numeric: proportional-nums;
 }
 
 .underline {
@@ -4278,6 +4302,10 @@ button:active:not(:disabled) {
   -webkit-user-select: none;
   -moz-user-select: none;
   user-select: none;
+}
+
+.\[word-spacing\:normal\] {
+  word-spacing: normal;
 }
 
 @media (hover: hover) {
@@ -5082,10 +5110,6 @@ button:active:not(:disabled) {
     margin-bottom: calc(calc(var(--spacing) * 5) * calc(1 - var(--tw-space-y-reverse)));
   }
 
-  .sm\:gap-x-6 {
-    column-gap: calc(var(--spacing) * 6);
-  }
-
   .sm\:gap-x-8 {
     column-gap: calc(var(--spacing) * 8);
   }
@@ -5169,11 +5193,6 @@ button:active:not(:disabled) {
   .sm\:py-3 {
     padding-top: calc(var(--spacing) * 3);
     padding-bottom: calc(var(--spacing) * 3);
-  }
-
-  .sm\:py-3\.5 {
-    padding-top: calc(var(--spacing) * 3.5);
-    padding-bottom: calc(var(--spacing) * 3.5);
   }
 
   .sm\:py-4 {
@@ -6136,6 +6155,21 @@ body::-webkit-scrollbar {
 
 .animate-compare-pulse {
   animation: 1.8s cubic-bezier(.4, 0, .6, 1) infinite compare-pulse;
+}
+
+.price-value-tight {
+  font-variant-numeric: proportional-nums;
+  -webkit-font-feature-settings: "tnum" 0, "pnum" 1;
+  font-feature-settings: "tnum" 0, "pnum" 1;
+  letter-spacing: 0;
+  word-spacing: normal;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif;
+}
+
+.price-comma-tight {
+  letter-spacing: 0;
+  margin-left: -.02em;
+  margin-right: -.02em;
 }
 
 @keyframes spin {

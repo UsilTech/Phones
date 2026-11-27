@@ -87,7 +87,7 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
   }, [article?.id]);
 
   useSeoMeta({
-    title: article.seoTitle || `${article.title} — GsmScope`,
+    title: article.seoTitle || article.title,
     description: article.seoDescription || article.summary || `Read ${article.title} on GsmScope — expert smartphone analysis, hardware testing, and mobile industry news.`,
     keywords: article.seoKeywords || (article.tags || []).join(', ') || `${article.title}, ${article.category}, smartphone news`,
     image: article.coverImage,
@@ -645,7 +645,7 @@ export default function ArticleDetailPage({ article, onBack }: ArticleDetailPage
 
           {/* Social Media Sharing Row after Article Content */}
           <SocialShareBar
-            title={`${article.title} — GsmScope`}
+            title={article.title}
             path={`/?article=${encodeURIComponent(article.slug || article.id)}`}
           />
 

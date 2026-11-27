@@ -191,7 +191,7 @@ if ($articleQuery !== '' && !empty($db['articles']) && is_array($db['articles'])
         $aTitleSlug = gsmSlugify($art['title'] ?? '');
         if ($aId === $aqLower || ($aSlug !== '' && $aSlug === $aqLower) || ($aTitleSlug !== '' && $aTitleSlug === $aqLower)) {
             $slugOrId = !empty($art['slug']) ? $art['slug'] : $art['id'];
-            $pageTitle = !empty($art['seoTitle']) ? $art['seoTitle'] : (($art['title'] ?? 'Article') . ' — ' . $siteName);
+            $pageTitle = !empty($art['seoTitle']) ? $art['seoTitle'] : ($art['title'] ?? 'Article');
             $pageDescription = !empty($art['seoDescription']) ? $art['seoDescription'] : ($art['summary'] ?? $pageDescription);
             $canonicalUrl = $origin . '/?article=' . rawurlencode($slugOrId);
             $ogType = 'article';
@@ -213,7 +213,7 @@ if ($articleQuery !== '' && !empty($db['articles']) && is_array($db['articles'])
             $priceNgn = isset($ph['priceNGN']) ? number_format((float)$ph['priceNGN']) : '';
             $pageTitle = !empty($ph['seoTitle'])
                 ? $ph['seoTitle']
-                : (($ph['name'] ?? 'Phone') . ' Full Specifications, Reviews & Price ($' . $priceUsd . ' / ₦' . $priceNgn . ') — ' . $siteName);
+                : (($ph['name'] ?? 'Phone') . ' Full Specifications, Reviews & Price ($' . $priceUsd . ' / ₦' . $priceNgn . ')');
             $kh = isset($ph['keyHighlights']) && is_array($ph['keyHighlights']) ? $ph['keyHighlights'] : array();
             $pageDescription = !empty($ph['seoDescription'])
                 ? $ph['seoDescription']
@@ -233,6 +233,17 @@ if ($articleQuery !== '' && !empty($db['articles']) && is_array($db['articles'])
             break;
         }
     }
+}
+
+$escapedSiteRegex = preg_quote((string)$siteName, '/');
+$cleanTitlePattern = '/\s*(?:\||—|–|-|•)+\s*(?:GsmScope|' . $escapedSiteRegex . ')(?:\s+(?:CMS|Guides))?\s*$/iu';
+$prevTitle = '';
+while ($pageTitle !== $prevTitle) {
+    $prevTitle = $pageTitle;
+    $pageTitle = trim((string)preg_replace($cleanTitlePattern, '', (string)$pageTitle));
+}
+if ($pageTitle === '') {
+    $pageTitle = $siteName;
 }
 
 $html = preg_replace('/<title>[\s\S]*?<\/title>/i', '<title>' . gsmEscapeAttr($pageTitle) . '</title>', $html, 1);

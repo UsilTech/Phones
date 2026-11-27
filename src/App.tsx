@@ -85,6 +85,7 @@ function MainApp() {
     setSelectedArticle,
     selectedBrand,
     setSelectedBrand,
+    isResolvingDeepLink,
     clearCompare,
     triggerNavigation,
     startGlobalLoading,
@@ -534,7 +535,7 @@ function MainApp() {
       return (
         <div className="min-h-screen min-h-[100dvh] w-full bg-[#04110b] text-slate-100 flex items-center justify-center p-4 font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200">
           <SeoMeta
-            title="Admin Login — GsmScope"
+            title="Admin Login"
             description="GsmScope Administrator Authentication"
             canonicalPath="/admin"
           />
@@ -548,7 +549,7 @@ function MainApp() {
     return (
       <div className="min-h-screen bg-[#f0f0f1] dark:bg-slate-950 text-[var(--text-main)] flex flex-col font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-200 w-full max-w-full overflow-x-hidden">
         <SeoMeta
-          title="Admin Dashboard — GsmScope CMS"
+          title="Admin Dashboard"
           description="Manage smartphones, full hardware specifications, brands, pricing, articles, user reviews, and site settings in the GsmScope Admin Dashboard."
           canonicalPath="/admin"
         />
@@ -600,6 +601,11 @@ function MainApp() {
               window.scrollTo({ top: 0, behavior: 'instant' });
             }}
           />
+        ) : isResolvingDeepLink ? (
+          <div className="min-h-[55vh] flex flex-col items-center justify-center gap-3 text-slate-500 dark:text-slate-400">
+            <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+            <span className="text-xs font-medium tracking-wide">Loading page...</span>
+          </div>
         ) : (
           <>
             {/* VIEW: HOME */}
@@ -1132,10 +1138,10 @@ function MainApp() {
             <SeoMeta
               title={
                 filterState.categoryPreset
-                  ? `${filterState.categoryPreset} — Smartphone Specs & Prices | GsmScope`
+                  ? `${filterState.categoryPreset} — Smartphone Specs & Prices`
                   : filterState.searchQuery
-                    ? `"${filterState.searchQuery}" Smartphone Specs & Prices | GsmScope`
-                    : 'World Mobile Phone Database | GsmScope'
+                    ? `"${filterState.searchQuery}" Smartphone Specs & Prices`
+                    : 'World Mobile Phone Database'
               }
               description="Explore the complete GsmScope smartphone database with full technical specifications, 5G bands, battery ratings, and live global prices."
               image={sortedPhones[0]?.image || phones[0]?.image}
@@ -1530,7 +1536,7 @@ function MainApp() {
         {activeTab === 'best-phones' && (
           <div className="space-y-8">
             <SeoMeta
-              title="Best Phones & Buying Shortlists by Budget and Camera | GsmScope"
+              title="Best Phones & Buying Shortlists by Budget and Camera"
               description="Discover the highest-rated smartphones in the GsmScope database ranked by camera quality, battery endurance, gaming performance, and budget."
               image={phones.find((p) => p.rating >= 4.7)?.image || phones[0]?.image}
               imageAlt="Best Smartphones & Buying Guides on GsmScope"
