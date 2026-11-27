@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "updatedAt": "2026-11-27T13:32:02.636Z",
+  "updatedAt": "2026-11-25T23:18:53.607Z",
   "phones": [
     {
       "id": "smart-20",
@@ -246,7 +246,7 @@
       "accentColor": "#14b8a6",
       "rating": 0,
       "reviewsCount": 0,
-      "viewsCount": 1,
+      "viewsCount": 0,
       "categories": [
         "best-camera",
         "best-5g",
@@ -2673,41 +2673,16 @@
   "deletedBrandKeys": [],
   "deletedInquiryIds": [],
   "websiteStats": {
-    "allTimeViews": 1,
-    "dailyViews": {
-      "2026-11-27": 1
-    },
-    "hourlyViews": {
-      "2026-11-27": {
-        "14": 1
-      }
-    },
-    "pageViews": {
-      "/?phone=google-pixel-8-pro": {
-        "path": "/?phone=google-pixel-8-pro",
-        "title": "Google Pixel 8 Pro — Full Specs & Price",
-        "type": "phone",
-        "entityId": "google-pixel-8-pro",
-        "views": 1,
-        "lastViewedAt": "2026-11-27T13:32:02.631Z"
-      }
-    },
-    "referrers": {
-      "aistudio.google.com": 1
-    },
-    "searchEngines": {
-      "Google": 1
-    },
+    "allTimeViews": 0,
+    "dailyViews": {},
+    "hourlyViews": {},
+    "pageViews": {},
+    "referrers": {},
+    "searchEngines": {},
     "socialSources": {},
-    "countries": {
-      "Nigeria": 1
-    },
-    "browsers": {
-      "Chrome": 1
-    },
-    "operatingSystems": {
-      "Android": 1
-    },
-    "updatedAt": "2026-11-27T13:32:02.631Z"
+    "countries": {},
+    "browsers": {},
+    "operatingSystems": {},
+    "updatedAt": "2026-11-20T20:03:18.342Z"
   }
 }

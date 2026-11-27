@@ -1532,6 +1532,10 @@ button:active:not(:disabled) {
   min-height: 55vh;
 }
 
+.min-h-\[65vh\] {
+  min-height: 65vh;
+}
+
 .min-h-\[100dvh\] {
   min-height: 100dvh;
 }

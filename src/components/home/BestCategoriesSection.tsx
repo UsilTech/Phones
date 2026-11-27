@@ -1,4 +1,5 @@
-import { useApp } from '../../context/AppContext';
+import { useApp, SEED_ARTICLE_IDS, getRecordTimestamp } from '../../context/AppContext';
+import LazyImage from '../common/LazyImage';
 import { 
   Camera, 
   BatteryCharging, 
@@ -9,7 +10,29 @@ import {
 } from 'lucide-react';
 
 export default function BestCategoriesSection() {
-  const { setCategoryPreset, setActiveTab, setSelectedPhone, setSelectedArticle, triggerNavigation } = useApp();
+  const { articles, phones, setCategoryPreset, setActiveTab, setSelectedPhone, setSelectedArticle, triggerNavigation } = useApp();
+
+  const buyingGuideArticles = [...articles.filter((a) => {
+    const cat = String(a.category || '').trim().toLowerCase();
+    return (
+      cat === 'buying guide' ||
+      cat === 'buying guides' ||
+      cat === 'frp & servicing tools' ||
+      cat === 'charging & battery' ||
+      cat === 'tips & security'
+    );
+  })].sort((a, b) => {
+    const isCustomA = !SEED_ARTICLE_IDS.has(a.id);
+    const isCustomB = !SEED_ARTICLE_IDS.has(b.id);
+    if (isCustomA && !isCustomB) return -1;
+    if (!isCustomA && isCustomB) return 1;
+    if (isCustomA && isCustomB) {
+      const tsB = getRecordTimestamp(b);
+      const tsA = getRecordTimestamp(a);
+      if (tsB && tsA && tsB !== tsA) return tsB - tsA;
+    }
+    return 0;
+  }).slice(0, 4);
 
   const categories = [
     {
@@ -132,6 +155,49 @@ export default function BestCategoriesSection() {
           );
         })}
       </div>
+
+      {buyingGuideArticles.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4 pt-1">
+          {buyingGuideArticles.map((guide) => {
+            const relatedPhone = phones.find((p) => guide.relatedPhoneIds?.includes(p.id));
+            return (
+              <div
+                key={guide.id}
+                onClick={() => {
+                  triggerNavigation(() => {
+                    setSelectedPhone(null);
+                    setSelectedArticle(guide);
+                    window.scrollTo({ top: 0, behavior: 'instant' });
+                  });
+                }}
+                className="group p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/60 transition-all flex items-center gap-4 cursor-pointer shadow-sm hover:shadow-md"
+              >
+                <div className="relative w-24 sm:w-28 h-[82px] sm:h-[95px] rounded-xl overflow-hidden shrink-0 bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-inner">
+                  <LazyImage
+                    src={guide.coverImage || relatedPhone?.image}
+                    alt={guide.title}
+                    fallbackSrc="/src/assets/images/hero_flagship_phones_1792578844852.jpg"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="site-badge text-[9px] font-mono font-semibold uppercase px-1.5 py-px rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
+                      {guide.category || 'BUYING GUIDE'}
+                    </span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                      {guide.date}
+                    </span>
+                  </div>
+                  <h4 className="post-title font-bold text-slate-900 dark:text-white text-base sm:text-lg font-['Space_Grotesk'] line-clamp-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors leading-snug">
+                    {guide.title}
+                  </h4>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }

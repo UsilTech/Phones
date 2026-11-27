@@ -50,12 +50,10 @@ export default function ReviewArticlesView() {
     } catch {}
   }, [selectedFilter, currentPage]);
 
-  const allReviewArticles = articles.filter(
-    (a) =>
-      (a.category || '').toLowerCase().includes('review') ||
-      (a.title || '').toLowerCase().includes('review') ||
-      (a.tags || []).some((t) => t.toLowerCase().includes('review'))
-  );
+  const allReviewArticles = articles.filter((a) => {
+    const cat = String(a.category || '').trim().toLowerCase();
+    return cat === 'reviews' || cat === 'review';
+  });
 
   // Show newly published custom review articles first (sorted newest-first); among seed reviews, keep iPhone 16 Pro Max first
   const sortedReviewArticles = [...allReviewArticles].sort((a, b) => {

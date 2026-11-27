@@ -2181,6 +2181,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   });
 
+  const deepLinkProgressActiveRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (isResolvingDeepLink && !deepLinkProgressActiveRef.current) {
+      deepLinkProgressActiveRef.current = true;
+      startGlobalLoading('Resolving shared link');
+    }
+    return () => {
+      if (deepLinkProgressActiveRef.current) {
+        deepLinkProgressActiveRef.current = false;
+        stopGlobalLoading();
+      }
+    };
+  }, [isResolvingDeepLink, startGlobalLoading, stopGlobalLoading]);
+
   const [selectedBrand, setSelectedBrandState] = useState<Brand | null>(() => {
     const brandParam = initialDeepLinkRef.current.brand;
     const tabParam = initialDeepLinkRef.current.tab;

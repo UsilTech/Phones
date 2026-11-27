@@ -602,10 +602,7 @@ function MainApp() {
             }}
           />
         ) : isResolvingDeepLink ? (
-          <div className="min-h-[55vh] flex flex-col items-center justify-center gap-3 text-slate-500 dark:text-slate-400">
-            <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
-            <span className="text-xs font-medium tracking-wide">Loading page...</span>
-          </div>
+          <div className="min-h-[65vh]" aria-busy="true" />
         ) : (
           <>
             {/* VIEW: HOME */}
@@ -778,12 +775,10 @@ function MainApp() {
 
               {/* Phone Review Posts */}
               {(() => {
-                const phoneReviewArticles = articles.filter(
-                  (a) =>
-                    (a.category || '').toLowerCase().includes('review') ||
-                    (a.title || '').toLowerCase().includes('review') ||
-                    (a.tags || []).some((t) => t.toLowerCase().includes('review'))
-                );
+                const phoneReviewArticles = articles.filter((a) => {
+                  const cat = String(a.category || '').trim().toLowerCase();
+                  return cat === 'reviews' || cat === 'review';
+                });
                 // Show newly published custom review articles first (newest-first); among seed reviews, keep iPhone 16 Pro Max first
                 const sortedReviewArticles = [...phoneReviewArticles].sort((a, b) => {
                   const isCustomA = !SEED_ARTICLE_IDS.has(a.id);
@@ -799,9 +794,7 @@ function MainApp() {
                   if (b.id === 'art-iphone-16-pro-review') return 1;
                   return 0;
                 });
-                const displayReviewPosts = sortedReviewArticles.length >= 5 
-                  ? sortedReviewArticles.slice(0, 5) 
-                  : [...sortedReviewArticles, ...articles.filter(a => !sortedReviewArticles.some(pra => pra.id === a.id))].slice(0, 5);
+                const displayReviewPosts = sortedReviewArticles.slice(0, 5);
                 const leadReview = displayReviewPosts[0];
                 const verticalListArticles = displayReviewPosts.slice(1, 5);
 
@@ -928,9 +921,16 @@ function MainApp() {
 
               {/* News Posts (1 large featured card at top + 4 horizontal-card list underneath) */}
               {(() => {
-                const newsArticles = [...articles.filter(
-                  (a) => !a.category.toLowerCase().includes('review') && !a.title.toLowerCase().includes('review')
-                )].sort((a, b) => {
+                const newsArticles = [...articles.filter((a) => {
+                  const cat = String(a.category || '').trim().toLowerCase();
+                  return (
+                    cat === 'news' ||
+                    cat === 'launch' ||
+                    cat === 'phone news' ||
+                    cat === 'smartphone news' ||
+                    cat === 'tech updates'
+                  );
+                })].sort((a, b) => {
                   const isCustomA = !SEED_ARTICLE_IDS.has(a.id);
                   const isCustomB = !SEED_ARTICLE_IDS.has(b.id);
                   if (isCustomA && !isCustomB) return -1;
@@ -942,9 +942,7 @@ function MainApp() {
                   }
                   return 0;
                 });
-                const displayNewsPosts = newsArticles.length >= 5
-                  ? newsArticles.slice(0, 5)
-                  : articles.slice(0, 5);
+                const displayNewsPosts = newsArticles.slice(0, 5);
                 const leadNews = displayNewsPosts[0];
                 const verticalListNews = displayNewsPosts.slice(1, 5);
 

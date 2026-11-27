@@ -32,7 +32,8 @@ export default function NewsView() {
 
   const [selectedCategory, setSelectedCategory] = useState<string>(() => {
     try {
-      return sessionStorage.getItem('gsmscope_news_cat_v1') || 'All';
+      const saved = sessionStorage.getItem('gsmscope_news_cat_v1') || 'All';
+      return ['All', 'News', 'Launch'].includes(saved) ? saved : 'All';
     } catch {
       return 'All';
     }
@@ -54,12 +55,19 @@ export default function NewsView() {
     } catch {}
   }, [selectedCategory, currentPage]);
 
-  const categories = ['All', 'News', 'Buying Guide', 'Launch'];
+  const categories = ['All', 'News', 'Launch'];
 
-  // Exclude Review articles (which have their own dedicated Reviews section) and sort newly added/posted articles first
-  const nonReviewArticles = [...articles.filter(
-    (a) => a.category !== 'Reviews' && a.category !== 'Review'
-  )].sort((a, b) => {
+  // Include only News & Launch articles (excluding Reviews and Buying Guides which have dedicated sections) and sort newly added/posted articles first
+  const newsAndLaunchArticles = [...articles.filter((a) => {
+    const cat = String(a.category || '').trim().toLowerCase();
+    return (
+      cat === 'news' ||
+      cat === 'launch' ||
+      cat === 'phone news' ||
+      cat === 'smartphone news' ||
+      cat === 'tech updates'
+    );
+  })].sort((a, b) => {
     const isCustomA = !SEED_ARTICLE_IDS.has(a.id);
     const isCustomB = !SEED_ARTICLE_IDS.has(b.id);
     if (isCustomA && !isCustomB) return -1;
@@ -73,21 +81,13 @@ export default function NewsView() {
   });
 
   const filteredArticles = selectedCategory === 'All'
-    ? nonReviewArticles
-    : nonReviewArticles.filter(a => {
+    ? newsAndLaunchArticles
+    : newsAndLaunchArticles.filter(a => {
+        const cat = String(a.category || '').trim().toLowerCase();
         if (selectedCategory === 'News') {
-          return a.category === 'News' || a.category === 'Phone News' || a.category === 'Smartphone News' || a.category === 'Tech Updates';
+          return cat === 'news' || cat === 'phone news' || cat === 'smartphone news' || cat === 'tech updates';
         }
-        if (selectedCategory === 'Buying Guide') {
-          return (
-            a.category === 'Buying Guide' ||
-            a.category === 'Buying Guides' ||
-            a.category === 'FRP & Servicing Tools' ||
-            a.category === 'Charging & Battery' ||
-            a.category === 'Tips & Security'
-          );
-        }
-        return a.category === selectedCategory;
+        return cat === selectedCategory.toLowerCase();
       });
 
   const totalPages = Math.max(1, Math.ceil(filteredArticles.length / POSTS_PER_PAGE));
