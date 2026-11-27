@@ -168,6 +168,124 @@ function MainApp() {
     });
   }, [websiteContent?.faviconUrl]);
 
+  // Inject Admin custom verification meta tags and header/body/footer scripts into live DOM
+  useEffect(() => {
+    const cs = websiteContent?.customScripts;
+    if (!cs) return;
+
+    const removeInjected = (slot: string) => {
+      document
+        .querySelectorAll(`[data-gsmscope-custom-slot="${slot}"]`)
+        .forEach((node) => node.parentNode?.removeChild(node));
+    };
+
+    const appendHtmlNodes = (htmlFragment: string, target: HTMLElement, slot: string, prepend = false) => {
+      const trimmed = htmlFragment.trim();
+      if (!trimmed) return;
+      const tpl = document.createElement('template');
+      tpl.innerHTML = trimmed;
+      const nodes = Array.from(tpl.content.childNodes);
+      const created: Node[] = [];
+      nodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const el = node as HTMLElement;
+          if (el.tagName.toLowerCase() === 'meta') {
+            const nameAttr = el.getAttribute('name');
+            if (nameAttr) {
+              document.head
+                .querySelectorAll(`meta[name="${CSS.escape(nameAttr)}"]`)
+                .forEach((existing) => existing.parentNode?.removeChild(existing));
+            }
+          }
+          if (el.tagName.toLowerCase() === 'script') {
+            const srcAttr = el.getAttribute('src');
+            const inlineText = (el.textContent || '').trim();
+            if (srcAttr) {
+              const alreadyLoaded = Array.from(document.scripts).some(
+                (s) => !s.hasAttribute('data-gsmscope-custom-slot') && s.getAttribute('src') === srcAttr
+              );
+              if (alreadyLoaded) return;
+            } else if (inlineText) {
+              const alreadyInline = Array.from(document.scripts).some(
+                (s) => !s.hasAttribute('data-gsmscope-custom-slot') && (s.textContent || '').trim() === inlineText
+              );
+              if (alreadyInline) return;
+            }
+            const scriptEl = document.createElement('script');
+            Array.from(el.attributes).forEach((attr) => scriptEl.setAttribute(attr.name, attr.value));
+            scriptEl.textContent = el.textContent;
+            scriptEl.setAttribute('data-gsmscope-custom-slot', slot);
+            created.push(scriptEl);
+            return;
+          }
+          el.setAttribute('data-gsmscope-custom-slot', slot);
+          created.push(el);
+        } else if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
+          created.push(node);
+        }
+      });
+
+      if (prepend && target.firstChild) {
+        const frag = document.createDocumentFragment();
+        created.forEach((n) => frag.appendChild(n));
+        target.insertBefore(frag, target.firstChild);
+      } else {
+        created.forEach((n) => target.appendChild(n));
+      }
+    };
+
+    try {
+      removeInjected('head');
+      const headChunks: string[] = [];
+
+      const googleVerify = (cs.metaVerificationGoogle || '').trim();
+      if (googleVerify && !googleVerify.toLowerCase().includes('gsmscope-verified-token')) {
+        if (/^<meta\b/i.test(googleVerify)) {
+          headChunks.push(googleVerify);
+        } else {
+          const escaped = googleVerify.replace(/"/g, '&quot;');
+          headChunks.push(`<meta name="google-site-verification" content="${escaped}" />`);
+        }
+      }
+
+      const bingVerify = (cs.metaVerificationBing || '').trim();
+      if (bingVerify && !bingVerify.toLowerCase().includes('gsmscope-bing-token')) {
+        if (/^<meta\b/i.test(bingVerify)) {
+          headChunks.push(bingVerify);
+        } else {
+          const escaped = bingVerify.replace(/"/g, '&quot;');
+          headChunks.push(`<meta name="msvalidate.01" content="${escaped}" />`);
+        }
+      }
+
+      const customHeadMeta = (cs.customHeadMeta || '').trim();
+      if (customHeadMeta) {
+        headChunks.push(customHeadMeta);
+      }
+
+      const headerScriptsRaw = (cs.headerScripts || '').trim();
+      if (headerScriptsRaw && headerScriptsRaw !== '<!-- Google Analytics / GTM Head Script -->') {
+        headChunks.push(headerScriptsRaw);
+      }
+
+      if (headChunks.length > 0) {
+        appendHtmlNodes(headChunks.join('\n'), document.head, 'head', false);
+      }
+
+      removeInjected('body-top');
+      const bodyTopRaw = (cs.bodyTopScripts || '').trim();
+      if (bodyTopRaw && bodyTopRaw !== '<!-- Custom Body Open Script (e.g. GTM noscript) -->') {
+        appendHtmlNodes(bodyTopRaw, document.body, 'body-top', true);
+      }
+
+      removeInjected('footer');
+      const footerRaw = (cs.footerScripts || '').trim();
+      if (footerRaw && footerRaw !== '<!-- Custom Footer Analytics / Chat Widget Script -->') {
+        appendHtmlNodes(footerRaw, document.body, 'footer', false);
+      }
+    } catch {}
+  }, [websiteContent?.customScripts]);
+
   const handleDbSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isDbSearching) return;

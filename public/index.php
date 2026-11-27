@@ -268,6 +268,67 @@ $html = preg_replace('/<meta[^>]*name=["\']twitter:description["\'][^>]*\/?>/i',
 $html = preg_replace('/<meta[^>]*name=["\']twitter:image["\'][^>]*\/?>/i', '<meta name="twitter:image" content="' . gsmEscapeAttr($ogImage) . '" />', $html, 1);
 $html = preg_replace('/<meta[^>]*name=["\']twitter:image:alt["\'][^>]*\/?>/i', '<meta name="twitter:image:alt" content="' . gsmEscapeAttr($ogImageAlt) . '" />', $html, 1);
 
+$customScripts = isset($wc['customScripts']) && is_array($wc['customScripts']) ? $wc['customScripts'] : array();
+if (!empty($customScripts)) {
+    $isAdminPath = ($reqUriPath === '/admin' || strpos($reqUriPath, '/admin/') === 0);
+    $robotsMeta = isset($customScripts['robotsTxtMeta']) ? trim((string)$customScripts['robotsTxtMeta']) : '';
+    if (!$isAdminPath && $robotsMeta !== '') {
+        $html = preg_replace('/<meta[^>]*name=["\']robots["\'][^>]*\/?>/i', '<meta name="robots" content="' . gsmEscapeAttr($robotsMeta) . '" />', $html, 1);
+        $html = preg_replace('/<meta[^>]*name=["\']googlebot["\'][^>]*\/?>/i', '<meta name="googlebot" content="' . gsmEscapeAttr($robotsMeta) . '" />', $html, 1);
+    }
+
+    $headExtras = array();
+
+    $googleVerify = isset($customScripts['metaVerificationGoogle']) ? trim((string)$customScripts['metaVerificationGoogle']) : '';
+    if ($googleVerify !== '' && stripos($googleVerify, 'gsmscope-verified-token') === false) {
+        if (preg_match('/^<meta\b/i', $googleVerify)) {
+            $headExtras[] = $googleVerify;
+        } else {
+            $headExtras[] = '<meta name="google-site-verification" content="' . gsmEscapeAttr($googleVerify) . '" />';
+        }
+    }
+
+    $bingVerify = isset($customScripts['metaVerificationBing']) ? trim((string)$customScripts['metaVerificationBing']) : '';
+    if ($bingVerify !== '' && stripos($bingVerify, 'gsmscope-bing-token') === false) {
+        if (preg_match('/^<meta\b/i', $bingVerify)) {
+            $headExtras[] = $bingVerify;
+        } else {
+            $headExtras[] = '<meta name="msvalidate.01" content="' . gsmEscapeAttr($bingVerify) . '" />';
+        }
+    }
+
+    $customHeadMeta = isset($customScripts['customHeadMeta']) ? trim((string)$customScripts['customHeadMeta']) : '';
+    if ($customHeadMeta !== '') {
+        $headExtras[] = $customHeadMeta;
+    }
+
+    $headerScriptsRaw = isset($customScripts['headerScripts']) ? trim((string)$customScripts['headerScripts']) : '';
+    if ($headerScriptsRaw !== '' && $headerScriptsRaw !== '<!-- Google Analytics / GTM Head Script -->') {
+        $headExtras[] = $headerScriptsRaw;
+    }
+
+    if (!empty($headExtras)) {
+        $headInjection = implode("\n    ", $headExtras) . "\n  </head>";
+        if (stripos($html, '</head>') !== false) {
+            $html = str_ireplace('</head>', $headInjection, $html);
+        }
+    }
+
+    $bodyTopRaw = isset($customScripts['bodyTopScripts']) ? trim((string)$customScripts['bodyTopScripts']) : '';
+    if ($bodyTopRaw !== '' && $bodyTopRaw !== '<!-- Custom Body Open Script (e.g. GTM noscript) -->') {
+        $html = preg_replace_callback('/<body([^>]*)>/i', function ($m) use ($bodyTopRaw) {
+            return $m[0] . "\n    " . $bodyTopRaw;
+        }, $html, 1);
+    }
+
+    $footerRaw = isset($customScripts['footerScripts']) ? trim((string)$customScripts['footerScripts']) : '';
+    if ($footerRaw !== '' && $footerRaw !== '<!-- Custom Footer Analytics / Chat Widget Script -->') {
+        if (stripos($html, '</body>') !== false) {
+            $html = str_ireplace('</body>', "    " . $footerRaw . "\n  </body>", $html);
+        }
+    }
+}
+
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-cache, must-revalidate');
 header('X-LiteSpeed-Cache-Control: no-cache');

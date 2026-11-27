@@ -39,8 +39,7 @@ import {
   Lock,
   Sliders,
   Newspaper,
-  Loader2,
-  AlertTriangle
+  Loader2
 } from 'lucide-react';
 
 function sanitizeSpecDisplay(value?: string | null): string {
@@ -294,12 +293,27 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
     }
   };
 
-  // Review article specifically for the current phone model
+  // Review article specifically linked to the current phone model via relatedPhoneIds
   const phoneReviewArticle = articles.find((a) => {
-    const isReview =
-      a.category.toLowerCase().includes('review') ||
-      /\breview\b/i.test(a.title);
+    const isReview = a.category.toLowerCase().includes('review');
     if (!isReview) return false;
+
+    const linkedIds = Array.isArray(a.relatedPhoneIds)
+      ? a.relatedPhoneIds.map((id) => String(id).trim().toLowerCase()).filter(Boolean)
+      : [];
+    if (linkedIds.length === 0) return false;
+
+    const phoneIdLower = phone.id.toLowerCase().trim();
+    const phoneSlugLower = (phone.slug || '').toLowerCase().trim();
+    const isLinkedToPhone =
+      linkedIds.includes(phoneIdLower) ||
+      (Boolean(phoneSlugLower) && linkedIds.includes(phoneSlugLower));
+    if (!isLinkedToPhone) return false;
+
+    if (linkedIds.length === 1) return true;
+    if (linkedIds[0] === phoneIdLower || (Boolean(phoneSlugLower) && linkedIds[0] === phoneSlugLower)) {
+      return true;
+    }
 
     const titleLower = a.title.toLowerCase().trim();
     const phoneNameLower = phone.name.toLowerCase().trim();
@@ -311,23 +325,16 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
       ? phoneNameLower.slice(brandLower.length + 1).trim()
       : phoneNameLower;
 
-    // Extract the device subject before "review" or subtitle punctuation
     const subjectBeforeReview = titleLower
       .split(/[:\-–—]|\bin-depth review\b|\bhands-on review\b|\breview\b/i)[0]
       .trim();
 
-    const exactTitleSubjectMatch =
+    return (
       Boolean(subjectBeforeReview) &&
       (subjectBeforeReview === phoneNameLower ||
         subjectBeforeReview === fullBrandAndModel ||
-        (modelWithoutBrand.length >= 5 && subjectBeforeReview === modelWithoutBrand));
-
-    const explicitlyLinkedToModel =
-      Array.isArray(a.relatedPhoneIds) &&
-      a.relatedPhoneIds.includes(phone.id) &&
-      (exactTitleSubjectMatch || a.relatedPhoneIds.length === 1);
-
-    return explicitlyLinkedToModel || exactTitleSubjectMatch;
+        (modelWithoutBrand.length >= 5 && subjectBeforeReview === modelWithoutBrand))
+    );
   });
 
   const handleOpenPhoneReview = () => {
@@ -582,8 +589,8 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
         {/* LEFT COLUMN (8 cols): Full Specification Breakdown & Reviews */}
         <div className="lg:col-span-8 space-y-6">
           
-          {/* Review Card right above Specifications & Reviews */}
-          {phoneReviewArticle ? (
+          {/* Review Card right above Specifications & Reviews (only shown when a review article is linked) */}
+          {phoneReviewArticle && (
             <div
               onClick={handleOpenPhoneReview}
               className="group -mt-2 flex items-center justify-between px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/60 dark:hover:border-emerald-500/50 shadow-sm hover:shadow-md transition-all cursor-pointer"
@@ -616,13 +623,6 @@ export default function PhoneDetailPage({ phone, onBack }: PhoneDetailPageProps)
                 <span className="hidden sm:inline">Read review</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </div>
-            </div>
-          ) : (
-            <div className="-mt-2 flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-              <AlertTriangle className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
-              <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
-                No review for this phone
-              </span>
             </div>
           )}
 

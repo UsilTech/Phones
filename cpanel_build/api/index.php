@@ -1072,6 +1072,9 @@ if ($route === 'settings') {
         $incoming = getJsonBody();
         $current = is_array($db['websiteContent']) ? $db['websiteContent'] : array();
         $merged = array_merge($current, $incoming);
+        if (isset($current['customScripts']) && is_array($current['customScripts']) && isset($incoming['customScripts']) && is_array($incoming['customScripts'])) {
+            $merged['customScripts'] = array_merge($current['customScripts'], $incoming['customScripts']);
+        }
         $merged['updatedAt'] = !empty($incoming['updatedAt']) ? $incoming['updatedAt'] : gmdate('c');
         $db['websiteContent'] = $merged;
         saveDatabase($db);

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useApp } from '../../context/AppContext';
 
 export interface SeoMetaProps {
   title: string;
@@ -104,6 +105,9 @@ export function useSeoMeta({
   twitterCard = 'summary_large_image',
   siteName = DEFAULT_SITE_NAME,
 }: SeoMetaProps) {
+  const { websiteContent } = useApp();
+  const customRobotsMeta = (websiteContent?.customScripts?.robotsTxtMeta || '').trim();
+
   useEffect(() => {
     const brandLabel = siteName || DEFAULT_SITE_NAME;
     const resolvedTitle = stripTrailingSiteNameSuffix(title, brandLabel);
@@ -127,7 +131,7 @@ export function useSeoMeta({
     const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
     const robotsDirective = isAdminRoute
       ? 'noindex, nofollow'
-      : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
+      : customRobotsMeta || 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
     upsertMetaTag('name', 'robots', robotsDirective);
     upsertMetaTag('name', 'googlebot', robotsDirective);
 
@@ -157,7 +161,7 @@ export function useSeoMeta({
 
     // Canonical URL
     upsertCanonicalLink(fullUrl);
-  }, [title, description, keywords, image, imageAlt, type, canonicalPath, twitterCard, siteName]);
+  }, [title, description, keywords, image, imageAlt, type, canonicalPath, twitterCard, siteName, customRobotsMeta]);
 }
 
 export default function SeoMeta(props: SeoMetaProps) {

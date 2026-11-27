@@ -167,14 +167,39 @@ const DEFAULT_USERS: AdminUserRecord[] = [
 const DEFAULT_WEBSITE_CONTENT: WebsiteContentSettings = INITIAL_WEBSITE_CONTENT;
 
 const DEFAULT_SCRIPTS: CustomScriptsSettings = {
-  metaVerificationGoogle: '<meta name="google-site-verification" content="gsmscope-verified-token" />',
-  metaVerificationBing: '<meta name="msvalidate.01" content="gsmscope-bing-token" />',
-  customHeadMeta: '<meta name="theme-color" content="#10b981" />\n<meta name="author" content="GsmScope Editorial" />',
-  headerScripts: '<!-- Google Analytics / GTM Head Script -->',
-  bodyTopScripts: '<!-- Custom Body Open Script (e.g. GTM noscript) -->',
-  footerScripts: '<!-- Custom Footer Analytics / Chat Widget Script -->',
+  metaVerificationGoogle: '',
+  metaVerificationBing: '',
+  customHeadMeta: '',
+  headerScripts: '',
+  bodyTopScripts: '',
+  footerScripts: '',
   robotsTxtMeta: 'index, follow, max-image-preview:large',
 };
+
+function sanitizeCustomScripts(raw?: Partial<CustomScriptsSettings> | null): CustomScriptsSettings {
+  const cleanStr = (val: unknown, legacyDummyPatterns: string[] = []): string => {
+    const s = typeof val === 'string' ? val : '';
+    const trimmed = s.trim();
+    if (!trimmed) return '';
+    for (const pat of legacyDummyPatterns) {
+      if (trimmed === pat || trimmed.includes(pat)) return '';
+    }
+    return s;
+  };
+  const base = raw || {};
+  return {
+    metaVerificationGoogle: cleanStr(base.metaVerificationGoogle, ['gsmscope-verified-token']),
+    metaVerificationBing: cleanStr(base.metaVerificationBing, ['gsmscope-bing-token']),
+    customHeadMeta: cleanStr(base.customHeadMeta),
+    headerScripts: cleanStr(base.headerScripts, ['<!-- Google Analytics / GTM Head Script -->']),
+    bodyTopScripts: cleanStr(base.bodyTopScripts, ['<!-- Custom Body Open Script (e.g. GTM noscript) -->']),
+    footerScripts: cleanStr(base.footerScripts, ['<!-- Custom Footer Analytics / Chat Widget Script -->']),
+    robotsTxtMeta:
+      typeof base.robotsTxtMeta === 'string' && base.robotsTxtMeta.trim()
+        ? base.robotsTxtMeta.trim()
+        : DEFAULT_SCRIPTS.robotsTxtMeta,
+  };
+}
 
 const ALL_CATEGORY_BADGES = [
   'top-rated',
@@ -399,6 +424,9 @@ export default function AdminDashboardModal() {
   const [editingPhoneId, setEditingPhoneId] = useState<string | null>(null);
   const [showPhoneForm, setShowPhoneForm] = useState(false);
   const [phoneDraft, setPhoneDraft] = useState<Phone>(() => createEmptyPhoneForm(brands[0]?.name || 'Samsung'));
+  const [phoneUsdText, setPhoneUsdText] = useState<string>('299');
+  const [phoneNgnText, setPhoneNgnText] = useState<string>('450000');
+  const [phoneScreenSizeText, setPhoneScreenSizeText] = useState<string>('6.7');
   const [ramVariantsText, setRamVariantsText] = useState('');
   const [storageVariantsText, setStorageVariantsText] = useState('');
   const [galleryUrlsText, setGalleryUrlsText] = useState('');
@@ -408,6 +436,8 @@ export default function AdminDashboardModal() {
   const [selectedSpecPhoneId, setSelectedSpecPhoneId] = useState<string>(phones[0]?.id || '');
   const selectedSpecPhone = phones.find((p) => p.id === selectedSpecPhoneId) || phones[0];
   const [specPhoneDraft, setSpecPhoneDraft] = useState<Phone | null>(null);
+  const [specUsdText, setSpecUsdText] = useState<string>('');
+  const [specNgnText, setSpecNgnText] = useState<string>('');
   const [specRamText, setSpecRamText] = useState('');
   const [specStorageText, setSpecStorageText] = useState('');
 
@@ -415,6 +445,12 @@ export default function AdminDashboardModal() {
     if (selectedSpecPhone) {
       const cloned: Phone = JSON.parse(JSON.stringify(selectedSpecPhone));
       setSpecPhoneDraft(cloned);
+      setSpecUsdText(
+        cloned.priceUSD !== undefined && cloned.priceUSD !== null ? String(cloned.priceUSD) : ''
+      );
+      setSpecNgnText(
+        cloned.priceNGN !== undefined && cloned.priceNGN !== null ? String(cloned.priceNGN) : ''
+      );
       setSpecRamText((cloned.detailedSpecs.memory.ramVariants || []).join(', '));
       setSpecStorageText((cloned.detailedSpecs.memory.storageVariants || []).join(', '));
     }
@@ -736,7 +772,7 @@ export default function AdminDashboardModal() {
         setUsersList(contextWebsiteContent.adminUsers);
       }
       if (contextWebsiteContent.customScripts && typeof contextWebsiteContent.customScripts === 'object') {
-        setScriptsConfig((prev) => ({ ...prev, ...contextWebsiteContent.customScripts }));
+        setScriptsConfig(sanitizeCustomScripts(contextWebsiteContent.customScripts));
       }
     }
   }, [contextWebsiteContent]);
@@ -822,11 +858,11 @@ export default function AdminDashboardModal() {
   // 13. Header / Body / Footer Scripts state
   const [scriptsConfig, setScriptsConfig] = useState<CustomScriptsSettings>(() => {
     if (contextWebsiteContent?.customScripts && typeof contextWebsiteContent.customScripts === 'object') {
-      return { ...DEFAULT_SCRIPTS, ...contextWebsiteContent.customScripts };
+      return sanitizeCustomScripts(contextWebsiteContent.customScripts);
     }
     try {
       const saved = localStorage.getItem('gsmscope_custom_scripts_v1');
-      if (saved) return { ...DEFAULT_SCRIPTS, ...JSON.parse(saved) };
+      if (saved) return sanitizeCustomScripts(JSON.parse(saved));
     } catch {}
     return DEFAULT_SCRIPTS;
   });
@@ -937,21 +973,6 @@ export default function AdminDashboardModal() {
       window.removeEventListener('gsmscope:contact-updated', handleContactUpdated);
     };
   }, [syncLiveAdminCollections]);
-
-  // Inject custom scripts/meta tags into document head/body/footer whenever saved
-  useEffect(() => {
-    try {
-      let container = document.getElementById('gsmscope-Dynamic-head-meta');
-      if (!container) {
-        container = document.createElement('div');
-        container.id = 'gsmscope-Dynamic-head-meta';
-        container.style.display = 'none';
-        document.body.appendChild(container);
-      }
-      container.setAttribute('data-robots', scriptsConfig.robotsTxtMeta);
-      container.setAttribute('data-head-scripts-len', String(scriptsConfig.headerScripts.length));
-    } catch {}
-  }, [scriptsConfig]);
 
   if (!isAdminAuthenticated) return null;
 
@@ -1099,6 +1120,11 @@ export default function AdminDashboardModal() {
     const empty = createEmptyPhoneForm(brands[0]?.name || 'Samsung');
     setEditingPhoneId(null);
     setPhoneDraft(empty);
+    setPhoneUsdText(empty.priceUSD !== undefined && empty.priceUSD !== null ? String(empty.priceUSD) : '');
+    setPhoneNgnText(empty.priceNGN !== undefined && empty.priceNGN !== null ? String(empty.priceNGN) : '');
+    setPhoneScreenSizeText(
+      empty.screenSizeInches !== undefined && empty.screenSizeInches !== null ? String(empty.screenSizeInches) : ''
+    );
     setRamVariantsText(empty.detailedSpecs.memory.ramVariants.join(', '));
     setStorageVariantsText(empty.detailedSpecs.memory.storageVariants.join(', '));
     setGalleryUrlsText((empty.images || [empty.image]).join('\n'));
@@ -1112,6 +1138,11 @@ export default function AdminDashboardModal() {
     const cloned: Phone = JSON.parse(JSON.stringify(phone));
     setEditingPhoneId(phone.id);
     setPhoneDraft(cloned);
+    setPhoneUsdText(cloned.priceUSD !== undefined && cloned.priceUSD !== null ? String(cloned.priceUSD) : '');
+    setPhoneNgnText(cloned.priceNGN !== undefined && cloned.priceNGN !== null ? String(cloned.priceNGN) : '');
+    setPhoneScreenSizeText(
+      cloned.screenSizeInches !== undefined && cloned.screenSizeInches !== null ? String(cloned.screenSizeInches) : ''
+    );
     setRamVariantsText((cloned.detailedSpecs?.memory?.ramVariants || [cloned.keyHighlights.ram]).join(', '));
     setStorageVariantsText((cloned.detailedSpecs?.memory?.storageVariants || [cloned.keyHighlights.storage]).join(', '));
     setGalleryUrlsText((cloned.images && cloned.images.length > 0 ? cloned.images : [cloned.image]).join('\n'));
@@ -1171,8 +1202,11 @@ export default function AdminDashboardModal() {
       .map((s) => s.trim())
       .filter(Boolean);
 
-    const priceNGN = Number(phoneDraft.priceNGN) || 350000;
-    const priceUSD = Number(phoneDraft.priceUSD) || Math.round(priceNGN / 1500);
+    const parsedNgn = phoneNgnText.trim() !== '' ? parseFloat(phoneNgnText) : NaN;
+    const parsedUsd = phoneUsdText.trim() !== '' ? parseFloat(phoneUsdText) : NaN;
+    const priceNGN = !Number.isNaN(parsedNgn) ? parsedNgn : 0;
+    const priceUSD = !Number.isNaN(parsedUsd) ? parsedUsd : (priceNGN > 0 ? Math.round(priceNGN / 1500) : 0);
+    const parsedScreen = phoneScreenSizeText.trim() !== '' ? parseFloat(phoneScreenSizeText) : NaN;
     const computedPriceRange: PriceRangeCategory =
       priceNGN < 100000
         ? 'under100k'
@@ -1219,7 +1253,7 @@ export default function AdminDashboardModal() {
       rating: editingPhoneId ? (phoneDraft.rating || 0) : 0,
       reviewsCount: editingPhoneId ? (phoneDraft.reviewsCount || 0) : 0,
       viewsCount: editingPhoneId ? (phoneDraft.viewsCount || 0) : 0,
-      screenSizeInches: Number(phoneDraft.screenSizeInches) || 6.7,
+      screenSizeInches: !Number.isNaN(parsedScreen) ? parsedScreen : undefined,
       categories: categoriesArr.length > 0 ? categoriesArr : ['5g'],
       isFeatured: Boolean(
         phoneDraft.isFeatured ||
@@ -1330,8 +1364,10 @@ export default function AdminDashboardModal() {
       .map((s) => s.trim())
       .filter(Boolean);
 
-    const priceNGN = Number(specPhoneDraft.priceNGN) || 0;
-    const priceUSD = Number(specPhoneDraft.priceUSD) || Math.round(priceNGN / 1500);
+    const parsedSpecNgn = specNgnText.trim() !== '' ? parseFloat(specNgnText) : NaN;
+    const parsedSpecUsd = specUsdText.trim() !== '' ? parseFloat(specUsdText) : NaN;
+    const priceNGN = !Number.isNaN(parsedSpecNgn) ? parsedSpecNgn : 0;
+    const priceUSD = !Number.isNaN(parsedSpecUsd) ? parsedSpecUsd : (priceNGN > 0 ? Math.round(priceNGN / 1500) : 0);
     const computedPriceRange: Phone['priceRange'] =
       priceNGN < 100000
         ? 'under100k'
@@ -2928,39 +2964,70 @@ export default function AdminDashboardModal() {
                       <div>
                         <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Price (USD $) *</label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           required
-                          value={phoneDraft.priceUSD}
-                          onChange={(e) => setPhoneDraft({ ...phoneDraft, priceUSD: Number(e.target.value) })}
+                          value={phoneUsdText}
+                          placeholder="e.g. 299"
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            if (raw !== '' && !/^\d*(\.\d*)?$/.test(raw)) return;
+                            setPhoneUsdText(raw);
+                            const num = parseFloat(raw);
+                            setPhoneDraft((prev) => ({
+                              ...prev,
+                              priceUSD: raw.trim() === '' || Number.isNaN(num) ? 0 : num,
+                            }));
+                          }}
                           className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Price (NGN ₦) *</label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           required
-                          value={phoneDraft.priceNGN}
-                          onChange={(e) => setPhoneDraft({ ...phoneDraft, priceNGN: Number(e.target.value) })}
+                          value={phoneNgnText}
+                          placeholder="e.g. 450000"
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            if (raw !== '' && !/^\d*(\.\d*)?$/.test(raw)) return;
+                            setPhoneNgnText(raw);
+                            const num = parseFloat(raw);
+                            setPhoneDraft((prev) => ({
+                              ...prev,
+                              priceNGN: raw.trim() === '' || Number.isNaN(num) ? 0 : num,
+                            }));
+                          }}
                           className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Screen Size (Inches, numeric)</label>
                         <input
-                          type="number"
-                          step="0.01"
-                          value={phoneDraft.screenSizeInches || 6.7}
-                          onChange={(e) => setPhoneDraft({ ...phoneDraft, screenSizeInches: Number(e.target.value) })}
+                          type="text"
+                          inputMode="decimal"
+                          value={phoneScreenSizeText}
+                          placeholder="e.g. 6.7"
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            if (raw !== '' && !/^\d*(\.\d*)?$/.test(raw)) return;
+                            setPhoneScreenSizeText(raw);
+                            const num = parseFloat(raw);
+                            setPhoneDraft((prev) => ({
+                              ...prev,
+                              screenSizeInches: raw.trim() === '' || Number.isNaN(num) ? undefined : num,
+                            }));
+                          }}
                           className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono"
                         />
                       </div>
                     </div>
 
-                    {/* Primary Image + Gallery + Price Notes */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+                    {/* Primary Image */}
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
                           Primary Phone Feature Image (Upload to /uploads or Pick from Media Library)
                         </label>
                         <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
@@ -3031,19 +3098,6 @@ export default function AdminDashboardModal() {
                             <ImageIcon className="w-3.5 h-3.5" />
                             <span>Library</span>
                           </button>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                          Price &amp; Market Availability Notes
-                        </label>
-                        <input
-                          type="text"
-                          value={phoneDraft.nairaPriceNotes}
-                          onChange={(e) => setPhoneDraft({ ...phoneDraft, nairaPriceNotes: e.target.value })}
-                          placeholder="e.g. Available at Slot, Pointek, Finet, and official stores."
-                          className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-                        />
                       </div>
                     </div>
 
@@ -3093,14 +3147,6 @@ export default function AdminDashboardModal() {
                               onChange={(e) => setPhoneDraft({ ...phoneDraft, isFeatured: e.target.checked })}
                             />
                             <span>Featured Phone (Homepage Spotlight — if unchecked, appears in Latest Phones)</span>
-                          </label>
-                          <label className="flex items-center gap-1.5 cursor-pointer font-semibold text-sky-600 dark:text-sky-400">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(phoneDraft.isPopular)}
-                              onChange={(e) => setPhoneDraft({ ...phoneDraft, isPopular: e.target.checked })}
-                            />
-                            <span>Trending / Popular Phone</span>
                           </label>
                         </div>
                       </div>
@@ -3387,18 +3433,38 @@ export default function AdminDashboardModal() {
                         <div>
                           <label className="block text-[11px] font-semibold text-slate-500 mb-1">Price (USD $)</label>
                           <input
-                            type="number"
-                            value={specPhoneDraft.priceUSD}
-                            onChange={(e) => setSpecPhoneDraft({ ...specPhoneDraft, priceUSD: Number(e.target.value) })}
+                            type="text"
+                            inputMode="decimal"
+                            value={specUsdText}
+                            placeholder="e.g. 299"
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if (raw !== '' && !/^\d*(\.\d*)?$/.test(raw)) return;
+                              setSpecUsdText(raw);
+                              const num = parseFloat(raw);
+                              setSpecPhoneDraft((prev) =>
+                                prev ? { ...prev, priceUSD: raw.trim() === '' || Number.isNaN(num) ? 0 : num } : prev
+                              );
+                            }}
                             className="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-mono"
                           />
                         </div>
                         <div>
                           <label className="block text-[11px] font-semibold text-slate-500 mb-1">Price (NGN ₦)</label>
                           <input
-                            type="number"
-                            value={specPhoneDraft.priceNGN}
-                            onChange={(e) => setSpecPhoneDraft({ ...specPhoneDraft, priceNGN: Number(e.target.value) })}
+                            type="text"
+                            inputMode="decimal"
+                            value={specNgnText}
+                            placeholder="e.g. 450000"
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if (raw !== '' && !/^\d*(\.\d*)?$/.test(raw)) return;
+                              setSpecNgnText(raw);
+                              const num = parseFloat(raw);
+                              setSpecPhoneDraft((prev) =>
+                                prev ? { ...prev, priceNGN: raw.trim() === '' || Number.isNaN(num) ? 0 : num } : prev
+                              );
+                            }}
                             className="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-mono"
                           />
                         </div>
@@ -7056,6 +7122,7 @@ export default function AdminDashboardModal() {
                       onChange={(e) =>
                         setScriptsConfig({ ...scriptsConfig, metaVerificationGoogle: e.target.value })
                       }
+                      placeholder='<meta name="google-site-verification" content="your-code" />'
                       className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-mono"
                     />
                   </div>
@@ -7069,6 +7136,7 @@ export default function AdminDashboardModal() {
                       onChange={(e) =>
                         setScriptsConfig({ ...scriptsConfig, metaVerificationBing: e.target.value })
                       }
+                      placeholder='<meta name="msvalidate.01" content="your-code" />'
                       className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-mono"
                     />
                   </div>
@@ -7082,18 +7150,20 @@ export default function AdminDashboardModal() {
                     type="text"
                     value={scriptsConfig.robotsTxtMeta}
                     onChange={(e) => setScriptsConfig({ ...scriptsConfig, robotsTxtMeta: e.target.value })}
+                    placeholder="index, follow, max-image-preview:large"
                     className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-xs font-mono"
                   />
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase text-emerald-600 dark:text-emerald-400 mb-1">
-                    Custom &lt;head&gt; Meta Tags & Header Scripts (Analytics, AdSense, Pixels)
+                    Custom &lt;head&gt; Meta Tags &amp; Header Scripts (Analytics, AdSense, Pixels)
                   </label>
                   <textarea
                     rows={4}
                     value={scriptsConfig.headerScripts}
                     onChange={(e) => setScriptsConfig({ ...scriptsConfig, headerScripts: e.target.value })}
+                    placeholder={'<!-- Paste <meta ...> verification tags, Google Analytics, or AdSense head scripts -->'}
                     className="w-full px-3 py-2 rounded-lg bg-slate-950 text-emerald-400 border border-slate-800 text-xs font-mono"
                   />
                 </div>
@@ -7106,6 +7176,7 @@ export default function AdminDashboardModal() {
                     rows={3}
                     value={scriptsConfig.bodyTopScripts}
                     onChange={(e) => setScriptsConfig({ ...scriptsConfig, bodyTopScripts: e.target.value })}
+                    placeholder={'<!-- Custom Body Open Script (e.g. GTM noscript) -->'}
                     className="w-full px-3 py-2 rounded-lg bg-slate-950 text-sky-300 border border-slate-800 text-xs font-mono"
                   />
                 </div>
@@ -7118,21 +7189,34 @@ export default function AdminDashboardModal() {
                     rows={4}
                     value={scriptsConfig.footerScripts}
                     onChange={(e) => setScriptsConfig({ ...scriptsConfig, footerScripts: e.target.value })}
+                    placeholder={'<!-- Custom Footer Analytics / Chat Widget Script -->'}
                     className="w-full px-3 py-2 rounded-lg bg-slate-950 text-purple-300 border border-slate-800 text-xs font-mono"
                   />
                 </div>
 
                 <button
-                  onClick={() =>
-                    runWithProgress(() => {
-                      localStorage.setItem('gsmscope_custom_scripts_v1', JSON.stringify(scriptsConfig));
-                      updateWebsiteContent({ customScripts: scriptsConfig });
-                    }, 'Saved Header, Body, and Footer scripts & meta codes to server.')
-                  }
+                  onClick={() => {
+                    startGlobalLoading();
+                    const cleanedScripts = { ...scriptsConfig };
+                    try {
+                      localStorage.setItem('gsmscope_custom_scripts_v1', JSON.stringify(cleanedScripts));
+                    } catch {}
+                    const nextContent: WebsiteContentSettings = {
+                      ...websiteContentRef.current,
+                      customScripts: cleanedScripts,
+                    };
+                    websiteContentRef.current = nextContent;
+                    setWebsiteContent(nextContent);
+                    updateWebsiteContent({ customScripts: cleanedScripts })
+                      .finally(() => {
+                        stopGlobalLoading();
+                        showGlobalToast('Saved Header, Body, and Footer scripts & meta codes to server.', 'success');
+                      });
+                  }}
                   className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 cursor-pointer"
                 >
                   <Save className="w-4 h-4" />
-                  <span>Save All Scripts & Meta Codes</span>
+                  <span>Save All Scripts &amp; Meta Codes</span>
                 </button>
               </div>
             </div>

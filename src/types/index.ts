@@ -231,6 +231,7 @@ export interface WebsiteContent {
   specTablesSchema?: any[];
   adminUsers?: any[];
   customScripts?: {
+    customHeadMeta?: string;
     headerScripts?: string;
     bodyTopScripts?: string;
     footerScripts?: string;

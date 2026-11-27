@@ -2039,9 +2039,19 @@ app.get('/api/settings', (_req: Request, res: Response) => {
 });
 
 const handleUpdateSettings = (req: Request, res: Response) => {
+  const currentScripts =
+    (websiteContentDatabase as any)?.customScripts &&
+    typeof (websiteContentDatabase as any).customScripts === 'object'
+      ? (websiteContentDatabase as any).customScripts
+      : {};
+  const incomingScripts =
+    req.body?.customScripts && typeof req.body.customScripts === 'object'
+      ? req.body.customScripts
+      : null;
   websiteContentDatabase = {
     ...websiteContentDatabase,
     ...req.body,
+    ...(incomingScripts ? { customScripts: { ...currentScripts, ...incomingScripts } } : {}),
     updatedAt: req.body?.updatedAt || new Date().toISOString(),
   } as any;
   saveDatabaseToDisk();
@@ -3480,37 +3490,42 @@ function injectDynamicSeoIntoHtml(rawHtml: string, req: Request): string {
   if (customScripts) {
     const headExtras: string[] = [];
     const googleVerify = (customScripts.metaVerificationGoogle || '').trim();
-    if (googleVerify) {
-      if (googleVerify.startsWith('<meta')) {
+    if (googleVerify && !googleVerify.toLowerCase().includes('gsmscope-verified-token')) {
+      if (/^<meta\b/i.test(googleVerify)) {
         headExtras.push(googleVerify);
       } else {
         headExtras.push(`<meta name="google-site-verification" content="${escapeHtmlAttr(googleVerify)}" />`);
       }
     }
     const bingVerify = (customScripts.metaVerificationBing || '').trim();
-    if (bingVerify) {
-      if (bingVerify.startsWith('<meta')) {
+    if (bingVerify && !bingVerify.toLowerCase().includes('gsmscope-bing-token')) {
+      if (/^<meta\b/i.test(bingVerify)) {
         headExtras.push(bingVerify);
       } else {
         headExtras.push(`<meta name="msvalidate.01" content="${escapeHtmlAttr(bingVerify)}" />`);
       }
     }
+    const customHeadMeta = (customScripts.customHeadMeta || '').trim();
+    if (customHeadMeta) {
+      headExtras.push(customHeadMeta);
+    }
     const headerScriptsRaw = (customScripts.headerScripts || '').trim();
-    if (headerScriptsRaw) {
+    if (headerScriptsRaw && headerScriptsRaw !== '<!-- Google Analytics / GTM Head Script -->') {
       headExtras.push(headerScriptsRaw);
     }
     if (headExtras.length > 0) {
-      html = html.replace('</head>', `${headExtras.join('\n  ')}\n  </head>`);
+      const joinedHead = `${headExtras.join('\n  ')}\n  </head>`;
+      html = html.replace('</head>', () => joinedHead);
     }
 
     const bodyTopRaw = (customScripts.bodyTopScripts || '').trim();
-    if (bodyTopRaw) {
-      html = html.replace(/<body([^>]*)>/i, `<body$1>\n  ${bodyTopRaw}`);
+    if (bodyTopRaw && bodyTopRaw !== '<!-- Custom Body Open Script (e.g. GTM noscript) -->') {
+      html = html.replace(/<body([^>]*)>/i, (full) => `${full}\n  ${bodyTopRaw}`);
     }
 
     const footerRaw = (customScripts.footerScripts || '').trim();
-    if (footerRaw) {
-      html = html.replace('</body>', `  ${footerRaw}\n  </body>`);
+    if (footerRaw && footerRaw !== '<!-- Custom Footer Analytics / Chat Widget Script -->') {
+      html = html.replace('</body>', () => `  ${footerRaw}\n  </body>`);
     }
   }
 
